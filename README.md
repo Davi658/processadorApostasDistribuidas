@@ -130,6 +130,7 @@ Toda transação nasce no estado `PENDING` e transiciona deterministicamente par
 - **Chaves de até 255 Caracteres:** A coluna `outbox_messages.correlation_id` e `causation_id` foi expandida para `VARCHAR(255)`. Chaves de 128, 129 e 255 caracteres são aceitas sem truncamento e sem erros de persistência. Chaves maiores que 255 caracteres são rejeitadas com HTTP 400.
 - **Correlação Independente:** O cabeçalho `x-correlation-id` propaga o identificador de rastreabilidade fim a fim pelos casos de uso e outbox, mantendo a chave integral `Idempotency-Key` como identidade transacional e de causalidade (`causationId`).
 - **Detecção Segura de Conflito Concorrente:** Quando uma requisição com mesma chave porém payload divergente disputa inserção no PostgreSQL, o erro de violação de unicidade (`23505`) é resolvido fora da transação abortada, retornando HTTP 409 Conflict sem corromper o estado da carteira.
+- **Serialização Canônica Recursiva e Registros Anteriores:** O cálculo do SHA-256 (`canonicalStringify`) ordena recursivamente todas as chaves de objetos em qualquer profundidade e preserva arrays. Registros de transações persistidos anteriormente utilizam o algoritmo legado e exigem uma decisão explícita de compatibilidade antes de qualquer ação; não há suposição de descarte ou expiração automática por TTL.
 
 ---
 

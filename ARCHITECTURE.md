@@ -159,3 +159,20 @@ Todos os eventos gravados na outbox transacional seguem a estrutura padronizada 
 - `data`: Carga útil tipada da transação.
 
 A entidade `IntegrationEvent` implementa `toEnvelope()` para serialização JSON padronizada e `reconstruct()` como ponto único de reconstrução testada.
+
+---
+
+## 6. Hash de Idempotência e Compatibilidade com Registros Anteriores
+
+### 6.1 Serialização Canônica Recursiva
+O método `ProcessWagerUseCase.computePayloadHash` utiliza serialização canônica recursiva (`canonicalStringify`):
+- Ordena alfabeticamente as chaves de objetos em todos os níveis de aninhamento.
+- Preserva a ordem estrita de elementos em arrays.
+- Inclui todos os campos de negócio normalizados: `externalTransactionId`, `gameId`, `kind`, `money: { amount, currency }`, `playerId`, `providerId`, `roundId`, `walletId` e `referenceExternalTransactionId` (se aplicável).
+- Exclui metadados de transporte (`correlationId`, cabeçalhos HTTP, timestamps).
+- Calcula o digest SHA-256 sobre a representação canônica em UTF-8.
+
+### 6.2 Política de Compatibilidade de Registros Anteriores
+- **Algoritmo Legado:** Registros de transações persistidos antes desta correção foram gerados pelo algoritmo legado (que omitia as chaves aninhadas `amount` e `currency` do objeto `money`).
+- **Decisão Explícita de Compatibilidade:** Registros anteriores utilizam o algoritmo legado e exigem uma decisão explícita de compatibilidade antes de qualquer intervenção ou migração. Não há suposição de expiração automática ou descarte de chaves.
+- **Imutabilidade Preservada:** Os hashes de transações já gravadas no banco de dados não são regravados silenciosamente, em conformidade com as restrições relacionais de transações terminais protegidas por trigger no PostgreSQL.
