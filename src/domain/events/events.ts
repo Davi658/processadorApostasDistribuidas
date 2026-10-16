@@ -1,151 +1,78 @@
-export interface DomainEvent {
-  readonly eventName: string;
-  readonly aggregateId: string;
-  readonly aggregateType: string;
-  readonly occurredAt: string;
-  readonly payload: Record<string, any>;
-}
-
-export class WagerTransactionProcessedEvent implements DomainEvent {
-  public readonly eventName = 'WagerTransactionProcessed';
-  public readonly aggregateType = 'WagerTransaction';
-  public readonly aggregateId: string;
+export abstract class IntegrationEvent<T> {
+  public readonly eventId: string;
   public readonly occurredAt: string;
-  public readonly payload: {
-    transactionId: string;
-    walletId: string;
-    playerId: string;
-    providerId: string;
-    externalTransactionId: string;
-    roundId: string;
-    gameId: string;
-    kind: string;
-    amount: string;
-    currency: string;
-    observedBalance: string;
-  };
+  public abstract readonly eventType: string;
+  public abstract readonly version: number;
+  public readonly aggregateId: string;
+  public readonly correlationId: string;
+  public readonly causationId?: string;
+  public readonly data: T;
 
   constructor(params: {
-    transactionId: string;
-    walletId: string;
-    playerId: string;
-    providerId: string;
-    externalTransactionId: string;
-    roundId: string;
-    gameId: string;
-    kind: string;
-    amount: string;
-    currency: string;
-    observedBalance: string;
+    eventId?: string;
     occurredAt?: string;
+    aggregateId: string;
+    correlationId: string;
+    causationId?: string;
+    data: T;
   }) {
-    this.aggregateId = params.transactionId;
+    this.eventId = params.eventId ?? crypto.randomUUID();
     this.occurredAt = params.occurredAt ?? new Date().toISOString();
-    this.payload = {
-      transactionId: params.transactionId,
-      walletId: params.walletId,
-      playerId: params.playerId,
-      providerId: params.providerId,
-      externalTransactionId: params.externalTransactionId,
-      roundId: params.roundId,
-      gameId: params.gameId,
-      kind: params.kind,
-      amount: params.amount,
-      currency: params.currency,
-      observedBalance: params.observedBalance,
-    };
+    this.aggregateId = params.aggregateId;
+    this.correlationId = params.correlationId;
+    this.causationId = params.causationId;
+    this.data = params.data;
   }
 }
 
-export class WagerTransactionRejectedEvent implements DomainEvent {
-  public readonly eventName = 'WagerTransactionRejected';
-  public readonly aggregateType = 'WagerTransaction';
-  public readonly aggregateId: string;
-  public readonly occurredAt: string;
-  public readonly payload: {
-    transactionId: string;
-    walletId: string;
-    playerId: string;
-    providerId: string;
-    externalTransactionId: string;
-    roundId: string;
-    gameId: string;
-    kind: string;
-    amount: string;
-    currency: string;
-    reason: string;
-    observedBalance: string;
-  };
-
-  constructor(params: {
-    transactionId: string;
-    walletId: string;
-    playerId: string;
-    providerId: string;
-    externalTransactionId: string;
-    roundId: string;
-    gameId: string;
-    kind: string;
-    amount: string;
-    currency: string;
-    reason: string;
-    observedBalance: string;
-    occurredAt?: string;
-  }) {
-    this.aggregateId = params.transactionId;
-    this.occurredAt = params.occurredAt ?? new Date().toISOString();
-    this.payload = {
-      transactionId: params.transactionId,
-      walletId: params.walletId,
-      playerId: params.playerId,
-      providerId: params.providerId,
-      externalTransactionId: params.externalTransactionId,
-      roundId: params.roundId,
-      gameId: params.gameId,
-      kind: params.kind,
-      amount: params.amount,
-      currency: params.currency,
-      reason: params.reason,
-      observedBalance: params.observedBalance,
-    };
-  }
+export interface WagerTransactionProcessedData {
+  transactionId: string;
+  walletId: string;
+  playerId: string;
+  providerId: string;
+  externalTransactionId: string;
+  roundId: string;
+  gameId: string;
+  kind: 'BET' | 'OPENING';
+  amount: { amount: string; currency: string };
+  balance: { amount: string; currency: string };
 }
 
-export class WalletBalanceChangedEvent implements DomainEvent {
-  public readonly eventName = 'WalletBalanceChanged';
-  public readonly aggregateType = 'Wallet';
-  public readonly aggregateId: string;
-  public readonly occurredAt: string;
-  public readonly payload: {
-    walletId: string;
-    playerId: string;
-    currency: string;
-    previousBalance: string;
-    currentBalance: string;
-    version: number;
-    triggerTransactionId: string;
-  };
+export class WagerTransactionProcessedEvent extends IntegrationEvent<WagerTransactionProcessedData> {
+  public readonly eventType = 'WagerTransactionProcessed';
+  public readonly version = 1;
+}
 
-  constructor(params: {
-    walletId: string;
-    playerId: string;
-    currency: string;
-    previousBalance: string;
-    currentBalance: string;
-    version: number;
-    triggerTransactionId: string;
-    occurredAt?: string;
-  }) {
-    this.aggregateId = params.walletId;
-    this.occurredAt = params.occurredAt ?? new Date().toISOString();
-    this.payload = {
-      walletId: params.walletId,
-      playerId: params.playerId,
-      currency: params.currency,
-      previousBalance: params.previousBalance,
-      currentBalance: params.currentBalance,
-      version: params.version,
-      triggerTransactionId: params.triggerTransactionId,
-    };
-  }
+export interface WagerTransactionRejectedData {
+  transactionId: string;
+  walletId: string;
+  playerId: string;
+  providerId: string;
+  externalTransactionId: string;
+  roundId: string;
+  gameId: string;
+  kind: 'BET';
+  amount: { amount: string; currency: string };
+  balance: { amount: string; currency: string };
+  failureCode: string;
+}
+
+export class WagerTransactionRejectedEvent extends IntegrationEvent<WagerTransactionRejectedData> {
+  public readonly eventType = 'WagerTransactionRejected';
+  public readonly version = 1;
+}
+
+export interface WalletBalanceChangedData {
+  walletId: string;
+  playerId: string;
+  currency: string;
+  previousBalance: { amount: string; currency: string };
+  currentBalance: { amount: string; currency: string };
+  version: number;
+  triggerTransactionId: string;
+}
+
+export class WalletBalanceChangedEvent extends IntegrationEvent<WalletBalanceChangedData> {
+  public readonly eventType = 'WalletBalanceChanged';
+  public readonly version = 1;
 }

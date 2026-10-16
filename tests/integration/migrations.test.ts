@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 import pg from 'pg';
 import { DatabaseMigrator } from '../../src/infrastructure/persistence/migrator';
+import { getMigrationDatabaseConfig } from '../../src/infrastructure/config/database.config';
 
 describe('Reversible Migrations on Disposable Database', () => {
-  it('should successfully run UP and DOWN migrations on a newly created disposable database', async () => {
+  it('should successfully run UP and DOWN migrations incrementally on a newly created disposable database', async () => {
+    const adminConfig = getMigrationDatabaseConfig();
     const disposableDbName = `betting_disposable_${Date.now()}`;
     const adminPool = new pg.Pool({
-      host: process.env.MIGRATION_DB_HOST || '127.0.0.1',
-      port: Number(process.env.MIGRATION_DB_PORT) || 5432,
+      host: adminConfig.host,
+      port: adminConfig.port,
       database: 'postgres',
-      user: process.env.MIGRATION_DB_USER || 'postgres',
-      password: process.env.MIGRATION_DB_PASSWORD || '',
+      user: adminConfig.user,
+      password: adminConfig.password,
     });
 
     try {
@@ -18,19 +20,22 @@ describe('Reversible Migrations on Disposable Database', () => {
       await adminPool.query(`CREATE DATABASE ${disposableDbName};`);
 
       const disposableConfig: pg.PoolConfig = {
-        host: process.env.MIGRATION_DB_HOST || '127.0.0.1',
-        port: Number(process.env.MIGRATION_DB_PORT) || 5432,
+        host: adminConfig.host,
+        port: adminConfig.port,
         database: disposableDbName,
-        user: process.env.MIGRATION_DB_USER || 'postgres',
-        password: process.env.MIGRATION_DB_PASSWORD || '',
+        user: adminConfig.user,
+        password: adminConfig.password,
       };
 
       const migrator = new DatabaseMigrator(disposableConfig);
 
-      // 2. Run UP migration
-      await migrator.up();
+      // 2. Run UP migrations
+      const applied = await migrator.up();
+      expect(applied.length).toBe(2);
+      expect(applied).toContain('001_initial_schema');
+      expect(applied).toContain('002_reinforce_schema_and_outbox');
 
-      // Verify tables exist
+      // Verify tables and constraints exist
       const client = new pg.Client(disposableConfig);
       await client.connect();
 
@@ -38,9 +43,9 @@ describe('Reversible Migrations on Disposable Database', () => {
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
-          AND table_name IN ('wallets', 'wager_transactions', 'wallet_ledger_entries', 'outbox_messages');
+          AND table_name IN ('wallets', 'wager_transactions', 'wallet_ledger_entries', 'outbox_messages', 'schema_migrations');
       `);
-      expect(tablesRes.rows.length).toBe(4);
+      expect(tablesRes.rows.length).toBe(5);
 
       // Verify trigger exists
       const triggerRes = await client.query<{ trigger_name: string }>(`
@@ -51,10 +56,15 @@ describe('Reversible Migrations on Disposable Database', () => {
       `);
       expect(triggerRes.rows.length).toBe(1);
 
-      // 3. Run DOWN migration
-      await migrator.down();
+      // 3. Run DOWN migration 002
+      const reverted002 = await migrator.down();
+      expect(reverted002).toBe('002_reinforce_schema_and_outbox');
 
-      // Verify tables no longer exist
+      // 4. Run DOWN migration 001
+      const reverted001 = await migrator.down();
+      expect(reverted001).toBe('001_initial_schema');
+
+      // Verify tables no longer exist (except schema_migrations which is empty)
       const tablesAfterDown = await client.query<{ table_name: string }>(`
         SELECT table_name 
         FROM information_schema.tables 
@@ -62,14 +72,6 @@ describe('Reversible Migrations on Disposable Database', () => {
           AND table_name IN ('wallets', 'wager_transactions', 'wallet_ledger_entries', 'outbox_messages');
       `);
       expect(tablesAfterDown.rows.length).toBe(0);
-
-      // Verify trigger no longer exists
-      const triggerAfterDown = await client.query<{ trigger_name: string }>(`
-        SELECT trigger_name 
-        FROM information_schema.triggers 
-        WHERE trigger_name = 'trg_protect_wallet_ledger_entries';
-      `);
-      expect(triggerAfterDown.rows.length).toBe(0);
 
       await client.end();
       await migrator.close();

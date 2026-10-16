@@ -1,24 +1,22 @@
-export class CreateWalletDto {
-  playerId!: string;
-  currency?: string;
-  initialBalance?: string;
+import { MoneyObjectDto } from './common.dto';
+
+export interface CreateWalletDto {
+  playerId: string;
+  initialBalance?: MoneyObjectDto;
 }
 
-export class WalletResponseDto {
-  walletId!: string;
-  playerId!: string;
-  currency!: string;
-  balance!: string;
-  version!: number;
-  createdAt!: string;
-  updatedAt!: string;
+export interface WalletResponseDto {
+  id: string;
+  playerId: string;
+  balance: MoneyObjectDto;
+  version: number;
 }
 
-export class ReconciliationResponseDto {
-  walletId!: string;
-  storedBalance!: string;
-  calculatedBalance!: string;
-  difference!: string;
-  consistent!: boolean;
-  checkedEntries!: number;
+export interface ReconciliationResponseDto {
+  walletId: string;
+  storedBalance: MoneyObjectDto;
+  calculatedBalance: MoneyObjectDto;
+  difference: MoneyObjectDto;
+  consistent: boolean;
+  checkedEntries: number;
 }

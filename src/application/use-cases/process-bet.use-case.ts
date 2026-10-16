@@ -32,17 +32,16 @@ export class ProcessBetUseCase {
   ) {}
 
   public static computePayloadHash(dto: ProcessBetDto): string {
-    // Canonical business fields in strict alphabetical order, excluding any transport metadata
     const canonicalBusinessPayload = {
-      amount: dto.money.amount.trim(),
-      currency: dto.money.currency.trim().toUpperCase(),
-      externalTransactionId: dto.externalTransactionId.trim(),
-      gameId: dto.gameId.trim(),
-      kind: dto.kind.trim(),
-      playerId: dto.playerId.trim(),
-      providerId: dto.providerId.trim(),
-      roundId: dto.roundId.trim(),
-      walletId: dto.walletId.trim(),
+      amount: dto.money.amount,
+      currency: dto.money.currency,
+      externalTransactionId: dto.externalTransactionId,
+      gameId: dto.gameId,
+      kind: dto.kind,
+      playerId: dto.playerId,
+      providerId: dto.providerId,
+      roundId: dto.roundId,
+      walletId: dto.walletId,
     };
 
     const canonicalJson = JSON.stringify(canonicalBusinessPayload);
@@ -50,202 +49,239 @@ export class ProcessBetUseCase {
   }
 
   public async execute(idempotencyKey: string, dto: ProcessBetDto): Promise<WagerResponseDto> {
-    if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.trim() === '') {
-      throw new InvalidWagerOperationError('Idempotency-Key header is mandatory and cannot be empty');
-    }
     const cleanIdempotencyKey = idempotencyKey.trim();
-
-    if (!dto.kind || dto.kind !== 'BET') {
-      throw new InvalidWagerOperationError(
-        `Unsupported wager operation kind: "${dto.kind}". Only kind="BET" is supported in this delivery.`
-      );
-    }
-
-    if (!dto.walletId || !dto.playerId || !dto.providerId || !dto.externalTransactionId || !dto.roundId || !dto.gameId) {
-      throw new InvalidWagerOperationError('All wager business fields are required');
-    }
-
-    if (!dto.money || typeof dto.money.amount !== 'string' || typeof dto.money.currency !== 'string') {
-      throw new InvalidMoneyError('money with string amount and currency is required');
-    }
-
-    const betCurrency = dto.money.currency.trim().toUpperCase();
-    if (betCurrency !== 'BRL') {
-      throw new InvalidMoneyError('Only BRL currency is currently supported');
-    }
-
+    const betCurrency = dto.money.currency;
     const betMoney = Money.create(dto.money.amount, betCurrency);
-    if (!betMoney.isPositive()) {
-      throw new InvalidWagerOperationError('BET amount must be strictly greater than zero');
-    }
-
     const payloadHash = ProcessBetUseCase.computePayloadHash(dto);
 
-    return this.uow.runInTransaction(async () => {
-      // 1. Lock wallet row explicitly for the current transaction
-      const wallet = await this.walletRepo.findById(dto.walletId.trim(), true);
-      if (!wallet) {
-        throw new WalletNotFoundError(dto.walletId.trim());
-      }
+    try {
+      return await this.uow.runInTransaction(async () => {
+        // 1. Lock wallet row explicitly for the current transaction
+        const wallet = await this.walletRepo.findById(dto.walletId, true);
+        if (!wallet) {
+          throw new WalletNotFoundError(dto.walletId);
+        }
 
-      if (wallet.playerId !== dto.playerId.trim()) {
-        throw new InvalidWagerOperationError(
-          `Wallet "${dto.walletId}" does not belong to player "${dto.playerId}"`
-        );
-      }
-
-      if (wallet.currency !== betCurrency) {
-        throw new CurrencyMismatchError(
-          `Transaction currency "${betCurrency}" does not match wallet currency "${wallet.currency}"`
-        );
-      }
-
-      // 2. Persistent Idempotency & Provider deduplication checks
-      const existingByIdempotency = await this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
-      if (existingByIdempotency) {
-        if (existingByIdempotency.payloadHash === payloadHash) {
-          // Replay original response snapshot with original observed balance
-          return existingByIdempotency.responseSnapshot as WagerResponseDto;
-        } else {
-          throw new IdempotencyConflictError(
-            `Idempotency key "${cleanIdempotencyKey}" was previously submitted with a different payload`
+        if (wallet.playerId !== dto.playerId) {
+          throw new InvalidWagerOperationError(
+            `Wallet "${dto.walletId}" does not belong to player "${dto.playerId}"`
           );
         }
-      }
 
-      const existingByProvider = await this.wagerRepo.findByProviderAndExternalId(
-        dto.providerId.trim(),
-        dto.externalTransactionId.trim()
-      );
-      if (existingByProvider) {
-        throw new IdempotencyConflictError(
-          `Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was already processed under another idempotency key`
+        if (wallet.currency !== betCurrency) {
+          throw new CurrencyMismatchError(
+            `Transaction currency "${betCurrency}" does not match wallet currency "${wallet.currency}"`
+          );
+        }
+
+        // 2. Persistent Idempotency & Provider deduplication checks
+        const existingByIdempotency = await this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
+        if (existingByIdempotency) {
+          if (existingByIdempotency.payloadHash === payloadHash) {
+            const snapshot = existingByIdempotency.responseSnapshot as WagerResponseDto;
+            return {
+              ...snapshot,
+              idempotentReplay: true,
+            };
+          } else {
+            throw new IdempotencyConflictError(
+              `Idempotency key "${cleanIdempotencyKey}" was previously submitted with a different payload`
+            );
+          }
+        }
+
+        const existingByProvider = await this.wagerRepo.findByProviderAndExternalId(
+          dto.providerId,
+          dto.externalTransactionId
         );
-      }
+        if (existingByProvider) {
+          throw new IdempotencyConflictError(
+            `Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was already processed under another idempotency key`
+          );
+        }
 
-      const transactionId = crypto.randomUUID();
+        const transactionId = crypto.randomUUID();
 
-      // 3. Balance verification and atomic ledger application
-      if (wallet.balance.lessThan(betMoney)) {
-        // Insufficient funds: Persist audited REJECTED transaction without ledger entry or balance mutation
-        const responseSnapshot: WagerResponseDto = {
-          status: 'REJECTED',
+        // 3. Balance verification and atomic ledger application
+        if (wallet.balance.lessThan(betMoney)) {
+          // Insufficient funds: Persist audited REJECTED transaction without ledger entry or balance mutation
+          const response: WagerResponseDto = {
+            transactionId,
+            status: 'REJECTED',
+            failureCode: 'INSUFFICIENT_FUNDS',
+            balance: {
+              amount: wallet.balance.getAmount(),
+              currency: wallet.currency,
+            },
+            idempotentReplay: false,
+          };
+
+          const rejectedTx = WagerTransaction.createBet({
+            id: transactionId,
+            walletId: wallet.id,
+            playerId: wallet.playerId,
+            providerId: dto.providerId,
+            externalTransactionId: dto.externalTransactionId,
+            roundId: dto.roundId,
+            gameId: dto.gameId,
+            money: betMoney,
+            status: 'REJECTED',
+            rejectionReason: 'INSUFFICIENT_FUNDS',
+            idempotencyKey: cleanIdempotencyKey,
+            payloadHash,
+            responseSnapshot: response,
+          });
+
+          await this.wagerRepo.save(rejectedTx);
+
+          const rejectedEvent = new WagerTransactionRejectedEvent({
+            aggregateId: wallet.id,
+            correlationId: cleanIdempotencyKey,
+            data: {
+              transactionId,
+              walletId: wallet.id,
+              playerId: wallet.playerId,
+              providerId: dto.providerId,
+              externalTransactionId: dto.externalTransactionId,
+              roundId: dto.roundId,
+              gameId: dto.gameId,
+              kind: 'BET',
+              amount: {
+                amount: betMoney.getAmount(),
+                currency: betCurrency,
+              },
+              balance: {
+                amount: wallet.balance.getAmount(),
+                currency: wallet.currency,
+              },
+              failureCode: 'INSUFFICIENT_FUNDS',
+            },
+          });
+          await this.outboxRepo.save(rejectedEvent);
+
+          return response;
+        }
+
+        // Sufficient funds: Process debit, increment version, create ledger entry, and save outbox events
+        const previousBalanceAmount = wallet.balance.getAmount();
+        const ledgerEntryId = crypto.randomUUID();
+        const ledgerEntry = wallet.debit({
           transactionId,
-          walletId: wallet.id,
-          providerId: dto.providerId.trim(),
-          externalTransactionId: dto.externalTransactionId.trim(),
-          amount: betMoney.getAmount(),
-          currency: betCurrency,
-          observedBalance: wallet.balance.getAmount(),
-          reason: 'INSUFFICIENT_FUNDS',
+          amount: betMoney,
+          ledgerEntryId,
+        });
+
+        const response: WagerResponseDto = {
+          transactionId,
+          status: 'PROCESSED',
+          balance: {
+            amount: wallet.balance.getAmount(),
+            currency: wallet.currency,
+          },
+          idempotentReplay: false,
         };
 
-        const rejectedTx = WagerTransaction.createBet({
+        const processedTx = WagerTransaction.createBet({
           id: transactionId,
           walletId: wallet.id,
           playerId: wallet.playerId,
-          providerId: dto.providerId.trim(),
-          externalTransactionId: dto.externalTransactionId.trim(),
-          roundId: dto.roundId.trim(),
-          gameId: dto.gameId.trim(),
+          providerId: dto.providerId,
+          externalTransactionId: dto.externalTransactionId,
+          roundId: dto.roundId,
+          gameId: dto.gameId,
           money: betMoney,
-          status: 'REJECTED',
-          rejectionReason: 'INSUFFICIENT_FUNDS',
+          status: 'PROCESSED',
+          rejectionReason: null,
           idempotencyKey: cleanIdempotencyKey,
           payloadHash,
-          responseSnapshot,
+          responseSnapshot: response,
         });
 
-        await this.wagerRepo.save(rejectedTx);
+        // Atomically persist wallet, wager transaction, ledger entry and outbox messages
+        await this.walletRepo.save(wallet);
+        await this.wagerRepo.save(processedTx);
+        await this.ledgerRepo.save(ledgerEntry);
 
-        const rejectedEvent = new WagerTransactionRejectedEvent({
-          transactionId,
-          walletId: wallet.id,
-          playerId: wallet.playerId,
-          providerId: dto.providerId.trim(),
-          externalTransactionId: dto.externalTransactionId.trim(),
-          roundId: dto.roundId.trim(),
-          gameId: dto.gameId.trim(),
-          kind: 'BET',
-          amount: betMoney.getAmount(),
-          currency: betCurrency,
-          reason: 'INSUFFICIENT_FUNDS',
-          observedBalance: wallet.balance.getAmount(),
+        const processedEvent = new WagerTransactionProcessedEvent({
+          aggregateId: wallet.id,
+          correlationId: cleanIdempotencyKey,
+          data: {
+            transactionId,
+            walletId: wallet.id,
+            playerId: wallet.playerId,
+            providerId: dto.providerId,
+            externalTransactionId: dto.externalTransactionId,
+            roundId: dto.roundId,
+            gameId: dto.gameId,
+            kind: 'BET',
+            amount: {
+              amount: betMoney.getAmount(),
+              currency: betCurrency,
+            },
+            balance: {
+              amount: wallet.balance.getAmount(),
+              currency: wallet.currency,
+            },
+          },
         });
-        await this.outboxRepo.save(rejectedEvent);
+        await this.outboxRepo.save(processedEvent);
 
-        return responseSnapshot;
+        const balanceChangedEvent = new WalletBalanceChangedEvent({
+          aggregateId: wallet.id,
+          correlationId: cleanIdempotencyKey,
+          data: {
+            walletId: wallet.id,
+            playerId: wallet.playerId,
+            currency: betCurrency,
+            previousBalance: {
+              amount: previousBalanceAmount,
+              currency: betCurrency,
+            },
+            currentBalance: {
+              amount: wallet.balance.getAmount(),
+              currency: betCurrency,
+            },
+            version: wallet.version,
+            triggerTransactionId: transactionId,
+          },
+        });
+        await this.outboxRepo.save(balanceChangedEvent);
+
+        return response;
+      });
+    } catch (error: any) {
+      const pgError = error?.cause ?? error;
+      if (pgError?.code === '23505') {
+        const constraint = String(pgError.constraint || '');
+        if (constraint.includes('uq_wager_transactions_idempotency_key')) {
+          // Look up committed transaction in a fresh read transaction
+          const existing = await this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
+          if (existing) {
+            if (existing.payloadHash === payloadHash) {
+              const snapshot = existing.responseSnapshot as WagerResponseDto;
+              return {
+                ...snapshot,
+                idempotentReplay: true,
+              };
+            } else {
+              throw new IdempotencyConflictError(
+                `Idempotency key "${cleanIdempotencyKey}" was previously submitted with a different payload`
+              );
+            }
+          }
+        }
+        if (constraint.includes('uq_wager_transactions_provider_external')) {
+          throw new IdempotencyConflictError(
+            `Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was already processed under another idempotency key`
+          );
+        }
+        if (constraint.includes('uq_wallet_ledger_entries_tx_wallet')) {
+          throw new IdempotencyConflictError(
+            `Ledger entry already exists for transaction "${cleanIdempotencyKey}"`
+          );
+        }
       }
-
-      // Sufficient funds: Process debit, increment version, create ledger entry, and save outbox events
-      const previousBalanceStr = wallet.balance.getAmount();
-      const ledgerEntryId = crypto.randomUUID();
-      const ledgerEntry = wallet.debit({
-        transactionId,
-        amount: betMoney,
-        ledgerEntryId,
-      });
-
-      const responseSnapshot: WagerResponseDto = {
-        status: 'PROCESSED',
-        transactionId,
-        walletId: wallet.id,
-        providerId: dto.providerId.trim(),
-        externalTransactionId: dto.externalTransactionId.trim(),
-        amount: betMoney.getAmount(),
-        currency: betCurrency,
-        observedBalance: wallet.balance.getAmount(),
-        reason: null,
-      };
-
-      const processedTx = WagerTransaction.createBet({
-        id: transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId.trim(),
-        externalTransactionId: dto.externalTransactionId.trim(),
-        roundId: dto.roundId.trim(),
-        gameId: dto.gameId.trim(),
-        money: betMoney,
-        status: 'PROCESSED',
-        rejectionReason: null,
-        idempotencyKey: cleanIdempotencyKey,
-        payloadHash,
-        responseSnapshot,
-      });
-
-      // Atomically persist wallet, wager transaction, ledger entry and outbox messages
-      await this.walletRepo.save(wallet);
-      await this.wagerRepo.save(processedTx);
-      await this.ledgerRepo.save(ledgerEntry);
-
-      const processedEvent = new WagerTransactionProcessedEvent({
-        transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId.trim(),
-        externalTransactionId: dto.externalTransactionId.trim(),
-        roundId: dto.roundId.trim(),
-        gameId: dto.gameId.trim(),
-        kind: 'BET',
-        amount: betMoney.getAmount(),
-        currency: betCurrency,
-        observedBalance: wallet.balance.getAmount(),
-      });
-      await this.outboxRepo.save(processedEvent);
-
-      const balanceChangedEvent = new WalletBalanceChangedEvent({
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        currency: betCurrency,
-        previousBalance: previousBalanceStr,
-        currentBalance: wallet.balance.getAmount(),
-        version: wallet.version,
-        triggerTransactionId: transactionId,
-      });
-      await this.outboxRepo.save(balanceChangedEvent);
-
-      return responseSnapshot;
-    });
+      throw error;
+    }
   }
 }

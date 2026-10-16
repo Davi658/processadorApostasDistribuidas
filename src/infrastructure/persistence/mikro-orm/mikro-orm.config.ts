@@ -1,4 +1,5 @@
-import { Options, PostgreSqlDriver } from '@mikro-orm/postgresql';
+import { type Options } from '@mikro-orm/core';
+import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import {
   WalletOrmEntity,
   WagerTransactionOrmEntity,

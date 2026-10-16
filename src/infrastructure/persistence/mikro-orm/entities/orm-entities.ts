@@ -2,6 +2,7 @@ import { Entity, PrimaryKey, Property, Unique, Check, Index } from '@mikro-orm/c
 
 @Entity({ tableName: 'wallets' })
 @Unique({ properties: ['playerId', 'currency'], name: 'uq_wallets_player_currency' })
+@Unique({ properties: ['id', 'currency'], name: 'uq_wallets_id_currency' })
 @Check({ expression: 'balance >= 0', name: 'chk_wallets_balance_non_negative' })
 export class WalletOrmEntity {
   @PrimaryKey({ type: 'uuid' })
@@ -120,7 +121,7 @@ export class OutboxMessageOrmEntity {
   @PrimaryKey({ type: 'uuid' })
   id!: string;
 
-  @Property({ fieldName: 'aggregate_type', length: 64 })
+  @Property({ fieldName: 'aggregate_type', length: 64, default: 'Wallet' })
   aggregateType!: string;
 
   @Property({ fieldName: 'aggregate_id', length: 128 })
@@ -128,6 +129,18 @@ export class OutboxMessageOrmEntity {
 
   @Property({ fieldName: 'event_type', length: 64 })
   eventType!: string;
+
+  @Property({ default: 1 })
+  version!: number;
+
+  @Property({ fieldName: 'correlation_id', length: 128, default: '' })
+  correlationId!: string;
+
+  @Property({ fieldName: 'causation_id', length: 128, nullable: true })
+  causationId?: string | null;
+
+  @Property({ fieldName: 'occurred_at', columnType: 'timestamptz' })
+  occurredAt: Date = new Date();
 
   @Property({ type: 'json' })
   payload!: any;

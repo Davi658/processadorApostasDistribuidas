@@ -39,9 +39,18 @@ export class ReconcileWalletUseCase {
 
       return {
         walletId: wallet.id,
-        storedBalance: wallet.balance.getAmount(),
-        calculatedBalance: calculated.getAmount(),
-        difference: difference.getAmount(),
+        storedBalance: {
+          amount: wallet.balance.getAmount(),
+          currency: wallet.currency,
+        },
+        calculatedBalance: {
+          amount: calculated.getAmount(),
+          currency: wallet.currency,
+        },
+        difference: {
+          amount: difference.getAmount(),
+          currency: wallet.currency,
+        },
         consistent,
         checkedEntries: entries.length,
       };

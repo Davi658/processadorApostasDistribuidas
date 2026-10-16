@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import {
-  PostgresOutboxRepository,
-  PostgresUnitOfWork,
-  PostgresWagerTransactionRepository,
-  PostgresWalletLedgerRepository,
-  PostgresWalletRepository,
-} from '../../infrastructure/persistence/postgres/postgres-adapter';
+  MikroOrmOutboxRepository,
+  MikroOrmUnitOfWork,
+  MikroOrmWagerTransactionRepository,
+  MikroOrmWalletLedgerRepository,
+  MikroOrmWalletRepository,
+} from '../../infrastructure/persistence/mikro-orm/mikro-orm-adapter';
 import { CreateWalletUseCase } from '../../application/use-cases/create-wallet.use-case';
 import { GetWalletUseCase } from '../../application/use-cases/get-wallet.use-case';
 import { ProcessBetUseCase } from '../../application/use-cases/process-bet.use-case';
@@ -17,76 +17,76 @@ import { WageringController } from './controllers/wagering.controller';
   controllers: [WalletController, WageringController],
   providers: [
     {
-      provide: PostgresUnitOfWork,
-      useFactory: () => new PostgresUnitOfWork(),
+      provide: MikroOrmUnitOfWork,
+      useFactory: () => new MikroOrmUnitOfWork(),
     },
     {
-      provide: PostgresWalletRepository,
-      useFactory: (uow: PostgresUnitOfWork) => new PostgresWalletRepository(uow),
-      inject: [PostgresUnitOfWork],
+      provide: MikroOrmWalletRepository,
+      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmWalletRepository(uow),
+      inject: [MikroOrmUnitOfWork],
     },
     {
-      provide: PostgresWagerTransactionRepository,
-      useFactory: (uow: PostgresUnitOfWork) => new PostgresWagerTransactionRepository(uow),
-      inject: [PostgresUnitOfWork],
+      provide: MikroOrmWagerTransactionRepository,
+      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmWagerTransactionRepository(uow),
+      inject: [MikroOrmUnitOfWork],
     },
     {
-      provide: PostgresWalletLedgerRepository,
-      useFactory: (uow: PostgresUnitOfWork) => new PostgresWalletLedgerRepository(uow),
-      inject: [PostgresUnitOfWork],
+      provide: MikroOrmWalletLedgerRepository,
+      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmWalletLedgerRepository(uow),
+      inject: [MikroOrmUnitOfWork],
     },
     {
-      provide: PostgresOutboxRepository,
-      useFactory: (uow: PostgresUnitOfWork) => new PostgresOutboxRepository(uow),
-      inject: [PostgresUnitOfWork],
+      provide: MikroOrmOutboxRepository,
+      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmOutboxRepository(uow),
+      inject: [MikroOrmUnitOfWork],
     },
     {
       provide: CreateWalletUseCase,
       useFactory: (
-        walletRepo: PostgresWalletRepository,
-        wagerRepo: PostgresWagerTransactionRepository,
-        ledgerRepo: PostgresWalletLedgerRepository,
-        outboxRepo: PostgresOutboxRepository,
-        uow: PostgresUnitOfWork
+        walletRepo: MikroOrmWalletRepository,
+        wagerRepo: MikroOrmWagerTransactionRepository,
+        ledgerRepo: MikroOrmWalletLedgerRepository,
+        outboxRepo: MikroOrmOutboxRepository,
+        uow: MikroOrmUnitOfWork
       ) => new CreateWalletUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow),
       inject: [
-        PostgresWalletRepository,
-        PostgresWagerTransactionRepository,
-        PostgresWalletLedgerRepository,
-        PostgresOutboxRepository,
-        PostgresUnitOfWork,
+        MikroOrmWalletRepository,
+        MikroOrmWagerTransactionRepository,
+        MikroOrmWalletLedgerRepository,
+        MikroOrmOutboxRepository,
+        MikroOrmUnitOfWork,
       ],
     },
     {
       provide: GetWalletUseCase,
-      useFactory: (walletRepo: PostgresWalletRepository) => new GetWalletUseCase(walletRepo),
-      inject: [PostgresWalletRepository],
+      useFactory: (walletRepo: MikroOrmWalletRepository) => new GetWalletUseCase(walletRepo),
+      inject: [MikroOrmWalletRepository],
     },
     {
       provide: ProcessBetUseCase,
       useFactory: (
-        walletRepo: PostgresWalletRepository,
-        wagerRepo: PostgresWagerTransactionRepository,
-        ledgerRepo: PostgresWalletLedgerRepository,
-        outboxRepo: PostgresOutboxRepository,
-        uow: PostgresUnitOfWork
+        walletRepo: MikroOrmWalletRepository,
+        wagerRepo: MikroOrmWagerTransactionRepository,
+        ledgerRepo: MikroOrmWalletLedgerRepository,
+        outboxRepo: MikroOrmOutboxRepository,
+        uow: MikroOrmUnitOfWork
       ) => new ProcessBetUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow),
       inject: [
-        PostgresWalletRepository,
-        PostgresWagerTransactionRepository,
-        PostgresWalletLedgerRepository,
-        PostgresOutboxRepository,
-        PostgresUnitOfWork,
+        MikroOrmWalletRepository,
+        MikroOrmWagerTransactionRepository,
+        MikroOrmWalletLedgerRepository,
+        MikroOrmOutboxRepository,
+        MikroOrmUnitOfWork,
       ],
     },
     {
       provide: ReconcileWalletUseCase,
       useFactory: (
-        walletRepo: PostgresWalletRepository,
-        ledgerRepo: PostgresWalletLedgerRepository,
-        uow: PostgresUnitOfWork
+        walletRepo: MikroOrmWalletRepository,
+        ledgerRepo: MikroOrmWalletLedgerRepository,
+        uow: MikroOrmUnitOfWork
       ) => new ReconcileWalletUseCase(walletRepo, ledgerRepo, uow),
-      inject: [PostgresWalletRepository, PostgresWalletLedgerRepository, PostgresUnitOfWork],
+      inject: [MikroOrmWalletRepository, MikroOrmWalletLedgerRepository, MikroOrmUnitOfWork],
     },
   ],
 })

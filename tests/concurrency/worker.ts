@@ -1,48 +1,52 @@
-import pg from 'pg';
+import { existsSync } from 'node:fs';
 import {
-  PostgresOutboxRepository,
-  PostgresUnitOfWork,
-  PostgresWagerTransactionRepository,
-  PostgresWalletLedgerRepository,
-  PostgresWalletRepository,
-} from '../../src/infrastructure/persistence/postgres/postgres-adapter';
+  MikroOrmOutboxRepository,
+  MikroOrmUnitOfWork,
+  MikroOrmWagerTransactionRepository,
+  MikroOrmWalletLedgerRepository,
+  MikroOrmWalletRepository,
+} from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
 import { ProcessBetUseCase } from '../../src/application/use-cases/process-bet.use-case';
 import { ProcessBetDto } from '../../src/application/dto/wager.dto';
 
 async function main() {
-  const [,, idempotencyKey, payloadJson] = process.argv;
+  const [, , idempotencyKey, payloadJson, barrierFilePath] = process.argv;
 
   if (!idempotencyKey || !payloadJson) {
-    console.error('Usage: bun run worker.ts <idempotencyKey> <payloadJson>');
+    console.error('Usage: worker <idempotencyKey> <payloadJson> [barrierFilePath]');
     process.exit(1);
   }
 
   const payload: ProcessBetDto = JSON.parse(payloadJson);
 
-  const pool = new pg.Pool({
-    host: process.env.APP_DB_HOST || '127.0.0.1',
-    port: Number(process.env.APP_DB_PORT) || 5432,
-    database: process.env.APP_DB_NAME || 'betting_db',
-    user: process.env.APP_DB_USER || 'app_user',
-    password: process.env.APP_DB_PASSWORD || 'app_user_secret',
-    max: 10,
-  });
+  const uow = new MikroOrmUnitOfWork();
+  await uow.init();
 
-  const uow = new PostgresUnitOfWork(pool);
-  const walletRepo = new PostgresWalletRepository(uow);
-  const wagerRepo = new PostgresWagerTransactionRepository(uow);
-  const ledgerRepo = new PostgresWalletLedgerRepository(uow);
-  const outboxRepo = new PostgresOutboxRepository(uow);
+  const walletRepo = new MikroOrmWalletRepository(uow);
+  const wagerRepo = new MikroOrmWagerTransactionRepository(uow);
+  const ledgerRepo = new MikroOrmWalletLedgerRepository(uow);
+  const outboxRepo = new MikroOrmOutboxRepository(uow);
 
   const processBetUseCase = new ProcessBetUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
 
   try {
+    // If a synchronization barrier file is provided, wait until it is released by the test coordinator
+    if (barrierFilePath) {
+      const startWait = Date.now();
+      while (!existsSync(barrierFilePath)) {
+        if (Date.now() - startWait > 10000) {
+          throw new Error('Timed out waiting for synchronization barrier');
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    }
+
     const result = await processBetUseCase.execute(idempotencyKey, payload);
     console.log(JSON.stringify({ ok: true, data: result }));
   } catch (err: any) {
     console.log(JSON.stringify({ ok: false, error: err.message, code: err.code }));
   } finally {
-    await pool.end();
+    await uow.close();
   }
 }
 

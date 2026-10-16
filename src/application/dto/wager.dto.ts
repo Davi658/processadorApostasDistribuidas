@@ -1,27 +1,20 @@
-export class MoneyDto {
-  amount!: string;
-  currency!: string;
+import { MoneyObjectDto } from './common.dto';
+
+export interface ProcessBetDto {
+  providerId: string;
+  externalTransactionId: string;
+  playerId: string;
+  walletId: string;
+  roundId: string;
+  gameId: string;
+  kind: 'BET';
+  money: MoneyObjectDto;
 }
 
-export class ProcessBetDto {
-  providerId!: string;
-  externalTransactionId!: string;
-  playerId!: string;
-  walletId!: string;
-  roundId!: string;
-  gameId!: string;
-  kind!: string;
-  money!: MoneyDto;
-}
-
-export class WagerResponseDto {
-  status!: 'PROCESSED' | 'REJECTED';
-  transactionId!: string;
-  walletId!: string;
-  providerId!: string;
-  externalTransactionId!: string;
-  amount!: string;
-  currency!: string;
-  observedBalance!: string;
-  reason?: string | null;
+export interface WagerResponseDto {
+  transactionId: string;
+  status: 'PROCESSED' | 'REJECTED';
+  balance: MoneyObjectDto;
+  failureCode?: string;
+  idempotentReplay: boolean;
 }

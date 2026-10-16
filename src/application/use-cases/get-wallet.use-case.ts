@@ -16,13 +16,13 @@ export class GetWalletUseCase {
     }
 
     return {
-      walletId: wallet.id,
+      id: wallet.id,
       playerId: wallet.playerId,
-      currency: wallet.currency,
-      balance: wallet.balance.getAmount(),
+      balance: {
+        amount: wallet.balance.getAmount(),
+        currency: wallet.currency,
+      },
       version: wallet.version,
-      createdAt: wallet.createdAt,
-      updatedAt: wallet.updatedAt,
     };
   }
 }

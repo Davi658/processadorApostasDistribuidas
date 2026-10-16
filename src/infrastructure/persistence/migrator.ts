@@ -1,33 +1,57 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import pg from 'pg';
-import { config } from 'dotenv';
-
-config();
+import { getMigrationDatabaseConfig } from '../config/database.config';
 
 export class DatabaseMigrator {
   private readonly pool: pg.Pool;
 
   constructor(customConfig?: pg.PoolConfig) {
-    this.pool = new pg.Pool(
-      customConfig ?? {
-        host: process.env.MIGRATION_DB_HOST || '127.0.0.1',
-        port: Number(process.env.MIGRATION_DB_PORT) || 5432,
-        database: process.env.MIGRATION_DB_NAME || 'betting_db',
-        user: process.env.MIGRATION_DB_USER || 'postgres',
-        password: process.env.MIGRATION_DB_PASSWORD || '',
-      }
-    );
+    this.pool = new pg.Pool(customConfig ?? getMigrationDatabaseConfig());
   }
 
-  public async up(): Promise<void> {
+  private async ensureMigrationTable(client: pg.PoolClient): Promise<void> {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version VARCHAR(128) PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+  }
+
+  public async up(): Promise<string[]> {
     const client = await this.pool.connect();
+    const appliedVersions: string[] = [];
+
     try {
       await client.query('BEGIN');
-      const upSqlPath = join(import.meta.dir, 'migrations', '001_initial_schema.sql');
-      const upSql = readFileSync(upSqlPath, 'utf-8');
-      await client.query(upSql);
+      // Advisory transaction lock to prevent concurrent migration executions
+      await client.query('SELECT pg_advisory_xact_lock(8492019);');
+
+      await this.ensureMigrationTable(client);
+
+      const migrationsDir = join(import.meta.dir, 'migrations');
+      const files = readdirSync(migrationsDir)
+        .filter((file) => file.endsWith('.sql') && !file.endsWith('.down.sql'))
+        .sort();
+
+      const existingRes = await client.query<{ version: string }>(
+        'SELECT version FROM schema_migrations ORDER BY version ASC;'
+      );
+      const appliedSet = new Set(existingRes.rows.map((r) => r.version));
+
+      for (const file of files) {
+        const version = file.replace('.sql', '');
+        if (!appliedSet.has(version)) {
+          const sql = readFileSync(join(migrationsDir, file), 'utf-8');
+          await client.query(sql);
+          await client.query('INSERT INTO schema_migrations (version) VALUES ($1);', [version]);
+          appliedVersions.push(version);
+        }
+      }
+
       await client.query('COMMIT');
+      return appliedVersions;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -36,14 +60,34 @@ export class DatabaseMigrator {
     }
   }
 
-  public async down(): Promise<void> {
+  public async down(): Promise<string | null> {
     const client = await this.pool.connect();
+
     try {
       await client.query('BEGIN');
-      const downSqlPath = join(import.meta.dir, 'migrations', '001_initial_schema.down.sql');
-      const downSql = readFileSync(downSqlPath, 'utf-8');
+      await client.query('SELECT pg_advisory_xact_lock(8492019);');
+
+      await this.ensureMigrationTable(client);
+
+      const lastMigrationRes = await client.query<{ version: string }>(
+        'SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1;'
+      );
+
+      if (lastMigrationRes.rows.length === 0) {
+        await client.query('COMMIT');
+        return null;
+      }
+
+      const lastVersion = lastMigrationRes.rows[0].version;
+      const migrationsDir = join(import.meta.dir, 'migrations');
+      const downFilePath = join(migrationsDir, `${lastVersion}.down.sql`);
+      const downSql = readFileSync(downFilePath, 'utf-8');
+
       await client.query(downSql);
+      await client.query('DELETE FROM schema_migrations WHERE version = $1;', [lastVersion]);
+
       await client.query('COMMIT');
+      return lastVersion;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -64,12 +108,20 @@ if (import.meta.main) {
 
   if (command === 'up') {
     console.log('Running UP migrations...');
-    await migrator.up();
-    console.log('UP migrations applied successfully!');
+    const applied = await migrator.up();
+    if (applied.length > 0) {
+      console.log(`Applied migrations: ${applied.join(', ')}`);
+    } else {
+      console.log('No new migrations to apply.');
+    }
   } else if (command === 'down') {
-    console.log('Running DOWN migrations...');
-    await migrator.down();
-    console.log('DOWN migrations reverted successfully!');
+    console.log('Running DOWN migration...');
+    const reverted = await migrator.down();
+    if (reverted) {
+      console.log(`Reverted migration: ${reverted}`);
+    } else {
+      console.log('No applied migrations to revert.');
+    }
   } else {
     console.error(`Unknown command: ${command}. Use "up" or "down".`);
     process.exit(1);

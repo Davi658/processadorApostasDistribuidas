@@ -1,7 +1,7 @@
 import { Wallet } from '../../domain/entities/wallet.entity';
 import { WagerTransaction } from '../../domain/entities/wager-transaction.entity';
 import { WalletLedgerEntry } from '../../domain/entities/wallet-ledger-entry.entity';
-import { DomainEvent } from '../../domain/events/events';
+import { IntegrationEvent } from '../../domain/events/events';
 
 export interface WalletRepositoryPort {
   findById(id: string, lockForUpdate?: boolean): Promise<Wallet | null>;
@@ -22,7 +22,7 @@ export interface WalletLedgerRepositoryPort {
 }
 
 export interface OutboxRepositoryPort {
-  save(event: DomainEvent): Promise<void>;
+  save(event: IntegrationEvent<unknown>): Promise<void>;
 }
 
 export interface UnitOfWorkPort {

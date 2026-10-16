@@ -2,7 +2,8 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestj
 import { CreateWalletUseCase } from '../../../application/use-cases/create-wallet.use-case';
 import { GetWalletUseCase } from '../../../application/use-cases/get-wallet.use-case';
 import { ReconcileWalletUseCase } from '../../../application/use-cases/reconcile-wallet.use-case';
-import { CreateWalletDto, ReconciliationResponseDto, WalletResponseDto } from '../../../application/dto/wallet.dto';
+import { ReconciliationResponseDto, WalletResponseDto } from '../../../application/dto/wallet.dto';
+import { HttpValidator } from '../validation/http-validator';
 
 @Controller('wallets')
 export class WalletController {
@@ -14,18 +15,21 @@ export class WalletController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  public async createWallet(@Body() body: CreateWalletDto): Promise<WalletResponseDto> {
-    return await this.createWalletUseCase.execute(body);
+  public async createWallet(@Body() rawBody: unknown): Promise<WalletResponseDto> {
+    const validatedDto = HttpValidator.validateCreateWalletBody(rawBody);
+    return await this.createWalletUseCase.execute(validatedDto);
   }
 
   @Get(':walletId')
   public async getWallet(@Param('walletId') walletId: string): Promise<WalletResponseDto> {
-    return await this.getWalletUseCase.execute(walletId);
+    const validatedId = HttpValidator.validateUuid(walletId, 'walletId');
+    return await this.getWalletUseCase.execute(validatedId);
   }
 
   @Post(':walletId/reconciliation')
   @HttpCode(HttpStatus.OK)
   public async reconcile(@Param('walletId') walletId: string): Promise<ReconciliationResponseDto> {
-    return await this.reconcileWalletUseCase.execute(walletId);
+    const validatedId = HttpValidator.validateUuid(walletId, 'walletId');
+    return await this.reconcileWalletUseCase.execute(validatedId);
   }
 }
