@@ -1,0 +1,39 @@
+{
+  "name": "processador-apostas-distribuidas",
+  "version": "1.0.0",
+  "description": "Backend financeiro distribuído de processamento de apostas com precisão monetária e idempotência",
+  "main": "src/main.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "start:dev": "bun --watch src/main.ts",
+    "test": "bun test:unit && bun test:integration && bun test:concurrency",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "test:concurrency": "bun test tests/concurrency/concurrency.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mikro-orm/cli": "^6.4.9",
+    "@mikro-orm/core": "^6.4.9",
+    "@mikro-orm/migrations": "^6.4.9",
+    "@mikro-orm/postgresql": "^6.4.9",
+    "@nestjs/common": "^11.0.11",
+    "@nestjs/core": "^11.0.11",
+    "@nestjs/platform-express": "^11.0.11",
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^12.1.3",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.13.9",
+    "@types/pg": "^8.11.11",
+    "@types/uuid": "^10.0.0",
+    "bun-types": "^1.2.4",
+    "typescript": "^5.8.2"
+  }
+}
