@@ -785,4 +785,137 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
       expect(capturedJson.code).toBe('INTERNAL_SERVER_ERROR');
     });
   });
+
+  describe('Idempotency Key Payload Conflict & Replay Tests', () => {
+    it('3. Via HTTP, mesma Idempotency-Key com valor diferente deve retornar 409 sem novo debito, ledger ou evento na outbox, e 4. Payload identico deve realizar replay com resultado original', async () => {
+      // Setup: Carteira com saldo 100.00
+      const playerId = crypto.randomUUID();
+      const createRes = await fetch(`${serverUrl}/wallets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId,
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        }),
+      });
+      const wallet = (await createRes.json()) as any;
+
+      const idempotencyKey = `idemp-conflict-test-${crypto.randomUUID()}`;
+      const extTxId = `ext-tx-${crypto.randomUUID()}`;
+
+      // 1. Processar BET inicial de 10.00
+      const initialBetRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-conflict',
+          externalTransactionId: extTxId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-conflict',
+          gameId: 'g-conflict',
+          kind: 'BET',
+          money: { amount: '10.00', currency: 'BRL' },
+        }),
+      });
+
+      expect(initialBetRes.status).toBe(200);
+      const initialBody = (await initialBetRes.json()) as any;
+      expect(initialBody.status).toBe('PROCESSED');
+      expect(initialBody.balance).toEqual({ amount: '90.00', currency: 'BRL' });
+      expect(initialBody.idempotentReplay).toBe(false);
+      const originalTxId = initialBody.transactionId;
+
+      // Inspecionar contadores no banco antes da tentativa de conflito
+      const ledgerCountBeforeRes = await adminPool.query(
+        'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
+        [wallet.id]
+      );
+      const ledgerCountBefore = Number(ledgerCountBeforeRes.rows[0].count);
+      expect(ledgerCountBefore).toBe(2); // OPENING (CREDIT) + BET (DEBIT)
+
+      const outboxCountBeforeRes = await adminPool.query(
+        'SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1;',
+        [wallet.id]
+      );
+      const outboxCountBefore = Number(outboxCountBeforeRes.rows[0].count);
+
+      // 2. Submeter a MESMA Idempotency-Key com payload alterado (valor 25.00 ao inves de 10.00)
+      const conflictRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-conflict',
+          externalTransactionId: extTxId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-conflict',
+          gameId: 'g-conflict',
+          kind: 'BET',
+          money: { amount: '25.00', currency: 'BRL' }, // valor diferente!
+        }),
+      });
+
+      // Deve retornar 409 Conflict
+      expect(conflictRes.status).toBe(409);
+      const conflictBody = (await conflictRes.json()) as any;
+      expect(conflictBody.code).toBe('IDEMPOTENCY_CONFLICT');
+
+      // 3. Comprovar que NENHUM novo debito, ledger ou outbox ocorreu
+      const walletAfterConflictRes = await fetch(`${serverUrl}/wallets/${wallet.id}`);
+      const walletAfterConflict = (await walletAfterConflictRes.json()) as any;
+      expect(walletAfterConflict.balance.amount).toBe('90.00'); // Saldo permaneceu 90.00, sem debito
+      expect(walletAfterConflict.version).toBe(2); // Versao permaneceu 2
+
+      const ledgerCountAfterConflictRes = await adminPool.query(
+        'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
+        [wallet.id]
+      );
+      expect(Number(ledgerCountAfterConflictRes.rows[0].count)).toBe(ledgerCountBefore); // Sem novo ledger
+
+      const outboxCountAfterConflictRes = await adminPool.query(
+        'SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1;',
+        [wallet.id]
+      );
+      expect(Number(outboxCountAfterConflictRes.rows[0].count)).toBe(outboxCountBefore); // Sem novo evento na outbox
+
+      // 4. Submeter payload IDENTICO (valor 10.00) -> Replay idempotente com resultado original
+      const replayRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-conflict',
+          externalTransactionId: extTxId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-conflict',
+          gameId: 'g-conflict',
+          kind: 'BET',
+          money: { amount: '10.00', currency: 'BRL' }, // payload identico
+        }),
+      });
+
+      expect(replayRes.status).toBe(200);
+      const replayBody = (await replayRes.json()) as any;
+      expect(replayBody.status).toBe('PROCESSED');
+      expect(replayBody.transactionId).toBe(originalTxId);
+      expect(replayBody.balance).toEqual({ amount: '90.00', currency: 'BRL' });
+      expect(replayBody.idempotentReplay).toBe(true);
+
+      // Saldo, versao, ledger e outbox permanecem intactos apos replay
+      const walletAfterReplayRes = await fetch(`${serverUrl}/wallets/${wallet.id}`);
+      const walletAfterReplay = (await walletAfterReplayRes.json()) as any;
+      expect(walletAfterReplay.balance.amount).toBe('90.00');
+      expect(walletAfterReplay.version).toBe(2);
+    });
+  });
 });

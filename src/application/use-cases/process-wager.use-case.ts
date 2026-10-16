@@ -974,7 +974,29 @@ export class ProcessWagerUseCase {
     }
   }
 
-  public static computePayloadHash(dto: ProcessWagerDto, cleanKey?: string): string {
+  public static canonicalStringify(value: unknown): string {
+    if (value === null || typeof value !== 'object') {
+      return JSON.stringify(value);
+    }
+
+    if (Array.isArray(value)) {
+      const items = value.map((item) => ProcessWagerUseCase.canonicalStringify(item));
+      return `[${items.join(',')}]`;
+    }
+
+    const obj = value as Record<string, unknown>;
+    const sortedKeys = Object.keys(obj).sort();
+    const entries: string[] = [];
+    for (const key of sortedKeys) {
+      const val = obj[key];
+      if (val !== undefined) {
+        entries.push(`${JSON.stringify(key)}:${ProcessWagerUseCase.canonicalStringify(val)}`);
+      }
+    }
+    return `{${entries.join(',')}}`;
+  }
+
+  public static computePayloadHash(dto: ProcessWagerDto, _cleanKey?: string): string {
     const money = Money.create(dto.money.amount, dto.money.currency);
     const normalized: Record<string, any> = {
       externalTransactionId: dto.externalTransactionId.trim(),
@@ -994,7 +1016,7 @@ export class ProcessWagerUseCase {
       normalized.referenceExternalTransactionId = dto.referenceExternalTransactionId.trim();
     }
 
-    const sortedJson = JSON.stringify(normalized, Object.keys(normalized).sort());
-    return createHash('sha256').update(sortedJson).digest('hex');
+    const canonicalJson = ProcessWagerUseCase.canonicalStringify(normalized);
+    return createHash('sha256').update(canonicalJson).digest('hex');
   }
 }
