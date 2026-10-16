@@ -1,3 +1,14 @@
+export interface IntegrationEventEnvelope<T = unknown> {
+  eventId: string;
+  eventType: string;
+  version: number;
+  aggregateId: string;
+  correlationId: string;
+  causationId?: string | null;
+  occurredAt: string;
+  data: T;
+}
+
 export abstract class IntegrationEvent<T> {
   public readonly eventId: string;
   public readonly occurredAt: string;
@@ -23,6 +34,41 @@ export abstract class IntegrationEvent<T> {
     this.causationId = params.causationId;
     this.data = params.data;
   }
+
+  public toEnvelope(): IntegrationEventEnvelope<T> {
+    return {
+      eventId: this.eventId,
+      eventType: this.eventType,
+      version: this.version,
+      aggregateId: this.aggregateId,
+      correlationId: this.correlationId,
+      causationId: this.causationId ?? null,
+      occurredAt: this.occurredAt,
+      data: this.data,
+    };
+  }
+
+  public static reconstruct(envelope: IntegrationEventEnvelope<any>): IntegrationEvent<any> {
+    return new ReconstructedIntegrationEvent(envelope);
+  }
+}
+
+export class ReconstructedIntegrationEvent extends IntegrationEvent<unknown> {
+  public readonly eventType: string;
+  public readonly version: number;
+
+  constructor(envelope: IntegrationEventEnvelope<unknown>) {
+    super({
+      eventId: envelope.eventId,
+      occurredAt: envelope.occurredAt,
+      aggregateId: envelope.aggregateId,
+      correlationId: envelope.correlationId,
+      causationId: envelope.causationId ?? undefined,
+      data: envelope.data,
+    });
+    this.eventType = envelope.eventType;
+    this.version = envelope.version;
+  }
 }
 
 export interface WagerTransactionProcessedData {
@@ -33,9 +79,10 @@ export interface WagerTransactionProcessedData {
   externalTransactionId: string;
   roundId: string;
   gameId: string;
-  kind: 'BET' | 'OPENING';
+  kind: 'BET' | 'WIN' | 'LOSS' | 'REFUND' | 'ROLLBACK' | 'OPENING';
   amount: { amount: string; currency: string };
   balance: { amount: string; currency: string };
+  referenceExternalTransactionId?: string | null;
 }
 
 export class WagerTransactionProcessedEvent extends IntegrationEvent<WagerTransactionProcessedData> {
@@ -51,14 +98,35 @@ export interface WagerTransactionRejectedData {
   externalTransactionId: string;
   roundId: string;
   gameId: string;
-  kind: 'BET';
+  kind: 'BET' | 'WIN' | 'LOSS' | 'REFUND' | 'ROLLBACK';
   amount: { amount: string; currency: string };
   balance: { amount: string; currency: string };
   failureCode: string;
+  referenceExternalTransactionId?: string | null;
 }
 
 export class WagerTransactionRejectedEvent extends IntegrationEvent<WagerTransactionRejectedData> {
   public readonly eventType = 'WagerTransactionRejected';
+  public readonly version = 1;
+}
+
+export interface WagerTransactionPendingReferenceData {
+  transactionId: string;
+  walletId: string;
+  playerId: string;
+  providerId: string;
+  externalTransactionId: string;
+  roundId: string;
+  gameId: string;
+  kind: 'REFUND' | 'ROLLBACK';
+  amount: { amount: string; currency: string };
+  referenceExternalTransactionId: string;
+  attempts: number;
+  nextAttemptAt: string;
+}
+
+export class WagerTransactionPendingReferenceEvent extends IntegrationEvent<WagerTransactionPendingReferenceData> {
+  public readonly eventType = 'WagerTransactionPendingReference';
   public readonly version = 1;
 }
 

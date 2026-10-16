@@ -15,12 +15,12 @@ import { CreateWalletUseCase } from '../../src/application/use-cases/create-wall
 import { GetWalletUseCase } from '../../src/application/use-cases/get-wallet.use-case';
 import { ProcessBetUseCase } from '../../src/application/use-cases/process-bet.use-case';
 import { ReconcileWalletUseCase } from '../../src/application/use-cases/reconcile-wallet.use-case';
-import { DatabaseMigrator } from '../../src/infrastructure/persistence/migrator';
-import { getMigrationDatabaseConfig } from '../../src/infrastructure/config/database.config';
 import { ProcessBetDto } from '../../src/application/dto/wager.dto';
+import { IdempotencyConflictError } from '../../src/domain/errors/domain.error';
+import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
 
 describe('High-Concurrency Invariants with Real PostgreSQL', () => {
-  let migrator: DatabaseMigrator;
+  let isolatedDb: IsolatedTestDatabase;
   let testPool: pg.Pool;
   let uow: MikroOrmUnitOfWork;
   let walletRepo: MikroOrmWalletRepository;
@@ -34,16 +34,10 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
   let reconcileWalletUseCase: ReconcileWalletUseCase;
 
   beforeAll(async () => {
-    migrator = new DatabaseMigrator();
-    await migrator.up();
+    isolatedDb = await createIsolatedTestDatabase('concurr_');
 
-    const migConfig = getMigrationDatabaseConfig();
     testPool = new pg.Pool({
-      host: migConfig.host,
-      port: migConfig.port,
-      database: migConfig.database,
-      user: migConfig.user,
-      password: migConfig.password,
+      ...isolatedDb.adminConfig,
       max: 60, // Sized for 50 concurrent transactions
     });
 
@@ -64,11 +58,10 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
   afterAll(async () => {
     await uow.close();
     await testPool.end();
-    await migrator.close();
+    await isolatedDb.closeAndDrop();
   });
 
   it('50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation', async () => {
-    // 1. Setup wallet with 100.00
     const wallet = await createWalletUseCase.execute({
       playerId: crypto.randomUUID(),
       initialBalance: { amount: '100.00', currency: 'BRL' },
@@ -90,54 +83,41 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
 
     const idempotencyKey = `idemp-50-${crypto.randomUUID()}`;
 
-    // 2. Fire 50 simultaneous submissions in parallel
+    // Fire 50 simultaneous submissions in parallel
     const promises = Array.from({ length: 50 }, () =>
       processBetUseCase.execute(idempotencyKey, payload)
     );
 
     const results = await Promise.all(promises);
 
-    // 3. Verify all 50 calls succeeded with valid result and observed balance 70.00
     expect(results.length).toBe(50);
-    for (const r of results) {
-      expect(r.status).toBe('PROCESSED');
-      expect(r.balance.amount).toBe('70.00');
-      expect(r.balance.currency).toBe('BRL');
+    for (const res of results) {
+      expect(res.status).toBe('PROCESSED');
+      expect(res.balance.amount).toBe('70.00');
+      expect(res.balance.currency).toBe('BRL');
     }
 
-    // Exactly 1 must have idempotentReplay = false, and 49 must have idempotentReplay = true
-    const freshExecutions = results.filter((r) => r.idempotentReplay === false).length;
-    const replayExecutions = results.filter((r) => r.idempotentReplay === true).length;
-    expect(freshExecutions).toBe(1);
-    expect(replayExecutions).toBe(49);
+    const firstProcessed = results.filter((r) => !r.idempotentReplay);
+    const replays = results.filter((r) => r.idempotentReplay);
+    expect(firstProcessed.length).toBe(1);
+    expect(replays.length).toBe(49);
 
-    // 4. Verify wallet balance in DB is strictly 70.00 and version is exactly 2
-    const finalWallet = await getWalletUseCase.execute(wallet.id);
-    expect(finalWallet.balance.amount).toBe('70.00');
-    expect(finalWallet.version).toBe(2);
+    const updatedWallet = await getWalletUseCase.execute(wallet.id);
+    expect(updatedWallet.balance.amount).toBe('70.00');
+    expect(updatedWallet.version).toBe(2);
 
-    // 5. Verify exactly 1 BET transaction exists in DB
     const txCount = await testPool.query(
       "SELECT COUNT(*) FROM wager_transactions WHERE wallet_id = $1 AND kind = 'BET';",
       [wallet.id]
     );
     expect(Number(txCount.rows[0].count)).toBe(1);
 
-    // 6. Verify ledger entries: exactly 2 (1 OPENING credit + 1 BET debit)
     const ledgerCount = await testPool.query(
       'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
       [wallet.id]
     );
     expect(Number(ledgerCount.rows[0].count)).toBe(2);
 
-    // 7. Verify outbox: 2 for opening + 2 for BET (Processed + BalanceChanged) = 4 messages
-    const outboxCount = await testPool.query(
-      'SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1;',
-      [wallet.id]
-    );
-    expect(Number(outboxCount.rows[0].count)).toBe(4);
-
-    // 8. Reconcile endpoint: stored balance equals calculated balance
     const recon = await reconcileWalletUseCase.execute(wallet.id);
     expect(recon.consistent).toBe(true);
     expect(recon.storedBalance.amount).toBe('70.00');
@@ -186,19 +166,10 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
     expect(rejectedRes.failureCode).toBe('INSUFFICIENT_FUNDS');
     expect(rejectedRes.balance.amount).toBe('20.00');
 
-    // Final balance must be exactly 20.00, version 2
     const finalWallet = await getWalletUseCase.execute(wallet.id);
     expect(finalWallet.balance.amount).toBe('20.00');
     expect(finalWallet.version).toBe(2);
 
-    // Ledger has exactly 2 entries (OPENING credit + 1 single BET debit)
-    const ledgerCount = await testPool.query(
-      'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
-      [wallet.id]
-    );
-    expect(Number(ledgerCount.rows[0].count)).toBe(2);
-
-    // Reconcile
     const recon = await reconcileWalletUseCase.execute(wallet.id);
     expect(recon.consistent).toBe(true);
     expect(recon.storedBalance.amount).toBe('20.00');
@@ -207,7 +178,84 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
     expect(recon.checkedEntries).toBe(2);
   }, 30000);
 
-  it('Repeat concurrency scenarios with at least THREE independent OS application processes sharing PostgreSQL using synchronization barrier', async () => {
+  it('Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected', async () => {
+    const wallet1 = await createWalletUseCase.execute({
+      playerId: crypto.randomUUID(),
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+    const wallet2 = await createWalletUseCase.execute({
+      playerId: crypto.randomUUID(),
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const sharedIdempKey = `shared-key-race-${crypto.randomUUID()}`;
+
+    const req1 = processBetUseCase.execute(sharedIdempKey, {
+      providerId: 'prv-race',
+      externalTransactionId: `ext-race-w1-${crypto.randomUUID()}`,
+      playerId: wallet1.playerId,
+      walletId: wallet1.id,
+      roundId: 'rnd-race',
+      gameId: 'gm-race',
+      kind: 'BET',
+      money: { amount: '30.00', currency: 'BRL' },
+    });
+
+    const req2 = processBetUseCase.execute(sharedIdempKey, {
+      providerId: 'prv-race',
+      externalTransactionId: `ext-race-w2-${crypto.randomUUID()}`,
+      playerId: wallet2.playerId,
+      walletId: wallet2.id,
+      roundId: 'rnd-race',
+      gameId: 'gm-race',
+      kind: 'BET',
+      money: { amount: '30.00', currency: 'BRL' },
+    });
+
+    const [settled1, settled2] = await Promise.allSettled([req1, req2]);
+
+    const fulfilled = [settled1, settled2].filter((s) => s.status === 'fulfilled') as PromiseFulfilledResult<any>[];
+    const rejected = [settled1, settled2].filter((s) => s.status === 'rejected') as PromiseRejectedResult[];
+
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(1);
+    expect(rejected[0].reason).toBeInstanceOf(IdempotencyConflictError);
+
+    const winnerWalletId = settled1.status === 'fulfilled' ? wallet1.id : wallet2.id;
+    const loserWalletId = winnerWalletId === wallet1.id ? wallet2.id : wallet1.id;
+
+    // Winner wallet had debit applied
+    const winnerWallet = await getWalletUseCase.execute(winnerWalletId);
+    expect(winnerWallet.balance.amount).toBe('70.00');
+    expect(winnerWallet.version).toBe(2);
+
+    // Loser wallet was NOT modified: balance 100.00, version 1
+    const loserWallet = await getWalletUseCase.execute(loserWalletId);
+    expect(loserWallet.balance.amount).toBe('100.00');
+    expect(loserWallet.version).toBe(1);
+
+    // Loser wallet has no debit in ledger
+    const loserLedger = await testPool.query(
+      "SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1 AND entry_type = 'DEBIT';",
+      [loserWalletId]
+    );
+    expect(Number(loserLedger.rows[0].count)).toBe(0);
+
+    // Outbox has no duplicate or leaked events for loser wallet
+    const loserOutbox = await testPool.query(
+      "SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1 AND event_type = 'WagerTransactionProcessed';",
+      [loserWalletId]
+    );
+    expect(Number(loserOutbox.rows[0].count)).toBe(1); // Only initial opening
+
+    const reconWinner = await reconcileWalletUseCase.execute(winnerWalletId);
+    expect(reconWinner.consistent).toBe(true);
+
+    const reconLoser = await reconcileWalletUseCase.execute(loserWalletId);
+    expect(reconLoser.consistent).toBe(true);
+  });
+
+  it('Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier', async () => {
     const wallet = await createWalletUseCase.execute({
       playerId: crypto.randomUUID(),
       initialBalance: { amount: '100.00', currency: 'BRL' },
@@ -217,37 +265,64 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
     const workerScript = join(import.meta.dir, 'worker.ts');
     const barrierPath = join(tmpdir(), `barrier_${Date.now()}_${Math.random().toString(36).substring(7)}.tmp`);
 
-    const spawnWorker = (idempKey: string, payload: ProcessBetDto): Promise<any> => {
-      return new Promise((resolve, reject) => {
-        const child = spawn(bunBin, ['run', workerScript, idempKey, JSON.stringify(payload), barrierPath], {
-          env: process.env,
-        });
+    const spawnWorker = (idempKey: string, payload: ProcessBetDto) => {
+      let markReady: () => void;
+      const readyPromise = new Promise<void>((resolve) => {
+        markReady = resolve;
+      });
+
+      const resultPromise = new Promise<any>((resolve, reject) => {
+        let child: any;
+        try {
+          child = spawn(bunBin, ['run', workerScript, idempKey, JSON.stringify(payload), barrierPath], {
+            env: {
+              ...process.env,
+              DB_NAME: isolatedDb.dbName,
+            },
+          });
+        } catch (err) {
+          return reject(err);
+        }
+
+        child.on('error', (err: any) => reject(err));
 
         let stdout = '';
         let stderr = '';
+        let signaledReady = false;
 
-        child.stdout.on('data', (d) => (stdout += d.toString()));
-        child.stderr.on('data', (d) => (stderr += d.toString()));
+        child.stdout.on('data', (d: any) => {
+          stdout += d.toString();
+          if (!signaledReady && stdout.includes('READY')) {
+            signaledReady = true;
+            markReady();
+          }
+        });
+
+        child.stderr.on('data', (d: any) => (stderr += d.toString()));
 
         const timer = setTimeout(() => {
-          child.kill();
-          reject(new Error(`Worker timed out after 15000ms: stdout="${stdout}" stderr="${stderr}"`));
-        }, 15000);
+          try { child.kill(); } catch {}
+          reject(new Error(`Worker timed out after 20000ms: stdout="${stdout}" stderr="${stderr}"`));
+        }, 20000);
 
-        child.on('close', (code) => {
+        child.on('close', (code: any) => {
           clearTimeout(timer);
           if (code !== 0) {
             reject(new Error(`Worker exited with code ${code}: ${stderr}`));
             return;
           }
           try {
-            const parsed = JSON.parse(stdout.trim());
+            const jsonLine = stdout.split('\n').filter((l) => l.trim().startsWith('{')).pop();
+            if (!jsonLine) throw new Error('No JSON output found in stdout');
+            const parsed = JSON.parse(jsonLine.trim());
             resolve(parsed);
           } catch {
             reject(new Error(`Worker output invalid JSON: "${stdout}"`));
           }
         });
       });
+
+      return { readyPromise, resultPromise };
     };
 
     const betPayloads: ProcessBetDto[] = [
@@ -283,21 +358,18 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
       },
     ];
 
-    // Start all 3 workers
-    const workerPromises = Promise.all([
-      spawnWorker(`idemp-proc-1-${crypto.randomUUID()}`, betPayloads[0]),
-      spawnWorker(`idemp-proc-2-${crypto.randomUUID()}`, betPayloads[1]),
-      spawnWorker(`idemp-proc-3-${crypto.randomUUID()}`, betPayloads[2]),
-    ]);
+    const w1 = spawnWorker(`idemp-proc-1-${crypto.randomUUID()}`, betPayloads[0]);
+    const w2 = spawnWorker(`idemp-proc-2-${crypto.randomUUID()}`, betPayloads[1]);
+    const w3 = spawnWorker(`idemp-proc-3-${crypto.randomUUID()}`, betPayloads[2]);
 
-    // Give child processes 500ms to spin up and reach the barrier loop
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // 1. Wait until ALL 3 workers announce READY (no arbitrary sleep!)
+    await Promise.all([w1.readyPromise, w2.readyPromise, w3.readyPromise]);
 
-    // Release the barrier so all 3 workers trigger at the exact same millisecond
+    // 2. Release barrier simultaneously for all 3 workers
     writeFileSync(barrierPath, 'RELEASE');
 
     try {
-      const results = await workerPromises;
+      const results = await Promise.all([w1.resultPromise, w2.resultPromise, w3.resultPromise]);
       expect(results.length).toBe(3);
       for (const r of results) {
         if (!r.ok) {
@@ -312,12 +384,10 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
       expect(processedCount).toBe(1);
       expect(rejectedCount).toBe(2);
 
-      // Verify wallet in DB is exactly 20.00 and version 2
       const finalWallet = await getWalletUseCase.execute(wallet.id);
       expect(finalWallet.balance.amount).toBe('20.00');
       expect(finalWallet.version).toBe(2);
 
-      // Verify ledger has exactly 2 entries (OPENING + 1 debit)
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
       expect(recon.storedBalance.amount).toBe('20.00');

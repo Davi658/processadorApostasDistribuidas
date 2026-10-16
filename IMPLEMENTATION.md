@@ -1,46 +1,64 @@
-# Plano de execução e critérios de aceite
+# Plano de Execução e Status da Implementação
 
-## 1. Fundação de domínio — iniciada
+## 1. Status Geral da Entrega (Rodada Atual)
 
-Implementados Money, Wallet e WalletLedgerEntry, com sete testes.
-Faltam WagerTransaction, estados terminais, reversões, eventos, inbox e outbox.
+| Bloco | Requisito | Status | Teste Automatizado |
+|---|---|---|---|
+| **Bloco A** | 1. Correlation ID e Idempotência (VARCHAR 255, propagação) | **CONCLUÍDO** | `tests/integration/postgres-invariants.test.ts`, `tests/integration/http-endpoints.test.ts` |
+| **Bloco A** | 2. Proteger Transações Terminais (`IS DISTINCT FROM`, trigger reforçado) | **CONCLUÍDO** | `tests/integration/postgres-invariants.test.ts` |
+| **Bloco A** | 3. Vincular Ledger à Transação Correta (FK composta transactionId, walletId, currency) | **CONCLUÍDO** | `tests/integration/postgres-invariants.test.ts` |
+| **Bloco A** | 4. Invariantes Independentes do HTTP (Domínio isolado, regex canônica, vínculo player) | **CONCLUÍDO** | `tests/integration/postgres-invariants.test.ts`, `tests/unit/money.test.ts` |
+| **Bloco A** | 5. Erros Transitórios e Envelope de Eventos (ECONNREFUSED, 503, IntegrationEventEnvelope) | **CONCLUÍDO** | `tests/integration/http-endpoints.test.ts`, `src/domain/events/events.ts` |
+| **Bloco B** | 6. Isolar o Banco de Testes (DB descartável por execução, migrador automático, app_user) | **CONCLUÍDO** | `tests/test-db-helper.ts`, todas as suítes de integração |
+| **Bloco B** | 7. Corrigir Testes de Concorrência (Disputa real de chaves em paralelo, barreira com READY) | **CONCLUÍDO** | `tests/concurrency/concurrency.test.ts`, `tests/concurrency/worker.ts` |
+| **Bloco B** | 8. Ponto de Controle (Validação completa com PostgreSQL real) | **CONCLUÍDO** | 79 testes unitários/integração + 4 concorrência passando |
+| **Bloco C** | 9. Generalizar Processamento (BET, WIN, LOSS, REFUND, ROLLBACK unificados) | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts`, `tests/integration/http-endpoints.test.ts` |
+| **Bloco C** | 10. Implementar Referências e Reversões (Validação estrita, unicidade parcial no banco) | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts` |
+| **Bloco C** | 11. Referências Fora de Ordem (`PENDING_REFERENCE`, worker com backoff exponencial) | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts` |
+| **Bloco C** | 12. Testar Novas Operações e Reconciliação Final | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts`, `tests/integration/http-endpoints.test.ts` |
 
-Validação executada neste ambiente:
+---
 
-    node --experimental-strip-types --test tests/unit/*.test.ts
+## 2. Detalhamento das Implementações Realizadas
 
-Resultado: sete testes passaram em Node 24.19.0. Bun e Docker indisponíveis.
-O resultado não certifica execução em Bun nem equivale a uma checagem estática TypeScript.
-Com Bun disponível, executar `bun run test:unit`.
+### 2.1 Bloco A — Correções Prioritárias
+- **Migration 003 (`003_protect_terminals_and_composite_fk.sql` & `.down.sql`):**
+  - Expansão de `outbox_messages.correlation_id` e `causation_id` para `VARCHAR(255)`.
+  - Adição de colunas `reference_external_transaction_id`, `attempts` e `next_attempt_at` em `wager_transactions`.
+  - Criação de índice único parcial `uq_processed_reversal_per_reference` em `(provider_id, reference_external_transaction_id, kind) WHERE status = 'PROCESSED' AND reference_external_transaction_id IS NOT NULL`.
+  - Criação de constraint única composta `uq_wager_tx_id_wallet_currency` em `wager_transactions(id, wallet_id, currency)`.
+  - Criação da foreign key composta `fk_ledger_wager_tx_wallet_currency` ligando `wallet_ledger_entries(transaction_id, wallet_id, currency)` a `wager_transactions(id, wallet_id, currency)`.
+  - Trigger `prevent_terminal_transaction_modification()` com comparação segura `IS DISTINCT FROM` para todos os campos que definem identidade, payload e resultado original.
+- **Invariantes de Domínio e Envelope:**
+  - `Money.create` com regex `/^(?:0|[1-9]\d*)\.\d{2}$/`, rejeitando representações não-canônicas (`"00.00"`, `"01.50"`).
+  - `IntegrationEventEnvelope<T>` com serialização explícita e método estático `reconstruct()`.
+  - `DomainExceptionFilter` com extração recursiva de erro (`ECONNREFUSED`, `57P01`, `08006`, etc.) retornando HTTP 503 com diagnóstico interno seguro.
 
-## 2. Persistência e primeira fatia HTTP
+### 2.2 Bloco B — Testes e Ponto de Controle
+- **Isolamento de Banco de Dados:** Módulo `tests/test-db-helper.ts` implementa `createIsolatedTestDatabase(prefix)` e `closeAndDrop()`, gerando banco de dados descartável por execução, executando migrações como superusuário, configurando concessão restrita de privilégios para `app_user` e destruindo o banco no teardown com terminação de conexões ativas.
+- **Barreira de Concorrência Confiável:** No arquivo `tests/concurrency/worker.ts`, o processo filho anuncia `READY\n` via stdout antes de aguardar a liberação da barreira. A coordenação em `tests/concurrency/concurrency.test.ts` elimina tempos fixos de espera e trata timeouts e falhas nos filhos.
+- **Disputa Real de Chaves entre Carteiras:** Implementado teste de colisão concorrente onde duas carteiras distintas competem simultaneamente pela mesma chave de idempotência; exatamente uma vence e a carteira perdedora permanece 100% inalterada, sem ledger ou eventos parciais.
 
-Adicionar NestJS, MikroORM e dependências com lockfile gerado por Bun.
-Implementar Compose com PostgreSQL e LocalStack, migrations up/down e credenciais locais.
-Entregar abertura e consulta de wallet; provar OPENING, unicidade e reconciliação.
-Implementar BET com idempotência persistida e snapshot da resposta.
-Aceite: 50 submissões paralelas geram um débito; duas BET de 80 sobre saldo 100
-produzem exatamente uma rejeição e saldo 20 em três processos reais.
+### 2.3 Bloco C — Próxima Fatia Financeira
+- **Caso de Uso Unificado (`ProcessWagerUseCase`):**
+  - `BET`: débito com validação de saldo insuficiente (`INSUFFICIENT_FUNDS`).
+  - `WIN`: crédito com ledger `CREDIT` e incremento de versão.
+  - `LOSS`: neutro, sem alteração de saldo, sem ledger e sem incremento de versão.
+  - `REFUND`: crédito estornando BET processada com valor idêntico.
+  - `ROLLBACK`: reversão estornando BET, WIN ou REFUND. Caso o rollback de WIN não tenha saldo, rejeita com `REVERSAL_INSUFFICIENT_FUNDS`.
+- **Worker de Referências Pendentes (`ReprocessPendingReferencesUseCase`):**
+  - Consulta registros `PENDING_REFERENCE` elegíveis com lock pessimista `SKIP LOCKED`.
+  - Se a referência foi processada, executa a reversão mantendo a atomicidade financeira.
+  - Se a referência foi rejeitada ou falhou, transiciona para `REJECTED` com `REFERENCE_NOT_PROCESSED`.
+  - Se o tempo limite ou número máximo de tentativas esgotar, transiciona para `REJECTED` com `REFERENCE_NOT_FOUND`.
 
-## 3. Operações e referências
+---
 
-WIN, LOSS, REFUND e ROLLBACK; validar identidade, moeda, rodada, valor e tipo da referência.
-Definir códigos de falha estáveis, conflitos HTTP e política para dependência rejeitada.
-Aceite: reversão duplicada, reversão sem saldo e referência fora de ordem cobertas em banco real.
+## 3. Próxima Rodada (Fatia de Mensageria e Resiliência)
 
-## 4. Mensageria e recuperação
-
-Inbox e outbox na mesma transação financeira; publishers concorrentes; consumidores SQS;
-retry, DLQ, shutdown e worker de referências pendentes.
-Aceite: morte após commit/antes do ack, indisponibilidade temporária e reinício não duplicam efeitos.
-
-## 5. Entrega
-
-Logs JSON, métricas, health, paginação opaca e estável, documentação e CI.
-Aceite: todos os cenários obrigatórios do README executados com PostgreSQL/SQS reais,
-reconciliação consistente ao final e limitações descritas sem alegações não demonstradas.
-
-## Limite de escopo
-
-Não investir inicialmente em frontend, autenticação externa, dashboard ou teste de carga opcional.
-Os critérios financeiros obrigatórios precedem os diferenciais.
+Itens explicitamente delimitados para a próxima rodada (não implementados nesta entrega):
+1. **Inbox Transacional:** Deduplicação e consumo idempotente na recepção de mensagens assíncronas.
+2. **Integração SQS / LocalStack:** Conexão real com filas SQS simuladas localmente no LocalStack via Docker.
+3. **Publisher Concorrente da Outbox:** Processador em background com polling distribuído (`SKIP LOCKED`), envio ao broker e marcação transacional de mensagens publicadas.
+4. **Mecanismo de Retries e Dead-Letter Queue (DLQ):** Políticas de repetição com backoff exponencial e encaminhamento para DLQ após esgotamento.
+5. **Crash Recovery:** Recuperação de falhas e reprocessamento consistente após reinicialização súbita de instâncias.

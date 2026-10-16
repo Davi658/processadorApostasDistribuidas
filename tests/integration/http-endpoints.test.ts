@@ -4,28 +4,22 @@ import { NestFactory } from '@nestjs/core';
 import pg from 'pg';
 import { AppModule } from '../../src/interfaces/http/app.module';
 import { DomainExceptionFilter } from '../../src/interfaces/http/filters/domain-exception.filter';
-import { DatabaseMigrator } from '../../src/infrastructure/persistence/migrator';
-import { getMigrationDatabaseConfig } from '../../src/infrastructure/config/database.config';
+import { MikroOrmUnitOfWork } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
+import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
 
 describe('HTTP Endpoints Real Integration & Validation Tests', () => {
   let app: INestApplication;
   let serverUrl: string;
+  let isolatedDb: IsolatedTestDatabase;
   let adminPool: pg.Pool;
 
   beforeAll(async () => {
-    const migrator = new DatabaseMigrator();
-    await migrator.up();
-    await migrator.close();
+    // 1. Create disposable database for isolated execution
+    isolatedDb = await createIsolatedTestDatabase('http_endpoints_');
+    adminPool = new pg.Pool(isolatedDb.adminConfig);
+    adminPool.on('error', () => {});
 
-    const migConfig = getMigrationDatabaseConfig();
-    adminPool = new pg.Pool({
-      host: migConfig.host,
-      port: migConfig.port,
-      database: migConfig.database,
-      user: migConfig.user,
-      password: migConfig.password,
-    });
-
+    // 2. Start NestJS application against isolated database
     app = await NestFactory.create(AppModule, { logger: false });
     app.useGlobalFilters(new DomainExceptionFilter());
     await app.listen(0);
@@ -37,8 +31,19 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await adminPool.end();
+    if (app) {
+      try {
+        const uow = app.get(MikroOrmUnitOfWork);
+        await uow.close();
+      } catch {}
+      await app.close();
+    }
+    if (adminPool) {
+      await adminPool.end();
+    }
+    if (isolatedDb) {
+      await isolatedDb.closeAndDrop();
+    }
   });
 
   describe('Wallet Creation & Consultation Contracts', () => {
@@ -132,7 +137,7 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
     });
   });
 
-  describe('HTTP Runtime Input Validation (Requirement 3)', () => {
+  describe('HTTP Runtime Input Validation (Requirement 3 & 4)', () => {
     it('should return 400 when amount is passed as a number instead of string', async () => {
       const res = await fetch(`${serverUrl}/wallets`, {
         method: 'POST',
@@ -163,6 +168,21 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
         });
         expect(res.status).toBe(400);
       }
+    });
+
+    it('should return 400 when initialBalance contains non-canonical decimal like "00.00"', async () => {
+      const res = await fetch(`${serverUrl}/wallets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: crypto.randomUUID(),
+          initialBalance: {
+            amount: '00.00',
+            currency: 'BRL',
+          },
+        }),
+      });
+      expect(res.status).toBe(400);
     });
 
     it('should return 400 when playerId is not a valid UUID', async () => {
@@ -236,7 +256,32 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
       expect(res.status).toBe(400);
     });
 
-    it('POST /wagering/transactions should return 400 when kind is not BET', async () => {
+    it('POST /wagering/transactions should return 400 when Idempotency-Key exceeds 255 chars (256 chars)', async () => {
+      const key256 = 'K'.repeat(256);
+      const res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': key256,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-1',
+          externalTransactionId: 'ext-1',
+          playerId: crypto.randomUUID(),
+          walletId: crypto.randomUUID(),
+          roundId: 'r-1',
+          gameId: 'g-1',
+          kind: 'BET',
+          money: { amount: '10.00', currency: 'BRL' },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.message).toContain('255 characters');
+    });
+
+    it('POST /wagering/transactions should return 400 when kind is not in allowed kinds', async () => {
       const res = await fetch(`${serverUrl}/wagering/transactions`, {
         method: 'POST',
         headers: {
@@ -250,7 +295,7 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
           walletId: crypto.randomUUID(),
           roundId: 'r-1',
           gameId: 'g-1',
-          kind: 'WIN',
+          kind: 'UNSUPPORTED_ACTION',
           money: { amount: '10.00', currency: 'BRL' },
         }),
       });
@@ -282,6 +327,102 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
       expect(res.status).toBe(400);
       const body = (await res.json()) as any;
       expect(body.message).toContain('cannot be empty or contain only whitespace');
+    });
+  });
+
+  describe('Idempotency-Key Lengths & Outbox Propagation (Requirement 1)', () => {
+    it('should accept 128, 129, and 255 char keys without truncation and persist in outbox with full length', async () => {
+      const createRes = await fetch(`${serverUrl}/wallets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '500.00', currency: 'BRL' },
+        }),
+      });
+      const wallet = (await createRes.json()) as any;
+
+      const testKeys = [
+        'A'.repeat(128),
+        'B'.repeat(129),
+        'C'.repeat(255),
+      ];
+
+      for (const key of testKeys) {
+        const extTx = `ext-${key.slice(0, 10)}-${crypto.randomUUID()}`;
+        const res = await fetch(`${serverUrl}/wagering/transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': key,
+          },
+          body: JSON.stringify({
+            providerId: 'prov-keys',
+            externalTransactionId: extTx,
+            playerId: wallet.playerId,
+            walletId: wallet.id,
+            roundId: 'r-keys',
+            gameId: 'g-keys',
+            kind: 'BET',
+            money: { amount: '10.00', currency: 'BRL' },
+          }),
+        });
+
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as any;
+        expect(body.status).toBe('PROCESSED');
+
+        // Verify outbox message saved with correlation_id matching full key
+        const outboxRes = await adminPool.query(
+          'SELECT correlation_id FROM outbox_messages WHERE correlation_id = $1;',
+          [key]
+        );
+        expect(outboxRes.rows.length).toBeGreaterThanOrEqual(1);
+        expect(outboxRes.rows[0].correlation_id).toBe(key);
+        expect(outboxRes.rows[0].correlation_id.length).toBe(key.length);
+      }
+    });
+
+    it('should propagate independent x-correlation-id header when provided', async () => {
+      const createRes = await fetch(`${serverUrl}/wallets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        }),
+      });
+      const wallet = (await createRes.json()) as any;
+
+      const idempKey = `idemp-independent-${crypto.randomUUID()}`;
+      const correlationId = `corr-${'X'.repeat(200)}`;
+
+      const res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempKey,
+          'x-correlation-id': correlationId,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-corr',
+          externalTransactionId: `ext-corr-${crypto.randomUUID()}`,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-corr',
+          gameId: 'g-corr',
+          kind: 'BET',
+          money: { amount: '15.00', currency: 'BRL' },
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const outboxRes = await adminPool.query(
+        'SELECT correlation_id FROM outbox_messages WHERE correlation_id = $1;',
+        [correlationId]
+      );
+      expect(outboxRes.rows.length).toBeGreaterThanOrEqual(1);
+      expect(outboxRes.rows[0].correlation_id).toBe(correlationId);
     });
   });
 
@@ -418,6 +559,230 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
       expect(reconBody.calculatedBalance).toEqual({ amount: '40.00', currency: 'BRL' });
       expect(reconBody.difference).toEqual({ amount: '0.00', currency: 'BRL' });
       expect(reconBody.checkedEntries).toBe(2);
+    });
+  });
+
+  describe('HTTP Extended Wager Operations (WIN, LOSS, REFUND, ROLLBACK)', () => {
+    it('POST /wagering/transactions should handle WIN, LOSS, REFUND, and ROLLBACK correctly via HTTP', async () => {
+      const createRes = await fetch(`${serverUrl}/wallets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        }),
+      });
+      const wallet = (await createRes.json()) as any;
+
+      // 1. BET: -30.00 -> balance: 70.00
+      const betExtId = `bet-http-${crypto.randomUUID()}`;
+      const betRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `key-${betExtId}`,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-http',
+          externalTransactionId: betExtId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-http-1',
+          gameId: 'g-http-1',
+          kind: 'BET',
+          money: { amount: '30.00', currency: 'BRL' },
+        }),
+      });
+      expect(betRes.status).toBe(200);
+      expect(((await betRes.json()) as any).balance.amount).toBe('70.00');
+
+      // 2. WIN: +50.00 -> balance: 120.00
+      const winExtId = `win-http-${crypto.randomUUID()}`;
+      const winRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `key-${winExtId}`,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-http',
+          externalTransactionId: winExtId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-http-1',
+          gameId: 'g-http-1',
+          kind: 'WIN',
+          money: { amount: '50.00', currency: 'BRL' },
+        }),
+      });
+      expect(winRes.status).toBe(200);
+      expect(((await winRes.json()) as any).balance.amount).toBe('120.00');
+
+      // 3. LOSS: 0.00 -> balance remains 120.00, version unchanged
+      const lossExtId = `loss-http-${crypto.randomUUID()}`;
+      const lossRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `key-${lossExtId}`,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-http',
+          externalTransactionId: lossExtId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-http-1',
+          gameId: 'g-http-1',
+          kind: 'LOSS',
+          money: { amount: '0.00', currency: 'BRL' },
+        }),
+      });
+      expect(lossRes.status).toBe(200);
+      expect(((await lossRes.json()) as any).balance.amount).toBe('120.00');
+
+      // 4. REFUND on BET: reverses BET (+30.00) -> balance: 150.00
+      const refundExtId = `ref-http-${crypto.randomUUID()}`;
+      const refundRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `key-${refundExtId}`,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-http',
+          externalTransactionId: refundExtId,
+          referenceExternalTransactionId: betExtId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-http-1',
+          gameId: 'g-http-1',
+          kind: 'REFUND',
+          money: { amount: '30.00', currency: 'BRL' },
+        }),
+      });
+      expect(refundRes.status).toBe(200);
+      expect(((await refundRes.json()) as any).balance.amount).toBe('150.00');
+
+      // 5. ROLLBACK on WIN: reverses WIN (-50.00) -> balance: 100.00
+      const rollbackExtId = `rb-http-${crypto.randomUUID()}`;
+      const rollbackRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `key-${rollbackExtId}`,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-http',
+          externalTransactionId: rollbackExtId,
+          referenceExternalTransactionId: winExtId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-http-1',
+          gameId: 'g-http-1',
+          kind: 'ROLLBACK',
+          money: { amount: '50.00', currency: 'BRL' },
+        }),
+      });
+      expect(rollbackRes.status).toBe(200);
+      expect(((await rollbackRes.json()) as any).balance.amount).toBe('100.00');
+
+      // 6. Reconciliation must be fully consistent
+      const reconRes = await fetch(`${serverUrl}/wallets/${wallet.id}/reconciliation`, {
+        method: 'POST',
+      });
+      expect(reconRes.status).toBe(200);
+      const recon = (await reconRes.json()) as any;
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('100.00');
+      expect(recon.calculatedBalance.amount).toBe('100.00');
+    });
+
+    it('POST /wagering/transactions should return 202 Accepted when reference is missing (PENDING_REFERENCE)', async () => {
+      const createRes = await fetch(`${serverUrl}/wallets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        }),
+      });
+      const wallet = (await createRes.json()) as any;
+
+      const refundExtId = `ref-async-${crypto.randomUUID()}`;
+      const missingBetExtId = `bet-not-yet-${crypto.randomUUID()}`;
+
+      const res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `key-${refundExtId}`,
+        },
+        body: JSON.stringify({
+          providerId: 'prov-http',
+          externalTransactionId: refundExtId,
+          referenceExternalTransactionId: missingBetExtId,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-async',
+          gameId: 'g-async',
+          kind: 'REFUND',
+          money: { amount: '25.00', currency: 'BRL' },
+        }),
+      });
+
+      expect(res.status).toBe(202);
+      const body = (await res.json()) as any;
+      expect(body.status).toBe('PENDING_REFERENCE');
+      expect(body.transactionId).toBeDefined();
+    });
+  });
+
+  describe('Transient Error Handling (Requirement 5)', () => {
+    it('DomainExceptionFilter should map connection errors and PostgreSQL transient codes to 503', () => {
+      const filter = new DomainExceptionFilter();
+      let capturedStatus = 0;
+      let capturedJson: any = null;
+
+      const mockResponse = {
+        status: (code: number) => {
+          capturedStatus = code;
+          return {
+            json: (body: any) => {
+              capturedJson = body;
+            },
+          };
+        },
+      };
+
+      const mockHost = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+          getRequest: () => ({}),
+        }),
+      } as any;
+
+      // 1. Test ECONNREFUSED
+      const connError = new Error('connect ECONNREFUSED 127.0.0.1:5432');
+      (connError as any).code = 'ECONNREFUSED';
+      filter.catch(connError, mockHost);
+
+      expect(capturedStatus).toBe(503);
+      expect(capturedJson.code).toBe('SERVICE_UNAVAILABLE');
+      expect(capturedJson.message).toBe('The service is temporarily unavailable. Please retry shortly.');
+
+      // 2. Test PostgreSQL transient code 57P01 (admin_shutdown)
+      const pgTransientError = new Error('terminating connection due to administrator command');
+      (pgTransientError as any).code = '57P01';
+      filter.catch(pgTransientError, mockHost);
+
+      expect(capturedStatus).toBe(503);
+      expect(capturedJson.code).toBe('SERVICE_UNAVAILABLE');
+
+      // 3. Non-transient errors should not be 503
+      const regularError = new Error('Some unexpected internal error');
+      filter.catch(regularError, mockHost);
+      expect(capturedStatus).toBe(500);
+      expect(capturedJson.code).toBe('INTERNAL_SERVER_ERROR');
     });
   });
 });

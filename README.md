@@ -1,6 +1,6 @@
 # Processador Financeiro de Apostas Distribuídas
 
-Backend financeiro independente e resiliente para processamento de transações de apostas, construído com foco em **precisão monetária estrita**, **idempotência persistente**, **garantias contábeis imutáveis**, **integração transacional com MikroORM** e **controle de concorrência com PostgreSQL real**.
+Backend financeiro independente e resiliente para processamento de transações de apostas, construído com foco em **precisão monetária estrita**, **idempotência persistente**, **garantias contábeis imutáveis**, **integração transacional com MikroORM**, **reversões referenciadas** e **controle de concorrência com PostgreSQL real**.
 
 ---
 
@@ -16,7 +16,7 @@ A verificação do ambiente local identificou:
 | **PostgreSQL** | PostgreSQL Real | **Instalado e Operacional** (v16.8) | Binários em `~/.pgsql/pgsql`, cluster em `~/.pgsql_data`, porta 5432 |
 
 > [!NOTE]
-> Conforme a restrição de **nunca substituir PostgreSQL por SQLite ou mocks**, o PostgreSQL 16.8 foi executado localmente na porta padrão 5432 com banco `betting_db` e usuário `app_user` com privilégios estritamente delimitados (sem permissão de `TRUNCATE` e sem superusuário).
+> Conforme a restrição mandatória de **nunca substituir PostgreSQL por SQLite ou mocks**, o PostgreSQL 16.8 está em execução local na porta padrão 5432. Os testes rodam contra bancos descartáveis isolados (`betting_test_*` e `http_endpoints_*`), executados pelo usuário de aplicação `app_user` com privilégios estritamente delimitados (sem permissão de `TRUNCATE` e sem superusuário).
 
 ---
 
@@ -57,7 +57,7 @@ docker-compose up -d
 O projeto possui um runner autônomo de migrações que suporta operações UP e DOWN incrementais com rastreamento na tabela `schema_migrations` e proteção contra execução concorrente via PostgreSQL Advisory Lock (`pg_advisory_xact_lock`):
 
 ```bash
-# Aplicar todas as migrações (001 e 002)
+# Aplicar todas as migrações (001, 002 e 003)
 bun run src/infrastructure/persistence/migrator.ts up
 
 # Reverter migrações de forma limpa
@@ -68,22 +68,22 @@ bun run src/infrastructure/persistence/migrator.ts down
 
 ### 3.3 Execução da Suíte de Testes
 
-Todas as suítes utilizam **Bun Test**, executam com isolamento de processos via `process.execPath` e interagem com o **PostgreSQL real**:
+Todas as suítes utilizam **Bun Test**, executam com isolamento de processos e banco descartável por execução, interagindo com o **PostgreSQL real**:
 
 ```bash
-# Executar verificação de tipos estritos TypeScript
+# Executar verificação de tipos estritos TypeScript (0 erros)
 bun run typecheck
 
-# Executar TODOS os testes (unitários, integração e concorrência)
+# Executar TODOS os testes unitários e de integração (79 testes)
 bun test
 
 # Executar testes unitários de domínio (Money, Wallet, Ledger)
 bun run test:unit
 
-# Executar testes de integração com PostgreSQL real (Invariantes, Migrações descartáveis e HTTP)
+# Executar testes de integração com PostgreSQL real (Invariantes, Migrações descartáveis, Operações e HTTP)
 bun run test:integration
 
-# Executar testes de alta concorrência (50 requests paralelas, corrida de saldo e barreira de sincronização entre 3 processos de SO)
+# Executar testes de alta concorrência (50 requests paralelas, corrida de saldo, chave disputada em paralelo e barreira de sincronização entre 3 processos)
 bun run test:concurrency
 ```
 
@@ -100,307 +100,42 @@ bun run start
 # Modo de desenvolvimento com auto-reload
 bun run start:dev
 ```
-A API iniciará por padrão em `http://localhost:3000`.
 
 ---
 
-## 4. Contratos HTTP Alinhados (Exemplos cURL)
+## 4. Matriz de Operações Financeiras Suportadas
 
-### 4.1 Abertura de Carteira (`POST /wallets`)
+A API e o caso de uso unificado `ProcessWagerUseCase` processam as seguintes operações financeiras:
 
-#### Com saldo inicial positivo (gera transação `OPENING`, crédito no ledger e eventos de outbox):
-```bash
-curl -X POST http://localhost:3000/wallets \
-  -H "Content-Type: application/json" \
-  -d '{
-    "playerId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    "initialBalance": {
-      "amount": "100.00",
-      "currency": "BRL"
-    }
-  }'
-```
-**Resposta (201 Created):**
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "playerId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-  "balance": {
-    "amount": "100.00",
-    "currency": "BRL"
-  },
-  "version": 1
-}
-```
+| Operação | Natureza | Efeito no Saldo | Registro no Ledger | Version | Reversão / Referência |
+|---|---|---|---|---|---|
+| `BET` | Débito | Deduz valor | Sim (`DEBIT`) | Incrementa (+1) | N/A. Rejeita se saldo insuficiente (`INSUFFICIENT_FUNDS`) |
+| `WIN` | Crédito | Adiciona valor | Sim (`CREDIT`) | Incrementa (+1) | N/A. Exige valor > 0 |
+| `LOSS` | Neutro | Inalterado | **Não** | **Inalterado** | N/A. Aceita valor "0.00" |
+| `REFUND` | Crédito | Adiciona valor da BET | Sim (`CREDIT`) | Incrementa (+1) | Referencia `BET` processada. Reverte valor integral |
+| `ROLLBACK` | Reversão | Movimento inverso | Sim (Inverso) | Incrementa (+1) | Referencia `BET` (crédito), `WIN` (débito) ou `REFUND` (débito) |
 
-#### Com saldo inicial zero explícito (sem lançamento no ledger e sem eventos de outbox):
-```bash
-curl -X POST http://localhost:3000/wallets \
-  -H "Content-Type: application/json" \
-  -d '{
-    "playerId": "b1ffcd88-8b1a-4fe7-aa5c-5aa8ac270b22",
-    "initialBalance": {
-      "amount": "0.00",
-      "currency": "BRL"
-    }
-  }'
-```
-> [!IMPORTANT]
-> Saldo zero deve ser explicitamente fornecido como `"0.00"`. A fronteira HTTP rejeita `null`, `0`, `false` ou strings vazias com `400 Bad Request`.
+### 4.1 Ciclo de Vida Explícito da Transação
+
+Toda transação nasce no estado `PENDING` e transiciona deterministicamente para um dos estados terminais ou pendência de referência:
+- `PENDING` -> `PROCESSED`: Operação autorizada, saldo alterado (ou LOSS neutro), ledger e outbox gravados atomicamente.
+- `PENDING` -> `REJECTED`: Operação recusada por regra de negócio (ex: saldo insuficiente, referência não processada). Snapshot preservado para replay idempotente idêntico.
+- `PENDING` -> `FAILED`: Falha técnica não recuperável.
+- `PENDING` -> `PENDING_REFERENCE`: Operação de reversão recebida fora de ordem antes da transação de referência. Retorna HTTP 202 Accepted. Reprocessada via worker com backoff exponencial.
 
 ---
 
-### 4.2 Consulta de Carteira (`GET /wallets/:walletId`)
+## 5. Idempotência Persistente e Correlação
 
-```bash
-curl -X GET http://localhost:3000/wallets/3fa85f64-5717-4562-b3fc-2c963f66afa6
-```
-**Resposta (200 OK):**
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "playerId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-  "balance": {
-    "amount": "100.00",
-    "currency": "BRL"
-  },
-  "version": 1
-}
-```
+- **Chaves de até 255 Caracteres:** A coluna `outbox_messages.correlation_id` e `causation_id` foi expandida para `VARCHAR(255)`. Chaves de 128, 129 e 255 caracteres são aceitas sem truncamento e sem erros de persistência. Chaves maiores que 255 caracteres são rejeitadas com HTTP 400.
+- **Correlação Independente:** O cabeçalho `x-correlation-id` propaga o identificador de rastreabilidade fim a fim pelos casos de uso e outbox, mantendo a chave integral `Idempotency-Key` como identidade transacional e de causalidade (`causationId`).
+- **Detecção Segura de Conflito Concorrente:** Quando uma requisição com mesma chave porém payload divergente disputa inserção no PostgreSQL, o erro de violação de unicidade (`23505`) é resolvido fora da transação abortada, retornando HTTP 409 Conflict sem corromper o estado da carteira.
 
 ---
 
-### 4.3 Processamento de Aposta (`POST /wagering/transactions`)
+## 6. Integridade Relacional e Proteções no PostgreSQL
 
-O cabeçalho `Idempotency-Key` é obrigatório. O payload requer o envelope de dinheiro `{ amount, currency }`.
-
-```bash
-curl -X POST http://localhost:3000/wagering/transactions \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: idempotency-key-uuid-1" \
-  -d '{
-    "providerId": "provider-a",
-    "externalTransactionId": "transaction-123",
-    "playerId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    "walletId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    "roundId": "round-987",
-    "gameId": "fortune-chimp",
-    "kind": "BET",
-    "money": {
-      "amount": "25.00",
-      "currency": "BRL"
-    }
-  }'
-```
-**Resposta de Processamento com Sucesso (200 OK):**
-```json
-{
-  "transactionId": "b8f683e9-74d2-43bb-81c8-c8005b61f9aa",
-  "status": "PROCESSED",
-  "balance": {
-    "amount": "75.00",
-    "currency": "BRL"
-  },
-  "idempotentReplay": false
-}
-```
-
-#### Replay Idempotente:
-Ao reenviar a requisição com a **mesma** `Idempotency-Key` e o **mesmo** corpo:
-- O backend não executa novo débito nem gera novo lançamento no ledger ou outbox.
-- Retorna `HTTP 200` com os dados originais, o saldo observado original e `idempotentReplay: true`:
-```json
-{
-  "transactionId": "b8f683e9-74d2-43bb-81c8-c8005b61f9aa",
-  "status": "PROCESSED",
-  "balance": {
-    "amount": "75.00",
-    "currency": "BRL"
-  },
-  "idempotentReplay": true
-}
-```
-
-#### Rejeição por Saldo Insuficiente:
-Ao submeter uma aposta de `90.00` quando o saldo disponível é `75.00`:
-**Resposta (422 Unprocessable Entity):**
-```json
-{
-  "transactionId": "c9a712f0-83b1-42cb-92d9-d9116c72e0bb",
-  "status": "REJECTED",
-  "failureCode": "INSUFFICIENT_FUNDS",
-  "balance": {
-    "amount": "75.00",
-    "currency": "BRL"
-  },
-  "idempotentReplay": false
-}
-```
-A rejeição é persistida para fins de auditoria, gerando evento de outbox `WagerTransactionRejected`, mas **sem mutação de saldo e sem lançamento no ledger**. Se a mesma chave for reenviada, retorna a mesma rejeição com `idempotentReplay: true`.
-
----
-
-### 4.4 Reconciliação Contábil (`POST /wallets/:walletId/reconciliation`)
-
-Compara o saldo armazenado na carteira com a soma de todos os lançamentos contábeis no ledger sob contexto transacional consistente:
-
-```bash
-curl -X POST http://localhost:3000/wallets/3fa85f64-5717-4562-b3fc-2c963f66afa6/reconciliation
-```
-**Resposta (200 OK):**
-```json
-{
-  "walletId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "storedBalance": {
-    "amount": "75.00",
-    "currency": "BRL"
-  },
-  "calculatedBalance": {
-    "amount": "75.00",
-    "currency": "BRL"
-  },
-  "difference": {
-    "amount": "0.00",
-    "currency": "BRL"
-  },
-  "consistent": true,
-  "checkedEntries": 2
-}
-```
-> [!NOTE]
-> Todos os valores monetários retornam no formato `{ amount, currency }`. O campo `difference` admite resultados negativos caso exista discrepância auditada.
-
----
-
-## 5. Estrutura de Arquivos
-
-```
-d:\processadorApostasDistribuidas/
-├── .env                                       # Configurações de ambiente locais
-├── .env.example                               # Exemplo seguro sem credenciais reais
-├── .gitignore                                 # Padrões ignorados (node_modules, logs, etc.)
-├── ARCHITECTURE.md                            # Documentação técnica e de invariantes
-├── IMPLEMENTATION.md                          # Critérios de aceite e plano de fases
-├── README.md                                  # Guia de execução e documentação da API
-├── bun.lock                                   # Lockfile estrito gerado pelo Bun
-├── docker-compose.yml                         # Manifesto compose para PostgreSQL
-├── package.json                               # Dependências e scripts de automação
-├── tsconfig.json                              # Configuração estrita do TypeScript
-│
-├── scripts/
-│   ├── db-start.ps1                           # Inicialização do PostgreSQL nativo em background
-│   ├── db-stop.ps1                            # Parada controlada do PostgreSQL nativo
-│   └── init-db.sql                            # Criação do banco betting_db e usuário app_user
-│
-├── src/
-│   ├── main.ts                                # Ponto de entrada do NestJS com CORS e validação
-│   │
-│   ├── domain/                                # Domínio puro isolado
-│   │   ├── entities/
-│   │   │   ├── wager-transaction.entity.ts    # Transação financeira de aposta / abertura
-│   │   │   ├── wallet-ledger-entry.entity.ts  # Entrada imutável de livro-razão contábil
-│   │   │   └── wallet.entity.ts               # Agregado Wallet com versionamento e saldo
-│   │   ├── errors/
-│   │   │   └── domain.error.ts                # Hierarquia de erros tipados de negócio
-│   │   ├── events/
-│   │   │   └── events.ts                      # IntegrationEvent<T> e subclasses de eventos de domínio
-│   │   └── value-objects/
-│   │       └── money.vo.ts                    # Objeto de valor Money (BigInt em centavos)
-│   │
-│   ├── application/                           # Casos de uso e portas de entrada
-│   │   ├── dto/
-│   │   │   ├── common.dto.ts                  # DTO compartilhado MoneyObjectDto
-│   │   │   ├── wager.dto.ts                   # DTOs de aposta alinhados ao contrato
-│   │   │   └── wallet.dto.ts                  # DTOs de carteira e reconciliação
-│   │   ├── ports/
-│   │   │   └── ports.ts                       # Interfaces de repositórios e Unit of Work
-│   │   └── use-cases/
-│   │       ├── create-wallet.use-case.ts      # Abertura de carteira transacional
-│   │       ├── get-wallet.use-case.ts         # Consulta de dados de carteira
-│   │       ├── process-bet.use-case.ts        # Processamento de BET com lock de linha e idempotência
-│   │       └── reconcile-wallet.use-case.ts   # Reconciliação de saldo vs ledger
-│   │
-│   ├── infrastructure/                        # Adaptadores de persistência e configuração
-│   │   ├── config/
-│   │   │   └── database.config.ts             # Centralização de credenciais e opções de banco
-│   │   └── persistence/
-│   │       ├── migrations/
-│   │       │   ├── 001_initial_schema.sql     # Schema inicial
-│   │       │   ├── 001_initial_schema.down.sql# Reversão 001
-│   │       │   ├── 002_reinforce_schema_and_outbox.sql     # Reforço de schema, triggers e outbox
-│   │       │   └── 002_reinforce_schema_and_outbox.down.sql# Reversão 002
-│   │       ├── mikro-orm/
-│   │       │   ├── entities/
-│   │       │   │   └── orm-entities.ts        # Mapeamento declarativo de entidades MikroORM
-│   │       │   ├── mikro-orm-adapter.ts       # MikroOrmUnitOfWork e repositórios com EntityManager
-│   │       │   └── mikro-orm.config.ts        # Configuração do MikroORM para PostgreSQL
-│   │       ├── postgres/
-│   │       │   └── postgres-adapter.ts        # Re-export unificado para evitar duplicação de UoW
-│   │       └── migrator.ts                    # Runner de migrações com advisory lock e tracking
-│   │
-│   └── interfaces/                            # Apresentação HTTP
-│       └── http/
-│           ├── controllers/
-│           │   ├── wagering.controller.ts     # Controller POST /wagering/transactions
-│           │   └── wallet.controller.ts       # Controller POST /wallets, GET /wallets/:id, reconciliação
-│           ├── filters/
-│           │   └── domain-exception.filter.ts # Filtro global de tratamento e códigos HTTP
-│           ├── validation/
-│           │   └── http-validator.ts          # Validador rigoroso de fronteira HTTP em runtime
-│           └── app.module.ts                  # Módulo raiz NestJS com ciclo do MikroORM
-│
-└── tests/
-    ├── unit/                                  # Testes unitários do domínio financeiro
-    │   ├── money.test.ts                      # 12 testes de precisão, escala, imutabilidade de Money
-    │   ├── wallet-ledger-entry.test.ts        # 5 testes de verificação aritmética do ledger
-    │   └── wallet.test.ts                     # 7 testes de abertura, crédito, débito e versão
-    │
-    ├── integration/                           # Testes de integração com PostgreSQL real
-    │   ├── http-endpoints.test.ts             # 13 testes de contratos HTTP e validações de fronteira
-    │   ├── migrations.test.ts                 # 1 teste de UP e DOWN incremental em banco descartável
-    │   └── postgres-invariants.test.ts        # 17 testes de constraints, falhas atômicas e triggers
-    │
-    └── concurrency/                           # Testes de alta concorrência
-        ├── concurrency.test.ts                # 3 testes (50 reqs, corrida 80/100, 3 processos de SO)
-        └── worker.ts                          # Script de processo com barreira de sincronização
-```
-
----
-
-## 6. Resultados Reais da Execução dos Testes
-
-Testes executados com Bun 1.4.3 e PostgreSQL 16.8 real:
-
-| Suíte | Arquivo | Testes | Asserções | Status |
-|---|---|---|---|---|
-| **Unit** | `money.test.ts` | 12 | 24 | ✅ Passou |
-| **Unit** | `wallet-ledger-entry.test.ts` | 5 | 15 | ✅ Passou |
-| **Unit** | `wallet.test.ts` | 7 | 56 | ✅ Passou |
-| **Integration** | `postgres-invariants.test.ts` | 17 | 93 | ✅ Passou |
-| **Integration** | `migrations.test.ts` | 1 | 8 | ✅ Passou |
-| **Integration** | `http-endpoints.test.ts` | 13 | 40 | ✅ Passou |
-| **Concurrency** | `concurrency.test.ts` | 3 | 184 | ✅ Passou |
-| **Total Geral** | **7 arquivos** | **58 testes** | **418 asserções** | **100% Sucesso** |
-
----
-
-## 7. Diferenciação de Escopo: Implementado, Testado e Lacunas Futuras
-
-### ✅ Implementado e Testado
-- Objeto de valor `Money` com `BigInt` em centavos, sem conversão para ponto flutuante, imutável e com detecção de moedas divergentes.
-- Agregado `Wallet` com versionamento atômico, criação com e sem saldo, integridade de saldo não negativo.
-- Unidade de trabalho transacional integrada exclusivamente via MikroORM (`EntityManager.transactional()`), com isolamento por requisição via `AsyncLocalStorage`.
-- Lock pessimista `LockMode.PESSIMISTIC_WRITE` (`FOR UPDATE`) na linha da carteira.
-- `WalletLedgerEntry` com verificação de aritmética contábil e trigger de imutabilidade no banco de dados.
-- Triggers de banco que impedem alteração de transações em estado terminal e bloqueiam `UPDATE`/`DELETE` no ledger.
-- `app_user` auditado com permissões mínimas e sem direito a `TRUNCATE`.
-- Migrações incrementais reversíveis (`001` e `002`) com runner protegido por advisory lock (`pg_advisory_xact_lock`).
-- Validação rigorosa na fronteira HTTP em runtime (`HttpValidator`), rejeitando coerção implícita de tipos, números para valores monetários, propriedades inesperadas e strings vazias.
-- Idempotência persistente com hash SHA-256 canônico normalizado, replay seguro com saldo original e resolução de corridas 23505 sem reuso de transações PostgreSQL abortadas.
-- Testes com injeção de falhas atômicas comprovando rollback completo e reprocessamento limpo.
-- Testes de concorrência com 50 submissões simultâneas, corrida de saldo com rejeição de saldo insuficiente e coordenação de 3 processos reais via barreira de sincronização em arquivo temporário.
-
-### ⏳ Fases Futuras Obrigatórias (Fora do Escopo desta Etapa)
-- Operações de aposta adicionais (`WIN`, `LOSS`, `REFUND`, `ROLLBACK`).
-- Worker/Publisher para leitura da tabela `outbox_messages` e despacho confiável para **AWS SQS** (broker estipulado pelo desafio).
-- Gestão de credenciais, autenticação e autorização por provedor de jogos.
+1. **Integridade Referencial Composta no Ledger:** Constraint `fk_ledger_wager_tx_wallet_currency` em `wallet_ledger_entries(transaction_id, wallet_id, currency) REFERENCES wager_transactions(id, wallet_id, currency)`. Garante fisicamente no banco que nenhum lançamento da carteira B possa referenciar uma transação da carteira A, nem com moeda divergente.
+2. **Proteção Rigorosa de Estados Terminais:** Trigger `prevent_terminal_transaction_modification()` utiliza `IS DISTINCT FROM` para proteger todos os campos que definem identidade, payload e resultado original (`wallet_id`, `player_id`, `provider_id`, `external_transaction_id`, `round_id`, `game_id`, `kind`, `amount`, `currency`, `idempotency_key`, `payload_hash`, `response_snapshot`, `status`) quando a transação está em estado terminal (`PROCESSED`, `REJECTED`, `FAILED`).
+3. **Unicidade de Reversão por Tipo e Referência:** Índice parcial `uq_processed_reversal_per_reference` em `(provider_id, reference_external_transaction_id, kind) WHERE status = 'PROCESSED' AND reference_external_transaction_id IS NOT NULL`. Impede no banco que duas reversões do mesmo tipo sejam processadas para a mesma referência.
+4. **Resiliência a Erros Transitórios:** `DomainExceptionFilter` reconhece erros de conexão como `ECONNREFUSED`, `ETIMEDOUT`, `ECONNRESET` e códigos PostgreSQL de shutdown/sobrecarga (`57P01`, `08006`, `08001`, `53300`, `40001`, `40P01`), retornando HTTP 503 `SERVICE_UNAVAILABLE` com mensagem segura sem expor dados internos.

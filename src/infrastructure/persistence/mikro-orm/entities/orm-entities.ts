@@ -31,6 +31,7 @@ export class WalletOrmEntity {
 @Entity({ tableName: 'wager_transactions' })
 @Unique({ properties: ['providerId', 'externalTransactionId'], name: 'uq_wager_transactions_provider_external' })
 @Unique({ properties: ['idempotencyKey'], name: 'uq_wager_transactions_idempotency_key' })
+@Unique({ properties: ['id', 'walletId', 'currency'], name: 'uq_wager_tx_id_wallet_currency' })
 export class WagerTransactionOrmEntity {
   @PrimaryKey({ type: 'uuid' })
   id!: string;
@@ -77,6 +78,15 @@ export class WagerTransactionOrmEntity {
 
   @Property({ fieldName: 'response_snapshot', type: 'json', nullable: true })
   responseSnapshot?: any | null;
+
+  @Property({ fieldName: 'reference_external_transaction_id', length: 128, nullable: true })
+  referenceExternalTransactionId?: string | null;
+
+  @Property({ default: 0 })
+  attempts: number = 0;
+
+  @Property({ fieldName: 'next_attempt_at', columnType: 'timestamptz', nullable: true })
+  nextAttemptAt?: Date | null;
 
   @Property({ fieldName: 'created_at', columnType: 'timestamptz' })
   createdAt: Date = new Date();
@@ -133,10 +143,10 @@ export class OutboxMessageOrmEntity {
   @Property({ default: 1 })
   version!: number;
 
-  @Property({ fieldName: 'correlation_id', length: 128, default: '' })
+  @Property({ fieldName: 'correlation_id', length: 255, default: '' })
   correlationId!: string;
 
-  @Property({ fieldName: 'causation_id', length: 128, nullable: true })
+  @Property({ fieldName: 'causation_id', length: 255, nullable: true })
   causationId?: string | null;
 
   @Property({ fieldName: 'occurred_at', columnType: 'timestamptz' })

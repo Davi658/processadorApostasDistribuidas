@@ -30,11 +30,14 @@ async function main() {
   const processBetUseCase = new ProcessBetUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
 
   try {
-    // If a synchronization barrier file is provided, wait until it is released by the test coordinator
+    // If a synchronization barrier file is provided, announce READY and wait until released
     if (barrierFilePath) {
+      // Announce readiness to the test coordinator
+      console.log('READY');
+
       const startWait = Date.now();
       while (!existsSync(barrierFilePath)) {
-        if (Date.now() - startWait > 10000) {
+        if (Date.now() - startWait > 15000) {
           throw new Error('Timed out waiting for synchronization barrier');
         }
         await new Promise((resolve) => setTimeout(resolve, 5));

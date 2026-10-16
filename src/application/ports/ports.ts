@@ -1,7 +1,7 @@
 import { Wallet } from '../../domain/entities/wallet.entity';
 import { WagerTransaction } from '../../domain/entities/wager-transaction.entity';
 import { WalletLedgerEntry } from '../../domain/entities/wallet-ledger-entry.entity';
-import { IntegrationEvent } from '../../domain/events/events';
+import { IntegrationEvent, IntegrationEventEnvelope } from '../../domain/events/events';
 
 export interface WalletRepositoryPort {
   findById(id: string, lockForUpdate?: boolean): Promise<Wallet | null>;
@@ -13,6 +13,8 @@ export interface WagerTransactionRepositoryPort {
   findById(id: string): Promise<WagerTransaction | null>;
   findByIdempotencyKey(key: string): Promise<WagerTransaction | null>;
   findByProviderAndExternalId(providerId: string, externalTransactionId: string): Promise<WagerTransaction | null>;
+  findByProviderAndReference(providerId: string, referenceExternalTransactionId: string, kind?: string): Promise<WagerTransaction | null>;
+  listPendingReferences(limit?: number): Promise<WagerTransaction[]>;
   save(transaction: WagerTransaction): Promise<void>;
 }
 
@@ -23,6 +25,8 @@ export interface WalletLedgerRepositoryPort {
 
 export interface OutboxRepositoryPort {
   save(event: IntegrationEvent<unknown>): Promise<void>;
+  listUnpublished(limit?: number): Promise<IntegrationEventEnvelope[]>;
+  findById(id: string): Promise<IntegrationEventEnvelope | null>;
 }
 
 export interface UnitOfWorkPort {

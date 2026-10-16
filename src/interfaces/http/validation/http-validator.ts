@@ -1,11 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { CreateWalletDto } from '../../../application/dto/wallet.dto';
-import { ProcessBetDto } from '../../../application/dto/wager.dto';
+import { ProcessWagerDto, WagerOperationKind } from '../../../application/dto/wager.dto';
 import { MoneyObjectDto } from '../../../application/dto/common.dto';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DECIMAL_AMOUNT_REGEX = /^\d+\.\d{2}$/;
-const SIGNED_DECIMAL_AMOUNT_REGEX = /^-?\d+\.\d{2}$/;
+const DECIMAL_AMOUNT_REGEX = /^(?:0|[1-9]\d*)\.\d{2}$/;
+const SIGNED_DECIMAL_AMOUNT_REGEX = /^-?(?:0|[1-9]\d*)\.\d{2}$/;
 
 /**
  * Normalization & Validation Policy:
@@ -123,7 +123,11 @@ export class HttpValidator {
     };
   }
 
-  public static validateProcessBet(body: unknown, idempotencyKeyHeader: unknown): { idempotencyKey: string; dto: ProcessBetDto } {
+  public static validateProcessWager(
+    body: unknown,
+    idempotencyKeyHeader: unknown,
+    correlationIdHeader?: unknown
+  ): { idempotencyKey: string; dto: ProcessWagerDto } {
     if (typeof idempotencyKeyHeader !== 'string') {
       throw new BadRequestException('Idempotency-Key header is mandatory and must be a string');
     }
@@ -150,6 +154,7 @@ export class HttpValidator {
       'gameId',
       'kind',
       'money',
+      'referenceExternalTransactionId',
     ];
 
     for (const key of Object.keys(obj)) {
@@ -158,7 +163,18 @@ export class HttpValidator {
       }
     }
 
-    for (const key of allowedKeys) {
+    const requiredKeys = [
+      'providerId',
+      'externalTransactionId',
+      'playerId',
+      'walletId',
+      'roundId',
+      'gameId',
+      'kind',
+      'money',
+    ];
+
+    for (const key of requiredKeys) {
       if (!(key in obj)) {
         throw new BadRequestException(`Missing required field: "${key}"`);
       }
@@ -174,14 +190,38 @@ export class HttpValidator {
     if (typeof obj.kind !== 'string') {
       throw new BadRequestException('kind must be a string');
     }
-    const kind = obj.kind.trim();
-    if (kind !== 'BET') {
+    const kind = obj.kind.trim().toUpperCase() as WagerOperationKind;
+    const allowedKinds: WagerOperationKind[] = ['BET', 'WIN', 'LOSS', 'REFUND', 'ROLLBACK'];
+    if (!allowedKinds.includes(kind)) {
       throw new BadRequestException(
-        `Unsupported kind: "${obj.kind}". Only kind="BET" is accepted in this release.`
+        `Unsupported kind: "${obj.kind}". Allowed kinds are: ${allowedKinds.join(', ')}`
       );
     }
 
-    const money = HttpValidator.validateMoneyObject(obj.money, 'money', { allowZero: false, allowNegative: false });
+    let referenceExternalTransactionId: string | undefined = undefined;
+    if (kind === 'REFUND' || kind === 'ROLLBACK') {
+      if (!('referenceExternalTransactionId' in obj) || obj.referenceExternalTransactionId === null || obj.referenceExternalTransactionId === '') {
+        throw new BadRequestException(
+          `referenceExternalTransactionId is required for kind="${kind}"`
+        );
+      }
+      referenceExternalTransactionId = HttpValidator.validateString(
+        obj.referenceExternalTransactionId,
+        'referenceExternalTransactionId',
+        1,
+        128
+      );
+    }
+
+    const allowZeroAmount = kind === 'LOSS';
+    const money = HttpValidator.validateMoneyObject(obj.money, 'money', {
+      allowZero: allowZeroAmount,
+      allowNegative: false,
+    });
+
+    const correlationId = typeof correlationIdHeader === 'string' && correlationIdHeader.trim().length > 0
+      ? correlationIdHeader.trim()
+      : undefined;
 
     return {
       idempotencyKey,
@@ -192,9 +232,19 @@ export class HttpValidator {
         walletId,
         roundId,
         gameId,
-        kind: 'BET',
+        kind,
         money,
+        referenceExternalTransactionId,
+        correlationId,
       },
     };
+  }
+
+  public static validateProcessBet(
+    body: unknown,
+    idempotencyKeyHeader: unknown,
+    correlationIdHeader?: unknown
+  ): { idempotencyKey: string; dto: ProcessWagerDto } {
+    return HttpValidator.validateProcessWager(body, idempotencyKeyHeader, correlationIdHeader);
   }
 }

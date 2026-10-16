@@ -1,7 +1,7 @@
 import { CurrencyMismatchError, InvalidMoneyError } from '../errors/domain.error';
 
-const DECIMAL_STRING_REGEX = /^\d+\.\d{2}$/;
-const SIGNED_DECIMAL_STRING_REGEX = /^-?\d+\.\d{2}$/;
+const DECIMAL_STRING_REGEX = /^(?:0|[1-9]\d*)\.\d{2}$/;
+const SIGNED_DECIMAL_STRING_REGEX = /^-?(?:0|[1-9]\d*)\.\d{2}$/;
 const CURRENCY_REGEX = /^[A-Z]{3}$/;
 const MAX_INTEGER_DIGITS = 16; // Conforms to NUMERIC(18,2) max 18 digits (16 integer + 2 decimal)
 

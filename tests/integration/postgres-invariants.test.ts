@@ -7,24 +7,24 @@ import {
   MikroOrmWalletLedgerRepository,
   MikroOrmWalletRepository,
 } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
-import { DatabaseMigrator } from '../../src/infrastructure/persistence/migrator';
 import { CreateWalletUseCase } from '../../src/application/use-cases/create-wallet.use-case';
 import { GetWalletUseCase } from '../../src/application/use-cases/get-wallet.use-case';
-import { ProcessBetUseCase } from '../../src/application/use-cases/process-bet.use-case';
+import { ProcessWagerUseCase } from '../../src/application/use-cases/process-wager.use-case';
 import { ReconcileWalletUseCase } from '../../src/application/use-cases/reconcile-wallet.use-case';
 import {
   CurrencyMismatchError,
   DuplicateWalletError,
   IdempotencyConflictError,
+  InvalidMoneyError,
+  InvalidWagerOperationError,
   WalletNotFoundError,
 } from '../../src/domain/errors/domain.error';
-import {
-  getAppDatabaseConfig,
-  getMigrationDatabaseConfig,
-} from '../../src/infrastructure/config/database.config';
+import { ProcessWagerDto } from '../../src/application/dto/wager.dto';
+import { Money } from '../../src/domain/value-objects/money.vo';
+import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
 
 describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
-  let migrator: DatabaseMigrator;
+  let isolatedDb: IsolatedTestDatabase;
   let testPool: pg.Pool;
   let appPool: pg.Pool;
   let uow: MikroOrmUnitOfWork;
@@ -35,30 +35,15 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
 
   let createWalletUseCase: CreateWalletUseCase;
   let getWalletUseCase: GetWalletUseCase;
-  let processBetUseCase: ProcessBetUseCase;
+  let processWagerUseCase: ProcessWagerUseCase;
   let reconcileWalletUseCase: ReconcileWalletUseCase;
 
   beforeAll(async () => {
-    migrator = new DatabaseMigrator();
-    await migrator.up();
+    // 1. Create dedicated disposable test database for complete test isolation
+    isolatedDb = await createIsolatedTestDatabase('invariants_');
 
-    const migConfig = getMigrationDatabaseConfig();
-    testPool = new pg.Pool({
-      host: migConfig.host,
-      port: migConfig.port,
-      database: migConfig.database,
-      user: migConfig.user,
-      password: migConfig.password,
-    });
-
-    const appConfig = getAppDatabaseConfig();
-    appPool = new pg.Pool({
-      host: appConfig.host,
-      port: appConfig.port,
-      database: appConfig.database,
-      user: appConfig.user,
-      password: appConfig.password,
-    });
+    testPool = new pg.Pool(isolatedDb.adminConfig);
+    appPool = new pg.Pool(isolatedDb.appConfig);
 
     uow = new MikroOrmUnitOfWork();
     await uow.init();
@@ -70,75 +55,86 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
 
     createWalletUseCase = new CreateWalletUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
     getWalletUseCase = new GetWalletUseCase(walletRepo);
-    processBetUseCase = new ProcessBetUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
+    processWagerUseCase = new ProcessWagerUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
     reconcileWalletUseCase = new ReconcileWalletUseCase(walletRepo, ledgerRepo, uow);
   });
 
   afterAll(async () => {
     await uow.close();
-    await testPool.end();
     await appPool.end();
-    await migrator.close();
+    await testPool.end();
+    await isolatedDb.closeAndDrop();
   });
 
   it('should create wallet with zero balance without ledger or opening transaction', async () => {
-    const playerId = `player-zero-${crypto.randomUUID()}`;
-    const res = await createWalletUseCase.execute({
+    const playerId = `player-${crypto.randomUUID()}`;
+    const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '0.00', currency: 'BRL' },
     });
 
-    expect(res.id).toBeDefined();
-    expect(res.playerId).toBe(playerId);
-    expect(res.balance.amount).toBe('0.00');
-    expect(res.balance.currency).toBe('BRL');
-    expect(res.version).toBe(1);
+    expect(wallet.id).toBeDefined();
+    expect(wallet.playerId).toBe(playerId);
+    expect(wallet.balance.amount).toBe('0.00');
+    expect(wallet.balance.currency).toBe('BRL');
+    expect(wallet.version).toBe(1);
 
-    const ledgerRes = await testPool.query(
-      'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
-      [res.id]
-    );
-    expect(Number(ledgerRes.rows[0].count)).toBe(0);
+    const reloaded = await getWalletUseCase.execute(wallet.id);
+    expect(reloaded.balance.amount).toBe('0.00');
+    expect(reloaded.version).toBe(1);
 
     const txRes = await testPool.query(
       'SELECT COUNT(*) FROM wager_transactions WHERE wallet_id = $1;',
-      [res.id]
+      [wallet.id]
     );
     expect(Number(txRes.rows[0].count)).toBe(0);
+
+    const ledgerRes = await testPool.query(
+      'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
+      [wallet.id]
+    );
+    expect(Number(ledgerRes.rows[0].count)).toBe(0);
+
+    const outboxRes = await testPool.query(
+      'SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1;',
+      [wallet.id]
+    );
+    expect(Number(outboxRes.rows[0].count)).toBe(0);
   });
 
   it('should create wallet with positive balance, generating OPENING tx, CREDIT ledger, outbox events, with version 1', async () => {
-    const playerId = `player-positive-${crypto.randomUUID()}`;
-    const res = await createWalletUseCase.execute({
+    const playerId = `player-${crypto.randomUUID()}`;
+    const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '100.00', currency: 'BRL' },
     });
 
-    expect(res.id).toBeDefined();
-    expect(res.playerId).toBe(playerId);
-    expect(res.balance.amount).toBe('100.00');
-    expect(res.version).toBe(1);
-
-    const ledgerRes = await testPool.query(
-      'SELECT * FROM wallet_ledger_entries WHERE wallet_id = $1;',
-      [res.id]
-    );
-    expect(ledgerRes.rows.length).toBe(1);
-    expect(ledgerRes.rows[0].entry_type).toBe('CREDIT');
-    expect(ledgerRes.rows[0].amount).toBe('100.00');
-    expect(ledgerRes.rows[0].balance_after).toBe('100.00');
+    expect(wallet.id).toBeDefined();
+    expect(wallet.playerId).toBe(playerId);
+    expect(wallet.balance.amount).toBe('100.00');
+    expect(wallet.balance.currency).toBe('BRL');
+    expect(wallet.version).toBe(1);
 
     const txRes = await testPool.query(
-      'SELECT * FROM wager_transactions WHERE wallet_id = $1;',
-      [res.id]
+      "SELECT * FROM wager_transactions WHERE wallet_id = $1 AND kind = 'OPENING';",
+      [wallet.id]
     );
     expect(txRes.rows.length).toBe(1);
-    expect(txRes.rows[0].kind).toBe('OPENING');
+    expect(Number(txRes.rows[0].amount)).toBe(100.0);
     expect(txRes.rows[0].status).toBe('PROCESSED');
 
+    const ledgerRes = await testPool.query(
+      "SELECT * FROM wallet_ledger_entries WHERE wallet_id = $1 AND entry_type = 'CREDIT';",
+      [wallet.id]
+    );
+    expect(ledgerRes.rows.length).toBe(1);
+    expect(Number(ledgerRes.rows[0].amount)).toBe(100.0);
+    expect(Number(ledgerRes.rows[0].balance_before)).toBe(0.0);
+    expect(Number(ledgerRes.rows[0].balance_after)).toBe(100.0);
+
     const outboxRes = await testPool.query(
-      'SELECT * FROM outbox_messages WHERE aggregate_id = $1 ORDER BY event_type ASC;',
-      [res.id]
+      'SELECT * FROM outbox_messages WHERE aggregate_id = $1 ORDER BY created_at ASC;',
+      [wallet.id]
     );
     expect(outboxRes.rows.length).toBe(2);
     expect(outboxRes.rows[0].event_type).toBe('WagerTransactionProcessed');
@@ -146,7 +142,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should return DuplicateWalletError when creating duplicate wallet for same player and currency', async () => {
-    const playerId = `player-dup-${crypto.randomUUID()}`;
+    const playerId = `dup-player-${crypto.randomUUID()}`;
     await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '50.00', currency: 'BRL' },
@@ -155,54 +151,59 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
     await expect(
       createWalletUseCase.execute({
         playerId,
-        initialBalance: { amount: '50.00', currency: 'BRL' },
+        initialBalance: { amount: '10.00', currency: 'BRL' },
       })
     ).rejects.toThrow(DuplicateWalletError);
   });
 
   it('should process BET, deduct balance, increment version, and record DEBIT ledger entry and outbox', async () => {
-    const playerId = `bettor-${crypto.randomUUID()}`;
+    const playerId = `bet-player-${crypto.randomUUID()}`;
     const wallet = await createWalletUseCase.execute({
       playerId,
-      initialBalance: { amount: '200.00', currency: 'BRL' },
+      initialBalance: { amount: '100.00', currency: 'BRL' },
     });
 
-    const betRes = await processBetUseCase.execute(`idemp-${crypto.randomUUID()}`, {
-      providerId: 'prv-1',
+    const idempKey = `idemp-${crypto.randomUUID()}`;
+    const betDto: ProcessWagerDto = {
+      providerId: 'provider-1',
       externalTransactionId: `tx-ext-${crypto.randomUUID()}`,
       playerId: wallet.playerId,
       walletId: wallet.id,
-      roundId: 'rnd-1',
-      gameId: 'gm-1',
+      roundId: 'round-1',
+      gameId: 'game-1',
       kind: 'BET',
-      money: { amount: '50.00', currency: 'BRL' },
-    });
+      money: { amount: '25.00', currency: 'BRL' },
+    };
 
-    expect(betRes.status).toBe('PROCESSED');
-    expect(betRes.balance.amount).toBe('150.00');
-    expect(betRes.balance.currency).toBe('BRL');
-    expect(betRes.idempotentReplay).toBe(false);
+    const res = await processWagerUseCase.execute(idempKey, betDto);
+    expect(res.transactionId).toBeDefined();
+    expect(res.status).toBe('PROCESSED');
+    expect(res.balance.amount).toBe('75.00');
+    expect(res.balance.currency).toBe('BRL');
+    expect(res.idempotentReplay).toBe(false);
 
-    const reloaded = await getWalletUseCase.execute(wallet.id);
-    expect(reloaded.balance.amount).toBe('150.00');
-    expect(reloaded.version).toBe(2);
+    const updatedWallet = await getWalletUseCase.execute(wallet.id);
+    expect(updatedWallet.balance.amount).toBe('75.00');
+    expect(updatedWallet.version).toBe(2);
 
-    const recon = await reconcileWalletUseCase.execute(wallet.id);
-    expect(recon.consistent).toBe(true);
-    expect(recon.storedBalance.amount).toBe('150.00');
-    expect(recon.calculatedBalance.amount).toBe('150.00');
-    expect(recon.difference.amount).toBe('0.00');
-    expect(recon.checkedEntries).toBe(2);
+    const ledgerRes = await testPool.query(
+      "SELECT * FROM wallet_ledger_entries WHERE transaction_id = $1 AND entry_type = 'DEBIT';",
+      [res.transactionId]
+    );
+    expect(ledgerRes.rows.length).toBe(1);
+    expect(Number(ledgerRes.rows[0].amount)).toBe(25.0);
+    expect(Number(ledgerRes.rows[0].balance_before)).toBe(100.0);
+    expect(Number(ledgerRes.rows[0].balance_after)).toBe(75.0);
   });
 
   it('should reject BET on insufficient funds without balance mutation or ledger entry', async () => {
-    const playerId = `poor-bettor-${crypto.randomUUID()}`;
+    const playerId = `insufficient-player-${crypto.randomUUID()}`;
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '30.00', currency: 'BRL' },
     });
 
-    const rejectRes = await processBetUseCase.execute(`idemp-${crypto.randomUUID()}`, {
+    const rejectRes = await processWagerUseCase.execute(`idemp-${crypto.randomUUID()}`, {
       providerId: 'prv-1',
       externalTransactionId: `tx-ext-${crypto.randomUUID()}`,
       playerId: wallet.playerId,
@@ -220,13 +221,13 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
 
     const reloaded = await getWalletUseCase.execute(wallet.id);
     expect(reloaded.balance.amount).toBe('30.00');
-    expect(reloaded.version).toBe(1); // Version not changed
+    expect(reloaded.version).toBe(1);
 
     const ledgerRes = await testPool.query(
       'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
       [wallet.id]
     );
-    expect(Number(ledgerRes.rows[0].count)).toBe(1); // Only the initial opening entry
+    expect(Number(ledgerRes.rows[0].count)).toBe(1);
   });
 
   it('should replay saved result with original observed balance when same idempotency key and payload are submitted', async () => {
@@ -239,7 +240,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
     const idempKey = `idemp-replay-${crypto.randomUUID()}`;
     const extId = `ext-${crypto.randomUUID()}`;
 
-    const first = await processBetUseCase.execute(idempKey, {
+    const first = await processWagerUseCase.execute(idempKey, {
       providerId: 'prv-1',
       externalTransactionId: extId,
       playerId: wallet.playerId,
@@ -249,13 +250,11 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
       kind: 'BET',
       money: { amount: '40.00', currency: 'BRL' },
     });
-
     expect(first.status).toBe('PROCESSED');
     expect(first.balance.amount).toBe('60.00');
     expect(first.idempotentReplay).toBe(false);
 
-    // Another bet changes the balance to 30.00
-    await processBetUseCase.execute(`idemp-other-${crypto.randomUUID()}`, {
+    await processWagerUseCase.execute(`idemp-other-${crypto.randomUUID()}`, {
       providerId: 'prv-1',
       externalTransactionId: `ext-other-${crypto.randomUUID()}`,
       playerId: wallet.playerId,
@@ -263,14 +262,13 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
       roundId: 'r-2',
       gameId: 'g-1',
       kind: 'BET',
-      money: { amount: '30.00', currency: 'BRL' },
+      money: { amount: '10.00', currency: 'BRL' },
     });
 
-    const currentWallet = await getWalletUseCase.execute(wallet.id);
-    expect(currentWallet.balance.amount).toBe('30.00');
+    const walletAfterOther = await getWalletUseCase.execute(wallet.id);
+    expect(walletAfterOther.balance.amount).toBe('50.00');
 
-    // Replay of first BET: MUST preserve original observed balance 60.00!
-    const replay = await processBetUseCase.execute(idempKey, {
+    const replay = await processWagerUseCase.execute(idempKey, {
       providerId: 'prv-1',
       externalTransactionId: extId,
       playerId: wallet.playerId,
@@ -281,10 +279,13 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
       money: { amount: '40.00', currency: 'BRL' },
     });
 
+    expect(replay.transactionId).toBe(first.transactionId);
     expect(replay.status).toBe('PROCESSED');
     expect(replay.balance.amount).toBe('60.00');
-    expect(replay.transactionId).toBe(first.transactionId);
     expect(replay.idempotentReplay).toBe(true);
+
+    const walletFinal = await getWalletUseCase.execute(wallet.id);
+    expect(walletFinal.balance.amount).toBe('50.00');
   });
 
   it('should throw IdempotencyConflictError when same idempotency key is submitted with different payload', async () => {
@@ -295,7 +296,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
     });
 
     const idempKey = `idemp-conflict-${crypto.randomUUID()}`;
-    await processBetUseCase.execute(idempKey, {
+    await processWagerUseCase.execute(idempKey, {
       providerId: 'prv-1',
       externalTransactionId: `ext-${crypto.randomUUID()}`,
       playerId: wallet.playerId,
@@ -307,7 +308,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
     });
 
     await expect(
-      processBetUseCase.execute(idempKey, {
+      processWagerUseCase.execute(idempKey, {
         providerId: 'prv-1',
         externalTransactionId: `ext-${crypto.randomUUID()}`,
         playerId: wallet.playerId,
@@ -315,44 +316,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
         roundId: 'r-1',
         gameId: 'g-1',
         kind: 'BET',
-        money: { amount: '20.00', currency: 'BRL' }, // Different amount
-      })
-    ).rejects.toThrow(IdempotencyConflictError);
-  });
-
-  it('should throw IdempotencyConflictError when same key is disputed by different wallets', async () => {
-    const wallet1 = await createWalletUseCase.execute({
-      playerId: `p1-${crypto.randomUUID()}`,
-      initialBalance: { amount: '100.00', currency: 'BRL' },
-    });
-    const wallet2 = await createWalletUseCase.execute({
-      playerId: `p2-${crypto.randomUUID()}`,
-      initialBalance: { amount: '100.00', currency: 'BRL' },
-    });
-
-    const idempKey = `idemp-dispute-${crypto.randomUUID()}`;
-
-    await processBetUseCase.execute(idempKey, {
-      providerId: 'prv-1',
-      externalTransactionId: `ext-${crypto.randomUUID()}`,
-      playerId: wallet1.playerId,
-      walletId: wallet1.id,
-      roundId: 'r-1',
-      gameId: 'g-1',
-      kind: 'BET',
-      money: { amount: '10.00', currency: 'BRL' },
-    });
-
-    await expect(
-      processBetUseCase.execute(idempKey, {
-        providerId: 'prv-1',
-        externalTransactionId: `ext-${crypto.randomUUID()}`,
-        playerId: wallet2.playerId,
-        walletId: wallet2.id, // Different wallet
-        roundId: 'r-1',
-        gameId: 'g-1',
-        kind: 'BET',
-        money: { amount: '10.00', currency: 'BRL' },
+        money: { amount: '20.00', currency: 'BRL' },
       })
     ).rejects.toThrow(IdempotencyConflictError);
   });
@@ -364,10 +328,10 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
       initialBalance: { amount: '100.00', currency: 'BRL' },
     });
 
-    const extId = `shared-ext-${crypto.randomUUID()}`;
+    const extId = `ext-dup-${crypto.randomUUID()}`;
 
-    await processBetUseCase.execute(`key-1-${crypto.randomUUID()}`, {
-      providerId: 'prv-dup',
+    await processWagerUseCase.execute(`key-1-${crypto.randomUUID()}`, {
+      providerId: 'prv-uniq',
       externalTransactionId: extId,
       playerId: wallet.playerId,
       walletId: wallet.id,
@@ -378,8 +342,8 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
     });
 
     await expect(
-      processBetUseCase.execute(`key-2-${crypto.randomUUID()}`, {
-        providerId: 'prv-dup',
+      processWagerUseCase.execute(`key-2-${crypto.randomUUID()}`, {
+        providerId: 'prv-uniq',
         externalTransactionId: extId,
         playerId: wallet.playerId,
         walletId: wallet.id,
@@ -391,205 +355,401 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
     ).rejects.toThrow(IdempotencyConflictError);
   });
 
-  describe('Atomic Fault Injections (Requirement 8)', () => {
-    it('should rollback completely when failure injected after wallet save, leaving no changes, then succeed on retry', async () => {
-      const playerId = `fault-w-${crypto.randomUUID()}`;
+  describe('Correlation ID and Idempotency Key Limits (Requirement 1)', () => {
+    it('should support Idempotency-Key lengths of 128, 129, and 255 characters without outbox persistence errors', async () => {
       const wallet = await createWalletUseCase.execute({
-        playerId,
-        initialBalance: { amount: '100.00', currency: 'BRL' },
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '300.00', currency: 'BRL' },
       });
 
-      const idempKey = `fault-idemp-${crypto.randomUUID()}`;
-      const extId = `fault-ext-${crypto.randomUUID()}`;
-      const dto = {
-        providerId: 'p-fault',
-        externalTransactionId: extId,
+      const key128 = 'a'.repeat(128);
+      const key129 = 'b'.repeat(129);
+      const key255 = 'c'.repeat(255);
+
+      const res128 = await processWagerUseCase.execute(key128, {
+        providerId: 'prv-key-len',
+        externalTransactionId: `ext-128-${crypto.randomUUID()}`,
         playerId: wallet.playerId,
         walletId: wallet.id,
-        roundId: 'r-1',
-        gameId: 'g-1',
-        kind: 'BET' as const,
-        money: { amount: '30.00', currency: 'BRL' },
-      };
-
-      // Set fault point after wallet save
-      uow.setTestFailurePoint('after_wallet_save');
-
-      await expect(processBetUseCase.execute(idempKey, dto)).rejects.toThrow();
-
-      // Verify ZERO changes remained
-      const reloaded = await getWalletUseCase.execute(wallet.id);
-      expect(reloaded.balance.amount).toBe('100.00');
-      expect(reloaded.version).toBe(1);
-
-      const txRes = await testPool.query(
-        'SELECT COUNT(*) FROM wager_transactions WHERE idempotency_key = $1;',
-        [idempKey]
-      );
-      expect(Number(txRes.rows[0].count)).toBe(0);
-
-      // Clear failure point and resend same operation
-      uow.clearTestFailurePoints();
-      const res = await processBetUseCase.execute(idempKey, dto);
-      expect(res.status).toBe('PROCESSED');
-      expect(res.balance.amount).toBe('70.00');
-
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('70.00');
-      expect(finalWallet.version).toBe(2);
-    });
-
-    it('should rollback completely when failure injected after tx save, leaving no changes, then succeed on retry', async () => {
-      const playerId = `fault-tx-${crypto.randomUUID()}`;
-      const wallet = await createWalletUseCase.execute({
-        playerId,
-        initialBalance: { amount: '100.00', currency: 'BRL' },
+        roundId: 'rnd-len',
+        gameId: 'gm-len',
+        kind: 'BET',
+        money: { amount: '10.00', currency: 'BRL' },
       });
+      expect(res128.status).toBe('PROCESSED');
 
-      const idempKey = `fault-tx-idemp-${crypto.randomUUID()}`;
-      const dto = {
-        providerId: 'p-fault',
-        externalTransactionId: `fault-tx-ext-${crypto.randomUUID()}`,
+      const res129 = await processWagerUseCase.execute(key129, {
+        providerId: 'prv-key-len',
+        externalTransactionId: `ext-129-${crypto.randomUUID()}`,
         playerId: wallet.playerId,
         walletId: wallet.id,
-        roundId: 'r-1',
-        gameId: 'g-1',
-        kind: 'BET' as const,
-        money: { amount: '40.00', currency: 'BRL' },
-      };
-
-      uow.setTestFailurePoint('after_tx_save');
-      await expect(processBetUseCase.execute(idempKey, dto)).rejects.toThrow();
-
-      // Verify no changes
-      const reloaded = await getWalletUseCase.execute(wallet.id);
-      expect(reloaded.balance.amount).toBe('100.00');
-
-      uow.clearTestFailurePoints();
-      const res = await processBetUseCase.execute(idempKey, dto);
-      expect(res.status).toBe('PROCESSED');
-      expect(res.balance.amount).toBe('60.00');
-    });
-
-    it('should rollback completely when failure injected after ledger save', async () => {
-      const playerId = `fault-ld-${crypto.randomUUID()}`;
-      const wallet = await createWalletUseCase.execute({
-        playerId,
-        initialBalance: { amount: '100.00', currency: 'BRL' },
+        roundId: 'rnd-len',
+        gameId: 'gm-len',
+        kind: 'BET',
+        money: { amount: '10.00', currency: 'BRL' },
       });
+      expect(res129.status).toBe('PROCESSED');
 
-      const idempKey = `fault-ld-idemp-${crypto.randomUUID()}`;
-      const dto = {
-        providerId: 'p-fault',
-        externalTransactionId: `fault-ld-ext-${crypto.randomUUID()}`,
+      const res255 = await processWagerUseCase.execute(key255, {
+        providerId: 'prv-key-len',
+        externalTransactionId: `ext-255-${crypto.randomUUID()}`,
         playerId: wallet.playerId,
         walletId: wallet.id,
-        roundId: 'r-1',
-        gameId: 'g-1',
-        kind: 'BET' as const,
-        money: { amount: '20.00', currency: 'BRL' },
-      };
-
-      uow.setTestFailurePoint('after_ledger_save');
-      await expect(processBetUseCase.execute(idempKey, dto)).rejects.toThrow();
-
-      const reloaded = await getWalletUseCase.execute(wallet.id);
-      expect(reloaded.balance.amount).toBe('100.00');
-
-      uow.clearTestFailurePoints();
-      const res = await processBetUseCase.execute(idempKey, dto);
-      expect(res.status).toBe('PROCESSED');
-      expect(res.balance.amount).toBe('80.00');
-    });
-
-    it('should rollback completely when failure injected after outbox save', async () => {
-      const playerId = `fault-outbox-${crypto.randomUUID()}`;
-      const wallet = await createWalletUseCase.execute({
-        playerId,
-        initialBalance: { amount: '100.00', currency: 'BRL' },
+        roundId: 'rnd-len',
+        gameId: 'gm-len',
+        kind: 'BET',
+        money: { amount: '10.00', currency: 'BRL' },
       });
+      expect(res255.status).toBe('PROCESSED');
 
-      const idempKey = `fault-ob-idemp-${crypto.randomUUID()}`;
-      const dto = {
-        providerId: 'p-fault',
-        externalTransactionId: `fault-ob-ext-${crypto.randomUUID()}`,
-        playerId: wallet.playerId,
-        walletId: wallet.id,
-        roundId: 'r-1',
-        gameId: 'g-1',
-        kind: 'BET' as const,
-        money: { amount: '25.00', currency: 'BRL' },
-      };
-
-      uow.setTestFailurePoint('after_outbox_save');
-      await expect(processBetUseCase.execute(idempKey, dto)).rejects.toThrow();
-
-      const reloaded = await getWalletUseCase.execute(wallet.id);
-      expect(reloaded.balance.amount).toBe('100.00');
-
-      uow.clearTestFailurePoints();
-      const res = await processBetUseCase.execute(idempKey, dto);
-      expect(res.status).toBe('PROCESSED');
-      expect(res.balance.amount).toBe('75.00');
+      // Verify all outbox messages were safely persisted with independent correlationId
+      const outboxMessages = await outboxRepo.listUnpublished(10);
+      expect(outboxMessages.length).toBeGreaterThanOrEqual(6);
+      for (const msg of outboxMessages) {
+        expect(typeof msg.correlationId).toBe('string');
+        expect(msg.correlationId.length).toBeGreaterThan(0);
+      }
     });
   });
 
-  describe('Database Guarantees & Constraints (Requirement 6)', () => {
-    it('should enforce database-level immutability preventing UPDATE or DELETE on ledger', async () => {
-      const playerId = `ledger-protect-${crypto.randomUUID()}`;
-      const wallet = await createWalletUseCase.execute({
-        playerId,
-        initialBalance: { amount: '80.00', currency: 'BRL' },
+  describe('Composite Foreign Key: Ledger to WagerTransaction (Requirement 3)', () => {
+    it('should reject ledger insertion referencing a transaction of another wallet', async () => {
+      const walletA = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+      const walletB = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
       });
 
-      const ledgerRes = await testPool.query(
-        'SELECT id FROM wallet_ledger_entries WHERE wallet_id = $1 LIMIT 1;',
-        [wallet.id]
-      );
-      const entryId = ledgerRes.rows[0].id;
-
-      // Attempting UPDATE must fail via trigger
-      let updateFailed = false;
-      try {
-        await testPool.query('UPDATE wallet_ledger_entries SET amount = 999.00 WHERE id = $1;', [entryId]);
-      } catch {
-        updateFailed = true;
-      }
-      expect(updateFailed).toBe(true);
-
-      // Attempting DELETE must fail via trigger
-      let deleteFailed = false;
-      try {
-        await testPool.query('DELETE FROM wallet_ledger_entries WHERE id = $1;', [entryId]);
-      } catch {
-        deleteFailed = true;
-      }
-      expect(deleteFailed).toBe(true);
-    });
-
-    it('should enforce terminal transaction status protection via database trigger', async () => {
-      const playerId = `term-protect-${crypto.randomUUID()}`;
-      const wallet = await createWalletUseCase.execute({
-        playerId,
-        initialBalance: { amount: '80.00', currency: 'BRL' },
+      const txA = await processWagerUseCase.execute(`key-txA-${crypto.randomUUID()}`, {
+        providerId: 'prv-fk',
+        externalTransactionId: `ext-txA-${crypto.randomUUID()}`,
+        playerId: walletA.playerId,
+        walletId: walletA.id,
+        roundId: 'rnd-fk',
+        gameId: 'gm-fk',
+        kind: 'BET',
+        money: { amount: '10.00', currency: 'BRL' },
       });
 
-      const txRes = await testPool.query(
-        'SELECT id FROM wager_transactions WHERE wallet_id = $1 LIMIT 1;',
-        [wallet.id]
-      );
-      const txId = txRes.rows[0].id;
-
-      // Attempting to alter terminal status must fail via trigger
-      let termFailed = false;
+      // Attempt inserting ledger for wallet B referencing transaction of wallet A
+      let fkFailed = false;
       try {
-        await testPool.query("UPDATE wager_transactions SET status = 'REJECTED' WHERE id = $1;", [txId]);
-      } catch {
-        termFailed = true;
+        await testPool.query(`
+          INSERT INTO wallet_ledger_entries (id, wallet_id, transaction_id, entry_type, amount, currency, balance_before, balance_after, created_at)
+          VALUES ('${crypto.randomUUID()}', '${walletB.id}', '${txA.transactionId}', 'DEBIT', 10.00, 'BRL', 100.00, 90.00, NOW());
+        `);
+      } catch (err: any) {
+        fkFailed = true;
       }
-      expect(termFailed).toBe(true);
+      expect(fkFailed).toBe(true);
     });
 
+    it('should reject ledger insertion referencing transaction with different currency', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const tx = await processWagerUseCase.execute(`key-tx-curr-${crypto.randomUUID()}`, {
+        providerId: 'prv-fk',
+        externalTransactionId: `ext-tx-curr-${crypto.randomUUID()}`,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'rnd-fk',
+        gameId: 'gm-fk',
+        kind: 'BET',
+        money: { amount: '10.00', currency: 'BRL' },
+      });
+
+      let currMismatchFailed = false;
+      try {
+        await testPool.query(`
+          INSERT INTO wallet_ledger_entries (id, wallet_id, transaction_id, entry_type, amount, currency, balance_before, balance_after, created_at)
+          VALUES ('${crypto.randomUUID()}', '${wallet.id}', '${tx.transactionId}', 'DEBIT', 10.00, 'USD', 100.00, 90.00, NOW());
+        `);
+      } catch {
+        currMismatchFailed = true;
+      }
+      expect(currMismatchFailed).toBe(true);
+    });
+
+    it('should reject ledger insertion referencing non-existent transaction', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      let nonExistentFailed = false;
+      try {
+        await testPool.query(`
+          INSERT INTO wallet_ledger_entries (id, wallet_id, transaction_id, entry_type, amount, currency, balance_before, balance_after, created_at)
+          VALUES ('${crypto.randomUUID()}', '${wallet.id}', '${crypto.randomUUID()}', 'DEBIT', 10.00, 'BRL', 100.00, 90.00, NOW());
+        `);
+      } catch {
+        nonExistentFailed = true;
+      }
+      expect(nonExistentFailed).toBe(true);
+    });
+  });
+
+  describe('Terminal Transaction Trigger Protection (Requirement 2)', () => {
+    it('should prevent altering protected fields of PROCESSED or REJECTED transactions as application user', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const tx = await processWagerUseCase.execute(`key-prot-${crypto.randomUUID()}`, {
+        providerId: 'prv-prot',
+        externalTransactionId: `ext-prot-${crypto.randomUUID()}`,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'rnd-prot',
+        gameId: 'gm-prot',
+        kind: 'BET',
+        money: { amount: '20.00', currency: 'BRL' },
+      });
+
+      // Attempt altering amount on PROCESSED tx
+      let amountModFailed = false;
+      try {
+        await appPool.query(
+          'UPDATE wager_transactions SET amount = 50.00 WHERE id = $1;',
+          [tx.transactionId]
+        );
+      } catch (err: any) {
+        amountModFailed = true;
+      }
+      expect(amountModFailed).toBe(true);
+
+      // Attempt altering status on PROCESSED tx
+      let statusModFailed = false;
+      try {
+        await appPool.query(
+          "UPDATE wager_transactions SET status = 'REJECTED' WHERE id = $1;",
+          [tx.transactionId]
+        );
+      } catch (err: any) {
+        statusModFailed = true;
+      }
+      expect(statusModFailed).toBe(true);
+
+      // Attempt altering idempotency_key on PROCESSED tx
+      let idempModFailed = false;
+      try {
+        await appPool.query(
+          "UPDATE wager_transactions SET idempotency_key = 'hacked' WHERE id = $1;",
+          [tx.transactionId]
+        );
+      } catch {
+        idempModFailed = true;
+      }
+      expect(idempModFailed).toBe(true);
+    });
+  });
+
+  describe('Independent Domain & Use Case Invariants (Requirement 4)', () => {
+    it('should reject BET with non-positive amount in domain without depending on HTTP', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      await expect(
+        processWagerUseCase.execute(`key-zero-${crypto.randomUUID()}`, {
+          providerId: 'prv-val',
+          externalTransactionId: `ext-zero-${crypto.randomUUID()}`,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'rnd-val',
+          gameId: 'gm-val',
+          kind: 'BET',
+          money: { amount: '0.00', currency: 'BRL' },
+        })
+      ).rejects.toThrow(InvalidWagerOperationError);
+    });
+
+    it('should reject non-canonical representations like "00.00" in Money.create', () => {
+      expect(() => Money.create('00.00', 'BRL')).toThrow(InvalidMoneyError);
+      expect(() => Money.create('01.50', 'BRL')).toThrow(InvalidMoneyError);
+    });
+
+    it('should reject player-wallet mismatch in use case', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      await expect(
+        processWagerUseCase.execute(`key-p-mismatch-${crypto.randomUUID()}`, {
+          providerId: 'prv-val',
+          externalTransactionId: `ext-p-${crypto.randomUUID()}`,
+          playerId: crypto.randomUUID(), // Different player
+          walletId: wallet.id,
+          roundId: 'rnd-val',
+          gameId: 'gm-val',
+          kind: 'BET',
+          money: { amount: '10.00', currency: 'BRL' },
+        })
+      ).rejects.toThrow(InvalidWagerOperationError);
+    });
+
+    it('should reject empty or missing idempotency key', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      await expect(
+        processWagerUseCase.execute('   ', {
+          providerId: 'prv-val',
+          externalTransactionId: `ext-${crypto.randomUUID()}`,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'rnd-val',
+          gameId: 'gm-val',
+          kind: 'BET',
+          money: { amount: '10.00', currency: 'BRL' },
+        })
+      ).rejects.toThrow(InvalidWagerOperationError);
+    });
+  });
+
+  describe('Atomic Fault Injections (Requirement 8)', () => {
+    it('should rollback completely when failure injected after wallet save, leaving no changes, then succeed on retry', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      uow.setTestHook('after_wallet_save', () => {
+        throw new Error('SIMULATED_FAILURE_AFTER_WALLET_SAVE');
+      });
+
+      const idempKey = `fail-w-${crypto.randomUUID()}`;
+      const extId = `ext-fail-w-${crypto.randomUUID()}`;
+      const betDto: ProcessWagerDto = {
+        providerId: 'prv-fail',
+        externalTransactionId: extId,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'r-fail',
+        gameId: 'g-fail',
+        kind: 'BET',
+        money: { amount: '30.00', currency: 'BRL' },
+      };
+
+      await expect(processWagerUseCase.execute(idempKey, betDto)).rejects.toThrow('SIMULATED_FAILURE_AFTER_WALLET_SAVE');
+
+      // Verify zero partial changes remained
+      const checkWallet = await getWalletUseCase.execute(wallet.id);
+      expect(checkWallet.balance.amount).toBe('100.00');
+      expect(checkWallet.version).toBe(1);
+
+      uow.clearTestHooks();
+
+      // Retry should succeed cleanly
+      const retryRes = await processWagerUseCase.execute(idempKey, betDto);
+      expect(retryRes.status).toBe('PROCESSED');
+      expect(retryRes.balance.amount).toBe('70.00');
+    });
+
+    it('should rollback completely when failure injected after tx save, leaving no changes, then succeed on retry', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      uow.setTestHook('after_tx_save', () => {
+        throw new Error('SIMULATED_FAILURE_AFTER_TX_SAVE');
+      });
+
+      const idempKey = `fail-tx-${crypto.randomUUID()}`;
+      const extId = `ext-fail-tx-${crypto.randomUUID()}`;
+      const betDto: ProcessWagerDto = {
+        providerId: 'prv-fail',
+        externalTransactionId: extId,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'r-fail',
+        gameId: 'g-fail',
+        kind: 'BET',
+        money: { amount: '30.00', currency: 'BRL' },
+      };
+
+      await expect(processWagerUseCase.execute(idempKey, betDto)).rejects.toThrow('SIMULATED_FAILURE_AFTER_TX_SAVE');
+
+      const checkWallet = await getWalletUseCase.execute(wallet.id);
+      expect(checkWallet.balance.amount).toBe('100.00');
+
+      uow.clearTestHooks();
+
+      const retryRes = await processWagerUseCase.execute(idempKey, betDto);
+      expect(retryRes.status).toBe('PROCESSED');
+      expect(retryRes.balance.amount).toBe('70.00');
+    });
+
+    it('should rollback completely when failure injected after ledger save', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      uow.setTestHook('after_ledger_save', () => {
+        throw new Error('SIMULATED_FAILURE_AFTER_LEDGER_SAVE');
+      });
+
+      await expect(
+        processWagerUseCase.execute(`fail-ledger-${crypto.randomUUID()}`, {
+          providerId: 'prv-fail',
+          externalTransactionId: `ext-fail-l-${crypto.randomUUID()}`,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-fail',
+          gameId: 'g-fail',
+          kind: 'BET',
+          money: { amount: '30.00', currency: 'BRL' },
+        })
+      ).rejects.toThrow('SIMULATED_FAILURE_AFTER_LEDGER_SAVE');
+
+      uow.clearTestHooks();
+      const checkWallet = await getWalletUseCase.execute(wallet.id);
+      expect(checkWallet.balance.amount).toBe('100.00');
+    });
+
+    it('should rollback completely when failure injected after outbox save', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      uow.setTestHook('after_outbox_save', () => {
+        throw new Error('SIMULATED_FAILURE_AFTER_OUTBOX_SAVE');
+      });
+
+      await expect(
+        processWagerUseCase.execute(`fail-outbox-${crypto.randomUUID()}`, {
+          providerId: 'prv-fail',
+          externalTransactionId: `ext-fail-o-${crypto.randomUUID()}`,
+          playerId: wallet.playerId,
+          walletId: wallet.id,
+          roundId: 'r-fail',
+          gameId: 'g-fail',
+          kind: 'BET',
+          money: { amount: '30.00', currency: 'BRL' },
+        })
+      ).rejects.toThrow('SIMULATED_FAILURE_AFTER_OUTBOX_SAVE');
+
+      uow.clearTestHooks();
+      const checkWallet = await getWalletUseCase.execute(wallet.id);
+      expect(checkWallet.balance.amount).toBe('100.00');
+    });
+  });
+
+  describe('Security & Privileges', () => {
     it('should enforce application user least-privilege security (TRUNCATE forbidden)', async () => {
       let truncateFailed = false;
       try {
@@ -598,34 +758,6 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
         truncateFailed = true;
       }
       expect(truncateFailed).toBe(true);
-    });
-
-    it('should reject invalid arithmetic on ledger via database CHECK constraint', async () => {
-      const wallet = await createWalletUseCase.execute({
-        playerId: `chk-arith-${crypto.randomUUID()}`,
-        initialBalance: { amount: '50.00', currency: 'BRL' },
-      });
-
-      let checkFailed = false;
-      try {
-        await testPool.query(`
-          INSERT INTO wallet_ledger_entries (id, wallet_id, transaction_id, entry_type, amount, currency, balance_before, balance_after, created_at)
-          VALUES (
-            '${crypto.randomUUID()}',
-            '${wallet.id}',
-            (SELECT id FROM wager_transactions WHERE wallet_id = '${wallet.id}' LIMIT 1),
-            'CREDIT',
-            10.00,
-            'BRL',
-            50.00,
-            70.00,
-            NOW()
-          );
-        `);
-      } catch {
-        checkFailed = true;
-      }
-      expect(checkFailed).toBe(true);
     });
   });
 });

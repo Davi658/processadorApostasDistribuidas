@@ -6,7 +6,7 @@ import { Wallet } from '../../../domain/entities/wallet.entity';
 import { WagerTransaction } from '../../../domain/entities/wager-transaction.entity';
 import { WalletLedgerEntry } from '../../../domain/entities/wallet-ledger-entry.entity';
 import { Money } from '../../../domain/value-objects/money.vo';
-import { IntegrationEvent } from '../../../domain/events/events';
+import { IntegrationEvent, IntegrationEventEnvelope } from '../../../domain/events/events';
 import {
   OutboxRepositoryPort,
   UnitOfWorkPort,
@@ -83,8 +83,16 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     );
   }
 
+  public setTestHook(point: FailureHookPoint, callback?: () => void): void {
+    this.setTestFailurePoint(point, callback);
+  }
+
   public clearTestFailurePoints(): void {
     this.testHooks.clear();
+  }
+
+  public clearTestHooks(): void {
+    this.clearTestFailurePoints();
   }
 
   public triggerTestHook(point: FailureHookPoint): void {
@@ -223,6 +231,40 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
     return this.toDomain(ormEntity);
   }
 
+  public async findByProviderAndReference(
+    providerId: string,
+    referenceExternalTransactionId: string,
+    kind?: string
+  ): Promise<WagerTransaction | null> {
+    const em = this.em;
+    const where: any = {
+      providerId,
+      referenceExternalTransactionId,
+      status: 'PROCESSED',
+    };
+    if (kind) {
+      where.kind = kind;
+    }
+    const ormEntity = await em.findOne(WagerTransactionOrmEntity, where);
+    if (!ormEntity) {
+      return null;
+    }
+    return this.toDomain(ormEntity);
+  }
+
+  public async listPendingReferences(limit = 100): Promise<WagerTransaction[]> {
+    const em = this.em;
+    const entities = await em.find(
+      WagerTransactionOrmEntity,
+      {
+        status: 'PENDING_REFERENCE',
+        nextAttemptAt: { $lte: new Date() },
+      },
+      { limit, orderBy: { nextAttemptAt: 'ASC' } }
+    );
+    return entities.map((e) => this.toDomain(e));
+  }
+
   public async save(transaction: WagerTransaction): Promise<void> {
     const em = this.em;
     let ormEntity = await em.findOne(WagerTransactionOrmEntity, { id: transaction.id });
@@ -247,6 +289,9 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
     ormEntity.idempotencyKey = transaction.idempotencyKey;
     ormEntity.payloadHash = transaction.payloadHash;
     ormEntity.responseSnapshot = transaction.responseSnapshot;
+    ormEntity.referenceExternalTransactionId = transaction.referenceExternalTransactionId;
+    ormEntity.attempts = transaction.attempts;
+    ormEntity.nextAttemptAt = transaction.nextAttemptAt ? new Date(transaction.nextAttemptAt) : null;
     ormEntity.updatedAt = new Date(transaction.updatedAt);
 
     await em.persistAndFlush(ormEntity);
@@ -262,13 +307,16 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
       externalTransactionId: orm.externalTransactionId,
       roundId: orm.roundId,
       gameId: orm.gameId,
-      kind: orm.kind as 'BET' | 'OPENING',
+      kind: orm.kind as any,
       money: Money.rehydrate(orm.amount, orm.currency),
-      status: orm.status as 'PROCESSED' | 'REJECTED',
+      status: orm.status as any,
       rejectionReason: orm.rejectionReason ?? null,
       idempotencyKey: orm.idempotencyKey ?? null,
       payloadHash: orm.payloadHash ?? null,
       responseSnapshot: orm.responseSnapshot ?? null,
+      referenceExternalTransactionId: orm.referenceExternalTransactionId ?? null,
+      attempts: orm.attempts ?? 0,
+      nextAttemptAt: orm.nextAttemptAt ? orm.nextAttemptAt.toISOString() : null,
       createdAt: orm.createdAt.toISOString(),
       updatedAt: orm.updatedAt.toISOString(),
     });
@@ -348,5 +396,43 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
 
     await em.persistAndFlush(ormEntity);
     this.uow.triggerTestHook('after_outbox_save');
+  }
+
+  public async listUnpublished(limit = 100): Promise<IntegrationEventEnvelope[]> {
+    const em = this.em;
+    const entities = await em.find(
+      OutboxMessageOrmEntity,
+      { publishedAt: null },
+      { limit, orderBy: { createdAt: 'ASC' } }
+    );
+
+    return entities.map((e) => ({
+      eventId: e.id,
+      eventType: e.eventType,
+      version: e.version,
+      aggregateId: e.aggregateId,
+      correlationId: e.correlationId,
+      causationId: e.causationId ?? null,
+      occurredAt: e.occurredAt.toISOString(),
+      data: e.payload,
+    }));
+  }
+
+  public async findById(id: string): Promise<IntegrationEventEnvelope | null> {
+    const em = this.em;
+    const e = await em.findOne(OutboxMessageOrmEntity, { id });
+    if (!e) {
+      return null;
+    }
+    return {
+      eventId: e.id,
+      eventType: e.eventType,
+      version: e.version,
+      aggregateId: e.aggregateId,
+      correlationId: e.correlationId,
+      causationId: e.causationId ?? null,
+      occurredAt: e.occurredAt.toISOString(),
+      data: e.payload,
+    };
   }
 }

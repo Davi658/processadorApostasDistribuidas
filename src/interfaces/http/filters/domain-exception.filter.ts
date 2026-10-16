@@ -82,15 +82,41 @@ export class DomainExceptionFilter implements ExceptionFilter {
       });
     }
 
-    // 6. Check for recognized transient database errors (503)
-    const err = exception as Record<string, unknown>;
-    const pgCode = typeof err?.code === 'string' ? err.code : '';
-    // 57P01 (admin shutdown), 57P02 (crash shutdown), 57P03 (cannot connect now), 08006 (connection failure), 53300 (too many connections)
-    if (['57P01', '57P02', '57P03', '08006', '53300'].includes(pgCode)) {
+    // 6. Check for recognized transient database and connection errors (503)
+    const extractErrorCode = (target: unknown): string => {
+      if (!target || typeof target !== 'object') return '';
+      const rec = target as Record<string, unknown>;
+      if (typeof rec.code === 'string') return rec.code;
+      if (rec.cause && typeof (rec.cause as any).code === 'string') return (rec.cause as any).code;
+      if (rec.originalError && typeof (rec.originalError as any).code === 'string') return (rec.originalError as any).code;
+      if (rec.driverException && typeof (rec.driverException as any).code === 'string') return (rec.driverException as any).code;
+      if (rec.driverError && typeof (rec.driverError as any).code === 'string') return (rec.driverError as any).code;
+      return '';
+    };
+
+    const errorCode = extractErrorCode(exception);
+    const transientCodes = [
+      'ECONNREFUSED',
+      'ETIMEDOUT',
+      'ENOTFOUND',
+      'ECONNRESET',
+      '57P01', // admin shutdown
+      '57P02', // crash shutdown
+      '57P03', // cannot connect now
+      '08006', // connection failure
+      '08001', // unable to establish connection
+      '08004', // connection rejected
+      '53300', // too many connections
+      '40001', // serialization failure
+      '40P01', // deadlock detected
+    ];
+
+    if (transientCodes.includes(errorCode)) {
       return response.status(HttpStatus.SERVICE_UNAVAILABLE).json({
         statusCode: HttpStatus.SERVICE_UNAVAILABLE,
         error: 'Service Unavailable',
-        message: 'The database service is temporarily unavailable. Please retry shortly.',
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'The service is temporarily unavailable. Please retry shortly.',
       });
     }
 
@@ -98,6 +124,7 @@ export class DomainExceptionFilter implements ExceptionFilter {
     return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       error: 'Internal Server Error',
+      code: 'INTERNAL_SERVER_ERROR',
       message: 'An unexpected internal error occurred.',
     });
   }
