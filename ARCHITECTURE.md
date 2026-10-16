@@ -199,3 +199,36 @@ A representação monetária é governada pelo Value Object `Money`, alinhado es
 - **Valores Negativos Internos (`Money.subtract`, `Money.rehydrate`, `Money.fromCents`):** Suportam valores negativos assinados (até `MIN_SIGNED_LIMIT`), exclusivamente para cálculo de deltas contábeis e divergências de reconciliação financeira (ex: `storedBalance.subtract(calculatedBalance)`).
 - **Proteção do Saldo:** O saldo de carteira (`Wallet.balance`) nunca pode ser negativo, garantido pela regra de domínio e pela constraint `CHECK (balance >= 0)` no PostgreSQL.
 
+---
+
+## 8. Abertura de Carteira e Invariantes de Criação (M03)
+
+### 8.1 Contrato e Semântica de `initialBalance`
+O endpoint `POST /wallets` aceita o corpo `{ playerId: string, initialBalance?: { amount: string, currency: string } }`:
+- **Ausência vs. Nulos:**
+  - Quando `initialBalance` é **ausente** (omitido no JSON ou `undefined`), a carteira é criada com saldo zero (`"0.00"` BRL), `version = 1`, sem movimentos contábeis.
+  - Valores como `null`, `false`, `0`, `""` ou primitivos avulsos são estritamente rejeitados com `400 Bad Request`.
+  - Se fornecido, deve ser um objeto contendo `amount` (string decimal canônica com 2 casas) e `currency` (`"BRL"`).
+
+### 8.2 Atomicidade e Movimentação Financeira de Abertura
+- **Abertura Positiva (`initialBalance > 0`):**
+  - Executada atomicamente na mesma transação SQL via `UnitOfWork`.
+  - Insere registro na tabela `wallets` com o saldo e `version = 1`.
+  - Cria transação interna com `kind = 'OPENING'`, `providerId = 'SYSTEM'`, `status = 'PROCESSED'`, `amount = initialBalance` e chave de idempotência `OPENING_{walletId}`.
+  - Cria lançamento contábil em `wallet_ledger_entries` do tipo `CREDIT`, com `balance_before = '0.00'` e `balance_after = initialBalance`, referenciando a transação OPENING.
+  - Publica dois eventos na tabela `outbox_messages`: `WagerTransactionProcessed` e `WalletBalanceChanged`.
+- **Abertura Zero (`initialBalance == 0` ou ausente):**
+  - Insere registro em `wallets` com saldo `"0.00"` e `version = 1`.
+  - Não gera transação `OPENING`.
+  - Não gera lançamento no ledger.
+  - Não gera eventos na outbox.
+
+### 8.3 Unicidade por Jogador e Moeda
+- **Garantia Física:** A constraint única `uq_wallets_player_currency` em `wallets(player_id, currency)` impede carteiras duplicadas para a mesma moeda.
+- **Tratamento Concorrente:** Requisições simultâneas que disputam a criação concorrem no PostgreSQL; exatamente uma é persistida e as demais recebem o erro `23505`, sendo traduzidas para `DuplicateWalletError` e retornando HTTP `409 Conflict`.
+
+### 8.4 Proteção da Operação OPENING
+- A operação `OPENING` é estritamente interna e gerada exclusivamente pelo ciclo de criação de carteira.
+- Qualquer tentativa de cliente submeter uma transação externa com `kind: "OPENING"` no endpoint `POST /wagering/transactions` é rejeitada na validação de domínio e HTTP com `400 Bad Request`.
+
+

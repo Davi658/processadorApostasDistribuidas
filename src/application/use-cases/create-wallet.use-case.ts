@@ -1,6 +1,6 @@
 import { Wallet } from '../../domain/entities/wallet.entity';
 import { Money } from '../../domain/value-objects/money.vo';
-import { DuplicateWalletError } from '../../domain/errors/domain.error';
+import { DuplicateWalletError, InvalidWagerOperationError } from '../../domain/errors/domain.error';
 import {
   WagerTransactionProcessedEvent,
   WalletBalanceChangedEvent,
@@ -24,7 +24,14 @@ export class CreateWalletUseCase {
   ) {}
 
   public async execute(dto: CreateWalletDto): Promise<WalletResponseDto> {
-    const currency = 'BRL';
+    if (!dto || typeof dto !== 'object') {
+      throw new InvalidWagerOperationError('CreateWalletDto must be an object');
+    }
+    if (!dto.playerId || typeof dto.playerId !== 'string' || !dto.playerId.trim()) {
+      throw new InvalidWagerOperationError('PlayerId is mandatory and must be a non-empty string');
+    }
+
+    const currency = dto.initialBalance?.currency ? dto.initialBalance.currency.trim().toUpperCase() : 'BRL';
     const initialAmount = dto.initialBalance?.amount ?? '0.00';
     const initialMoney = Money.create(initialAmount, currency);
 
@@ -110,12 +117,21 @@ export class CreateWalletUseCase {
         };
       });
     } catch (error: any) {
-      const pgError = error?.cause ?? error;
-      if (pgError?.code === '23505') {
-        const constraint = String(pgError.constraint || '');
-        if (constraint.includes('uq_wallets_player_currency') || constraint.includes('wallets_pkey')) {
-          throw new DuplicateWalletError(dto.playerId, currency);
-        }
+      const extractErrorCode = (target: unknown): string => {
+        if (!target || typeof target !== 'object') return '';
+        const rec = target as Record<string, unknown>;
+        if (typeof rec.code === 'string') return rec.code;
+        if (rec.cause && typeof (rec.cause as any).code === 'string') return (rec.cause as any).code;
+        if (rec.originalError && typeof (rec.originalError as any).code === 'string') return (rec.originalError as any).code;
+        if (rec.driverException && typeof (rec.driverException as any).code === 'string') return (rec.driverException as any).code;
+        if (rec.driverError && typeof (rec.driverError as any).code === 'string') return (rec.driverError as any).code;
+        return '';
+      };
+
+      const code = extractErrorCode(error);
+      const msg = String(error?.message || '') + ' ' + String(error?.cause?.message || '');
+      if (code === '23505' || msg.includes('23505') || msg.includes('uq_wallets_player_currency')) {
+        throw new DuplicateWalletError(dto.playerId, currency);
       }
       throw error;
     }

@@ -108,10 +108,10 @@ export class HttpValidator {
     const playerId = HttpValidator.validateUuid(obj.playerId, 'playerId');
 
     let initialBalance: MoneyObjectDto | undefined = undefined;
-    if ('initialBalance' in obj) {
+    if ('initialBalance' in obj && obj.initialBalance !== undefined) {
       if (obj.initialBalance === null || obj.initialBalance === false || obj.initialBalance === '' || obj.initialBalance === 0) {
         throw new BadRequestException(
-          'initialBalance cannot be null, empty, false, or 0. Zero balance must be explicitly specified as { "amount": "0.00", "currency": "BRL" }'
+          'initialBalance cannot be null, empty, false, or 0. To open with zero balance, omit initialBalance or explicitly specify { "amount": "0.00", "currency": "BRL" }'
         );
       }
       initialBalance = HttpValidator.validateMoneyObject(obj.initialBalance, 'initialBalance', { allowZero: true, allowNegative: false });
