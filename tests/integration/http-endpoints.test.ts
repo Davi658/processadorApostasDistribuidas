@@ -830,6 +830,13 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
       const originalTxId = initialBody.transactionId;
 
       // Inspecionar contadores no banco antes da tentativa de conflito
+      const txCountBeforeRes = await adminPool.query(
+        'SELECT COUNT(*) FROM wager_transactions WHERE wallet_id = $1;',
+        [wallet.id]
+      );
+      const txCountBefore = Number(txCountBeforeRes.rows[0].count);
+      expect(txCountBefore).toBe(2); // OPENING + BET
+
       const ledgerCountBeforeRes = await adminPool.query(
         'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
         [wallet.id]
@@ -867,11 +874,25 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
       const conflictBody = (await conflictRes.json()) as any;
       expect(conflictBody.code).toBe('IDEMPOTENCY_CONFLICT');
 
-      // 3. Comprovar que NENHUM novo debito, ledger ou outbox ocorreu
+      // 3. Comprovar que NENHUM novo debito, transacao, ledger ou outbox ocorreu
       const walletAfterConflictRes = await fetch(`${serverUrl}/wallets/${wallet.id}`);
       const walletAfterConflict = (await walletAfterConflictRes.json()) as any;
       expect(walletAfterConflict.balance.amount).toBe('90.00'); // Saldo permaneceu 90.00, sem debito
       expect(walletAfterConflict.version).toBe(2); // Versao permaneceu 2
+
+      const txCountAfterConflictRes = await adminPool.query(
+        'SELECT COUNT(*) FROM wager_transactions WHERE wallet_id = $1;',
+        [wallet.id]
+      );
+      expect(Number(txCountAfterConflictRes.rows[0].count)).toBe(txCountBefore); // Nenhuma nova transacao
+
+      const txRowRes = await adminPool.query(
+        'SELECT status, amount, currency FROM wager_transactions WHERE id = $1;',
+        [originalTxId]
+      );
+      expect(txRowRes.rows[0].status).toBe('PROCESSED');
+      expect(txRowRes.rows[0].amount).toBe('10.00');
+      expect(txRowRes.rows[0].currency).toBe('BRL');
 
       const ledgerCountAfterConflictRes = await adminPool.query(
         'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
@@ -911,11 +932,29 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
       expect(replayBody.balance).toEqual({ amount: '90.00', currency: 'BRL' });
       expect(replayBody.idempotentReplay).toBe(true);
 
-      // Saldo, versao, ledger e outbox permanecem intactos apos replay
+      // Saldo, versao, transacoes, ledger e outbox permanecem intactos apos replay (sem novos registros ou movimentos)
       const walletAfterReplayRes = await fetch(`${serverUrl}/wallets/${wallet.id}`);
       const walletAfterReplay = (await walletAfterReplayRes.json()) as any;
       expect(walletAfterReplay.balance.amount).toBe('90.00');
       expect(walletAfterReplay.version).toBe(2);
+
+      const txCountAfterReplayRes = await adminPool.query(
+        'SELECT COUNT(*) FROM wager_transactions WHERE wallet_id = $1;',
+        [wallet.id]
+      );
+      expect(Number(txCountAfterReplayRes.rows[0].count)).toBe(txCountBefore);
+
+      const ledgerCountAfterReplayRes = await adminPool.query(
+        'SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;',
+        [wallet.id]
+      );
+      expect(Number(ledgerCountAfterReplayRes.rows[0].count)).toBe(ledgerCountBefore);
+
+      const outboxCountAfterReplayRes = await adminPool.query(
+        'SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1;',
+        [wallet.id]
+      );
+      expect(Number(outboxCountAfterReplayRes.rows[0].count)).toBe(outboxCountBefore);
     });
   });
 });
