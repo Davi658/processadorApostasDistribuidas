@@ -16,6 +16,7 @@
 | **Bloco C** | 10. Implementar Referências e Reversões (Validação estrita, unicidade parcial no banco) | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts` |
 | **Bloco C** | 11. Referências Fora de Ordem (`PENDING_REFERENCE`, worker com backoff exponencial) | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts` |
 | **Bloco C** | 12. Testar Novas Operações e Reconciliação Final | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts`, `tests/integration/http-endpoints.test.ts` |
+| **Frente M02** | 13. Estabilização da Frente Money (NUMERIC 18,2, overflow no domínio, round-trip real) | **CONCLUÍDO** | `tests/unit/money.test.ts`, `tests/integration/money-postgres-roundtrip.test.ts` |
 
 ---
 
@@ -57,6 +58,12 @@
 - **Serialização Canônica Recursiva:** O método `ProcessWagerUseCase.computePayloadHash` utiliza `canonicalStringify`, ordenando chaves alfabeticamente em todos os níveis e preservando a ordem de arrays. Isso garante que campos aninhados (`money.amount` e `money.currency`) sejam incluídos no cálculo do SHA-256.
 - **Registros Anteriores e Decisão de Compatibilidade:** Registros de transações gravados antes desta correção foram gerados pelo algoritmo legado e exigem uma decisão explícita de compatibilidade antes de qualquer intervenção ou migração.
 - **Sem Suposição de TTL:** Não há fundamento no enunciado para assumir validade transitória por TTL contratual. A imutabilidade histórica no PostgreSQL é preservada sem regravação silenciosa de hashes em transações terminais.
+
+### 2.5 Frente Money Estabilizada (M02)
+- **Limites e Precisão:** Alinhamento estrito com `NUMERIC(18,2)`: máximo `"9999999999999999.99"` e mínimo assinado `"-9999999999999999.99"`. Dinheiro nunca convertido para `number` (aritmética em `bigint` centavos e strings decimais canônicas com 2 casas).
+- **Política de Overflow:** Erros de estouro de capacidade geram `MoneyOverflowError` (`code: 'MONEY_OVERFLOW'`) no nível de domínio antes de qualquer tentativa de persistência, evitando erros SQL inesperados (`22003`). Transações abortadas preservam 100% o saldo, versão, transação, ledger e outbox.
+- **Valores Negativos Internos:** `Money.create` rejeita negativos em contratos externos. Operações internas e `rehydrate` suportam deltas negativos estritamente para diferenças contábeis e reconciliação.
+- **Comprovação com PostgreSQL Real:** Suíte `tests/integration/money-postgres-roundtrip.test.ts` valida o ciclo `Money → ORM → NUMERIC(18,2) → ORM → Money` para valores de 0 centavos até o limite máximo, inclusive acima de `Number.MAX_SAFE_INTEGER`.
 
 ---
 

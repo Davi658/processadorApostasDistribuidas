@@ -8,9 +8,17 @@ export abstract class DomainError extends Error {
 }
 
 export class InvalidMoneyError extends DomainError {
-  public readonly code = 'INVALID_MONEY';
+  public readonly code: string = 'INVALID_MONEY';
 
   constructor(message: string) {
+    super(message);
+  }
+}
+
+export class MoneyOverflowError extends InvalidMoneyError {
+  public override readonly code: string = 'MONEY_OVERFLOW';
+
+  constructor(message = 'Amount exceeds maximum allowed capacity for NUMERIC(18,2)') {
     super(message);
   }
 }

@@ -176,3 +176,26 @@ O método `ProcessWagerUseCase.computePayloadHash` utiliza serialização canôn
 - **Algoritmo Legado:** Registros de transações persistidos antes desta correção foram gerados pelo algoritmo legado (que omitia as chaves aninhadas `amount` e `currency` do objeto `money`).
 - **Decisão Explícita de Compatibilidade:** Registros anteriores utilizam o algoritmo legado e exigem uma decisão explícita de compatibilidade antes de qualquer intervenção ou migração. Não há suposição de expiração automática ou descarte de chaves.
 - **Imutabilidade Preservada:** Os hashes de transações já gravadas no banco de dados não são regravados silenciosamente, em conformidade com as restrições relacionais de transações terminais protegidas por trigger no PostgreSQL.
+
+---
+
+## 7. Precisão Monetária, Limites NUMERIC(18,2) e Política de Overflow (M02)
+
+### 7.1 Limites entre Domínio e Persistência
+A representação monetária é governada pelo Value Object `Money`, alinhado estritamente com as colunas `NUMERIC(18,2)` do PostgreSQL e entidades MikroORM:
+- **Precisão Total:** 18 dígitos, com escala fixa de 2 casas decimais (máximo de 16 dígitos inteiros).
+- **Limite Máximo Superior:** `"9999999999999999.99"` (`999_999_999_999_999_999n` centavos).
+- **Limite Mínimo Assinado:** `"-9999999999999999.99"` (`-999_999_999_999_999_999n` centavos).
+- **Sem Conversão para Number:** Dinheiro nunca transita como tipo `number` do JavaScript em nenhuma camada (domínio, DTO, ORM ou driver SQL). Todos os cálculos internos utilizam `bigint` para centavos e manipulação de string decimal canônica. Valores acima de `Number.MAX_SAFE_INTEGER` (`9007199254740991`) operam com precisão exata e sem perdas de ponto flutuante.
+
+### 7.2 Política de Overflow e Prevenção de Erros SQL
+- **Validação Antecipada no Domínio:** Limites são validados no construtor privado e em todas as operações (`create`, `rehydrate`, `fromCents`, `add`, `subtract`).
+- **Tratamento de Exceções:** Quando uma operação aritmética ou entrada excede a capacidade do banco, o domínio lança `MoneyOverflowError` (`code: 'MONEY_OVERFLOW'`), que estende `InvalidMoneyError`.
+- **Prevenção de Falhas SQL:** A falha é interceptada antes de atingir o banco de dados, evitando erros inesperados de driver (`numeric field overflow 22003`). No HTTP, é mapeada para `400 Bad Request`.
+- **Atomicidade Total:** Quando uma operação é recusada por estouro de limite dentro de uma unidade de trabalho (`UnitOfWork`), a transação é abortada e nenhuma mutação parcial ocorre: saldo, versão, transação, ledger e outbox permanecem intactos.
+
+### 7.3 Diferenciação de Entradas Externas e Valores Negativos Internos
+- **Entradas Externas (`Money.create`):** Aceitam estritamente strings decimais canônicas positivas ou `"0.00"` (`/^(?:0|[1-9]\d*)\.\d{2}$/`). Rejeitam qualquer valor negativo (inclusive `"-0.00"`), `NaN`, `Infinity`, notação científica, espaços em branco e escalas diferentes de 2 casas.
+- **Valores Negativos Internos (`Money.subtract`, `Money.rehydrate`, `Money.fromCents`):** Suportam valores negativos assinados (até `MIN_SIGNED_LIMIT`), exclusivamente para cálculo de deltas contábeis e divergências de reconciliação financeira (ex: `storedBalance.subtract(calculatedBalance)`).
+- **Proteção do Saldo:** O saldo de carteira (`Wallet.balance`) nunca pode ser negativo, garantido pela regra de domínio e pela constraint `CHECK (balance >= 0)` no PostgreSQL.
+

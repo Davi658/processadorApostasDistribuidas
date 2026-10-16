@@ -6,6 +6,7 @@ import {
   IdempotencyConflictError,
   InsufficientBalanceError,
   InvalidMoneyError,
+  MoneyOverflowError,
   InvalidWagerOperationError,
   WalletNotFoundError,
   CurrencyMismatchError,

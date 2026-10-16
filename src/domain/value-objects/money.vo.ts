@@ -1,15 +1,30 @@
-import { CurrencyMismatchError, InvalidMoneyError } from '../errors/domain.error';
+import { CurrencyMismatchError, InvalidMoneyError, MoneyOverflowError } from '../errors/domain.error';
 
 const DECIMAL_STRING_REGEX = /^(?:0|[1-9]\d*)\.\d{2}$/;
 const SIGNED_DECIMAL_STRING_REGEX = /^-?(?:0|[1-9]\d*)\.\d{2}$/;
 const CURRENCY_REGEX = /^[A-Z]{3}$/;
-const MAX_INTEGER_DIGITS = 16; // Conforms to NUMERIC(18,2) max 18 digits (16 integer + 2 decimal)
 
 export class Money {
+  public static readonly MAX_INTEGER_DIGITS = 16;
+  public static readonly SCALE = 2;
+  public static readonly MAX_LIMIT = '9999999999999999.99';
+  public static readonly MIN_SIGNED_LIMIT = '-9999999999999999.99';
+  public static readonly MAX_CENTS = 999_999_999_999_999_999n; // 16 nines + 2 decimal nines
+  public static readonly MIN_CENTS = -999_999_999_999_999_999n;
+
   private readonly cents: bigint;
   private readonly currency: string;
 
   private constructor(cents: bigint, currency: string) {
+    if (typeof cents !== 'bigint') {
+      throw new InvalidMoneyError('Cents must be a bigint');
+    }
+    if (cents > Money.MAX_CENTS || cents < Money.MIN_CENTS) {
+      throw new MoneyOverflowError(
+        `Amount exceeds maximum allowed capacity for NUMERIC(18,2) (limit is ${Money.MAX_LIMIT})`
+      );
+    }
+    Money.validateCurrency(currency);
     this.cents = cents;
     this.currency = currency;
     Object.freeze(this);
@@ -17,66 +32,80 @@ export class Money {
 
   /**
    * Factory for creating non-negative Money instances from external input contracts.
-   * Rejects negatives, NaN, Infinity, scientific notation, and invalid scales.
+   * Rejects negatives, NaN, Infinity, scientific notation, whitespace and invalid scales.
    */
   public static create(amountStr: string, currency: string): Money {
     if (typeof amountStr !== 'string' || typeof currency !== 'string') {
       throw new InvalidMoneyError('Amount and currency must be strings');
     }
 
-    const trimmedAmount = amountStr.trim();
-    const trimmedCurrency = currency.trim();
+    if (amountStr.trim() !== amountStr) {
+      throw new InvalidMoneyError('Non-canonical format: amount string cannot have leading or trailing whitespace');
+    }
 
-    Money.validateCurrency(trimmedCurrency);
+    if (currency.trim() !== currency) {
+      throw new InvalidMoneyError('Non-canonical format: currency string cannot have leading or trailing whitespace');
+    }
 
-    if (trimmedAmount.startsWith('-')) {
+    Money.validateCurrency(currency);
+
+    if (amountStr.startsWith('-')) {
       throw new InvalidMoneyError('Money input contracts do not accept negative values');
     }
 
-    if (!DECIMAL_STRING_REGEX.test(trimmedAmount)) {
+    if (!DECIMAL_STRING_REGEX.test(amountStr)) {
       throw new InvalidMoneyError(
         `Invalid money format: "${amountStr}". Must be a non-negative decimal string with exactly two decimal places, e.g. "100.00"`
       );
     }
 
-    const [intPart, decPart] = trimmedAmount.split('.');
-    if (intPart.length > MAX_INTEGER_DIGITS) {
-      throw new InvalidMoneyError(
-        `Amount exceeds maximum allowed magnitude (max ${MAX_INTEGER_DIGITS} integer digits)`
+    const [intPart, decPart] = amountStr.split('.');
+    if (intPart.length > Money.MAX_INTEGER_DIGITS) {
+      throw new MoneyOverflowError(
+        `Amount exceeds maximum allowed magnitude (max ${Money.MAX_INTEGER_DIGITS} integer digits, limit is ${Money.MAX_LIMIT})`
       );
     }
 
     const cents = BigInt(intPart) * 100n + BigInt(decPart);
-    return new Money(cents, trimmedCurrency);
+    return new Money(cents, currency);
   }
 
   /**
    * Factory for internal and persistent state rehydration.
-   * Accepts signed decimal strings (e.g. for differences and ledger balance deltas).
+   * Accepts signed decimal strings (e.g. for differences and reconciliation deltas).
    */
   public static rehydrate(amountStr: string, currency: string): Money {
     if (typeof amountStr !== 'string' || typeof currency !== 'string') {
       throw new InvalidMoneyError('Amount and currency must be strings');
     }
 
-    const trimmedAmount = amountStr.trim();
-    const trimmedCurrency = currency.trim();
+    if (amountStr.trim() !== amountStr) {
+      throw new InvalidMoneyError('Non-canonical format: amount string cannot have leading or trailing whitespace');
+    }
 
-    Money.validateCurrency(trimmedCurrency);
+    if (currency.trim() !== currency) {
+      throw new InvalidMoneyError('Non-canonical format: currency string cannot have leading or trailing whitespace');
+    }
 
-    if (!SIGNED_DECIMAL_STRING_REGEX.test(trimmedAmount)) {
+    Money.validateCurrency(currency);
+
+    if (amountStr === '-0.00' || amountStr === '-0' || amountStr === '-0.0') {
+      throw new InvalidMoneyError('Negative zero is not a valid canonical decimal');
+    }
+
+    if (!SIGNED_DECIMAL_STRING_REGEX.test(amountStr)) {
       throw new InvalidMoneyError(
         `Invalid money format for rehydrate: "${amountStr}". Must have exactly two decimal places`
       );
     }
 
-    const isNegative = trimmedAmount.startsWith('-');
-    const unsignedStr = isNegative ? trimmedAmount.slice(1) : trimmedAmount;
+    const isNegative = amountStr.startsWith('-');
+    const unsignedStr = isNegative ? amountStr.slice(1) : amountStr;
     const [intPart, decPart] = unsignedStr.split('.');
 
-    if (intPart.length > MAX_INTEGER_DIGITS) {
-      throw new InvalidMoneyError(
-        `Amount exceeds maximum allowed magnitude (max ${MAX_INTEGER_DIGITS} integer digits)`
+    if (intPart.length > Money.MAX_INTEGER_DIGITS) {
+      throw new MoneyOverflowError(
+        `Amount exceeds maximum allowed magnitude (max ${Money.MAX_INTEGER_DIGITS} integer digits, limit is ${Money.MAX_LIMIT})`
       );
     }
 
@@ -85,13 +114,16 @@ export class Money {
       cents = -cents;
     }
 
-    return new Money(cents, trimmedCurrency);
+    return new Money(cents, currency);
   }
 
   /**
    * Factory for creating Money directly from bigint cents.
    */
   public static fromCents(cents: bigint, currency: string): Money {
+    if (typeof cents !== 'bigint') {
+      throw new InvalidMoneyError('Cents must be a bigint');
+    }
     Money.validateCurrency(currency);
     return new Money(cents, currency);
   }
@@ -103,7 +135,7 @@ export class Money {
     return Money.create('0.00', currency);
   }
 
-  private static validateCurrency(currency: string): void {
+  public static validateCurrency(currency: string): void {
     if (!CURRENCY_REGEX.test(currency)) {
       throw new InvalidMoneyError(`Invalid currency code: "${currency}". Must be 3 uppercase letters (ISO-4217)`);
     }
