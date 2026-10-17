@@ -102,17 +102,18 @@ Para eliminar qualquer discrepância de regras entre o fluxo imediato (`ProcessW
   4. *Garantia de Reversão Única por Tipo:* Consulta no banco se já existe reversão `PROCESSED` do mesmo tipo para aquela referência (`findByProviderAndReference`). Se existir, resulta em `REJECTED` com código estável `REVERSAL_ALREADY_PROCESSED`. A política não impõe exclusividade global entre `REFUND` e `ROLLBACK`, sendo garantida no banco pelo índice parcial `uq_processed_reversal_per_reference`.
   5. *Proteção de Saldo Negativo:* Se a reversão exigir débito (`ROLLBACK` de `WIN` ou `REFUND`) e o saldo for insuficiente, a reversão é rejeitada com código estável `REVERSAL_INSUFFICIENT_FUNDS`.
 - **Invariantes em Cenários de Rejeição:**
-  - Status `REJECTED` é persistido com seu respectivo `failureCode`.
-  - Publica exclusivamente o evento `WagerTransactionRejectedEvent` na outbox.
-  - **Zero movimentação financeira:** Saldo da carteira não se altera, versão não é incrementada, nenhum registro contábil é criado em `wallet_ledger_entries` e nunca é emitido `WalletBalanceChangedEvent`.
+  - Status `REJECTED` é persistido com seu respectivo `failureCode` e snapshot terminal completo (`response_snapshot` com `transactionId`, `status: 'REJECTED'`, `failureCode` e `balance`).
+  - Publica exclusivamente o evento `WagerTransactionRejectedEvent` na tabela `outbox_messages` (coluna `payload` contendo `transactionId` e `failureCode`).
+  - **Zero movimentação financeira e ausência auditada:** Saldo da carteira não se altera, versão não é incrementada, nenhum registro contábil é criado em `wallet_ledger_entries` para a reversão, e nenhum evento `WalletBalanceChangedEvent` (`payload.triggerTransactionId`) ou `WagerTransactionProcessedEvent` (`payload.transactionId`) é emitido.
 
 ### 3.3 Tratamento de Referências Fora de Ordem (`PENDING_REFERENCE`)
 Quando uma reversão (`REFUND` ou `ROLLBACK`) chega antes da transação de referência:
 1. No fluxo imediato, o use case persiste a transação com status `PENDING_REFERENCE`, `attempts = 1` e agendamento de retry em `next_attempt_at`.
 2. Publica o evento `WagerTransactionPendingReferenceEvent` na outbox e responde imediatamente com HTTP 202 Accepted.
-3. O worker agendado `ReprocessPendingReferencesUseCase` pesquisa transações pendentes elegíveis com lock pessimista `SKIP LOCKED`, delegando a validação e movimentação ao `ReversalProcessor` sob a mesma regra do fluxo imediato.
+3. O serviço `ReprocessPendingReferencesUseCase` pesquisa transações pendentes elegíveis com lock pessimista `SKIP LOCKED`, delegando a validação e movimentação ao `ReversalProcessor` sob a mesma regra do fluxo imediato.
 4. Se a referência ainda estiver ausente ou pendente: aplica backoff exponencial com jitter (até 5 tentativas). Esgotadas as tentativas, transiciona terminalmente para `REJECTED` com código `REFERENCE_NOT_FOUND`.
-5. Se a referência for posteriormente confirmada, ambos os caminhos (referência prévia ou referência tardia) produzem exatamente o mesmo resultado contábil, saldo, versão, ledger, outbox e reconciliação.
+5. Se a referência for posteriormente confirmada (ou rejeitada/falhada/incompatível), ambos os caminhos (referência prévia imediata ou referência tardia com reprocessador) produzem exatamente o mesmo resultado contábil, saldo, versão, ledger, outbox e reconciliação.
+6. **Delimitação Estrita de Escopo (M08 vs M10):** A validação de M08 abrange exclusivamente a integridade contábil, a compatibilidade de regras e o reprocessamento determinístico das pendências. O agendamento contínuo em background, a concorrência distribuída entre múltiplos workers e a integração com SQS pertencem à frente M10 e permanecem marcados como **NÃO VALIDADO** nesta etapa.
 
 ---
 

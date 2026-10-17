@@ -60,12 +60,267 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
     if (isolatedDb) await isolatedDb.closeAndDrop();
   }, 30000);
 
-  // Helper to make pending transactions immediately eligible for reprocessing
+  // Helper para tornar pendências imediatamente elegíveis para reprocessamento
   async function makePendingEligible(transactionId: string): Promise<void> {
     await adminPool.query(
       "UPDATE wager_transactions SET next_attempt_at = NOW() - INTERVAL '1 second' WHERE id = $1;",
       [transactionId]
     );
+  }
+
+  // Helper de auditoria estrita de rejeição:
+  // - exatamente um evento WagerTransactionRejected com failureCode correto
+  // - nenhum WalletBalanceChanged emitido para a reversão
+  // - nenhum WagerTransactionProcessed emitido para a reversão
+  // - nenhum lançamento no ledger para a reversão
+  // - saldo e version da carteira preservados
+  // - snapshot terminal completo e coerente
+  async function assertRejectionAudit(params: {
+    reversalTxId: string;
+    walletId: string;
+    expectedFailureCode: string;
+    expectedBalance: string;
+    expectedVersion: number;
+  }): Promise<void> {
+    // 1. Snapshot terminal na tabela wager_transactions
+    const txRow = (
+      await adminPool.query('SELECT * FROM wager_transactions WHERE id = $1;', [params.reversalTxId])
+    ).rows[0];
+    expect(txRow).toBeDefined();
+    expect(txRow.status).toBe('REJECTED');
+    expect(txRow.rejection_reason).toBe(params.expectedFailureCode);
+
+    const snapshot =
+      typeof txRow.response_snapshot === 'string'
+        ? JSON.parse(txRow.response_snapshot)
+        : txRow.response_snapshot;
+    expect(snapshot).toBeDefined();
+    expect(snapshot.transactionId).toBe(params.reversalTxId);
+    expect(snapshot.status).toBe('REJECTED');
+    expect(snapshot.failureCode).toBe(params.expectedFailureCode);
+    expect(snapshot.balance?.amount).toBe(params.expectedBalance);
+    expect(snapshot.idempotentReplay).toBe(false);
+
+    // 2. Nenhum lançamento no ledger para a reversão
+    const ledgerRows = (
+      await adminPool.query('SELECT * FROM wallet_ledger_entries WHERE transaction_id = $1;', [
+        params.reversalTxId,
+      ])
+    ).rows;
+    expect(ledgerRows.length).toBe(0);
+
+    // 3. Saldo e versão da carteira preservados
+    const wallet = await getWalletUseCase.execute(params.walletId);
+    expect(wallet.balance.amount).toBe(params.expectedBalance);
+    expect(wallet.version).toBe(params.expectedVersion);
+
+    // 4. Outbox: exatamente um WagerTransactionRejected com failureCode correto
+    const outboxRows = (
+      await adminPool.query('SELECT * FROM outbox_messages WHERE aggregate_id = $1;', [params.walletId])
+    ).rows;
+
+    const rejectedEvents = outboxRows.filter((r: any) => {
+      const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+      return r.event_type === 'WagerTransactionRejected' && payload?.transactionId === params.reversalTxId;
+    });
+    expect(rejectedEvents.length).toBe(1);
+    const rejPayload =
+      typeof rejectedEvents[0].payload === 'string'
+        ? JSON.parse(rejectedEvents[0].payload)
+        : rejectedEvents[0].payload;
+    expect(rejPayload.failureCode).toBe(params.expectedFailureCode);
+
+    // 5. Outbox: nenhum WagerTransactionProcessed para a reversão
+    const processedEvents = outboxRows.filter((r: any) => {
+      const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+      return r.event_type === 'WagerTransactionProcessed' && payload?.transactionId === params.reversalTxId;
+    });
+    expect(processedEvents.length).toBe(0);
+
+    // 6. Outbox: nenhum WalletBalanceChanged disparado pela reversão
+    const balanceChangedEvents = outboxRows.filter((r: any) => {
+      const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+      return r.event_type === 'WalletBalanceChanged' && payload?.triggerTransactionId === params.reversalTxId;
+    });
+    expect(balanceChangedEvents.length).toBe(0);
+  }
+
+  // Helper para criar fixture contabilmente consistente em USD:
+  // Carteira USD + transação OPENING + crédito ledger + transação BET + débito ledger
+  async function createAccountingConsistentUsdFixture(params: {
+    playerId?: string;
+    walletId?: string;
+    initialBalance?: string;
+    betAmount?: string;
+    betExtId: string;
+    providerId?: string;
+    roundId?: string;
+    gameId?: string;
+  }) {
+    const playerId = params.playerId ?? crypto.randomUUID();
+    const walletId = params.walletId ?? crypto.randomUUID();
+    const providerId = params.providerId ?? 'prv-curr';
+    const roundId = params.roundId ?? 'rnd-curr';
+    const gameId = params.gameId ?? 'gm-curr';
+    const initialBalance = params.initialBalance ?? '100.00';
+    const betAmount = params.betAmount ?? '20.00';
+    const finalBalance = (Number(initialBalance) - Number(betAmount)).toFixed(2);
+
+    // 1. Wallets table (version = 2: 1 abertura + 1 bet)
+    await adminPool.query(
+      `INSERT INTO wallets (id, player_id, currency, balance, version, created_at, updated_at)
+       VALUES ($1, $2, 'USD', $3, 2, NOW(), NOW());`,
+      [walletId, playerId, finalBalance]
+    );
+
+    // 2. OPENING transaction
+    const openingTxId = crypto.randomUUID();
+    const openingKey = `OPENING_${walletId}`;
+    const openingSnapshot = JSON.stringify({
+      transactionId: openingTxId,
+      status: 'PROCESSED',
+      balance: { amount: initialBalance, currency: 'USD' },
+      idempotentReplay: false,
+    });
+    await adminPool.query(
+      `INSERT INTO wager_transactions (
+         id, wallet_id, player_id, provider_id, external_transaction_id,
+         round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash,
+         response_snapshot, created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, 'SYSTEM', $4,
+         'ROUND-OPENING', 'SYSTEM', 'OPENING', $5, 'USD', 'PROCESSED', $6, NULL,
+         $7::jsonb, NOW(), NOW()
+       );`,
+      [openingTxId, walletId, playerId, `OPENING-${walletId}`, initialBalance, openingKey, openingSnapshot]
+    );
+
+    // 3. OPENING ledger entry (CREDIT)
+    const openingLedgerId = crypto.randomUUID();
+    await adminPool.query(
+      `INSERT INTO wallet_ledger_entries (
+         id, wallet_id, transaction_id, entry_type, amount, currency,
+         balance_before, balance_after, created_at
+       ) VALUES (
+         $1, $2, $3, 'CREDIT', $4, 'USD',
+         0.00, $4, NOW()
+       );`,
+      [openingLedgerId, walletId, openingTxId, initialBalance]
+    );
+
+    // 4. BET transaction (PROCESSED)
+    const betTxId = crypto.randomUUID();
+    const betKey = `key-usd-${crypto.randomUUID()}`;
+    const dummyHash = crypto.createHash('sha256').update(params.betExtId).digest('hex');
+    const betSnapshot = JSON.stringify({
+      transactionId: betTxId,
+      status: 'PROCESSED',
+      balance: { amount: finalBalance, currency: 'USD' },
+      idempotentReplay: false,
+    });
+    await adminPool.query(
+      `INSERT INTO wager_transactions (
+         id, wallet_id, player_id, provider_id, external_transaction_id,
+         round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash,
+         response_snapshot, created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, $4, $5,
+         $6, $7, 'BET', $8, 'USD', 'PROCESSED', $9, $10,
+         $11::jsonb, NOW(), NOW()
+       );`,
+      [
+        betTxId,
+        walletId,
+        playerId,
+        providerId,
+        params.betExtId,
+        roundId,
+        gameId,
+        betAmount,
+        betKey,
+        dummyHash,
+        betSnapshot,
+      ]
+    );
+
+    // 5. BET ledger entry (DEBIT)
+    const betLedgerId = crypto.randomUUID();
+    await adminPool.query(
+      `INSERT INTO wallet_ledger_entries (
+         id, wallet_id, transaction_id, entry_type, amount, currency,
+         balance_before, balance_after, created_at
+       ) VALUES (
+         $1, $2, $3, 'DEBIT', $4, 'USD',
+         $5, $6, NOW()
+       );`,
+      [betLedgerId, walletId, betTxId, betAmount, initialBalance, finalBalance]
+    );
+
+    return {
+      walletId,
+      playerId,
+      betTxId,
+      betExtId: params.betExtId,
+      balance: finalBalance,
+    };
+  }
+
+  // Helper para criar fixture de BET em status FAILED (sem desativar triggers)
+  async function createFailedBetFixture(params: {
+    walletId: string;
+    playerId: string;
+    betExtId: string;
+    amount?: string;
+    currency?: string;
+    providerId?: string;
+    roundId?: string;
+    gameId?: string;
+  }) {
+    const betTxId = crypto.randomUUID();
+    const providerId = params.providerId ?? 'prv-failed';
+    const roundId = params.roundId ?? 'rnd-failed';
+    const gameId = params.gameId ?? 'gm-failed';
+    const amount = params.amount ?? '25.00';
+    const currency = params.currency ?? 'BRL';
+    const idempotencyKey = `key-failed-${crypto.randomUUID()}`;
+    const payloadHash = crypto.createHash('sha256').update(params.betExtId).digest('hex');
+    const failureReason = 'SYSTEM_ERROR_FAILED';
+    const responseSnapshot = JSON.stringify({
+      transactionId: betTxId,
+      status: 'FAILED',
+      failureCode: failureReason,
+      balance: { amount: '100.00', currency },
+      idempotentReplay: false,
+    });
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions (
+         id, wallet_id, player_id, provider_id, external_transaction_id,
+         round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash,
+         rejection_reason, response_snapshot, created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, $4, $5,
+         $6, $7, 'BET', $8, $9, 'FAILED', $10, $11,
+         $12, $13::jsonb, NOW(), NOW()
+       );`,
+      [
+        betTxId,
+        params.walletId,
+        params.playerId,
+        providerId,
+        params.betExtId,
+        roundId,
+        gameId,
+        amount,
+        currency,
+        idempotencyKey,
+        payloadHash,
+        failureReason,
+        responseSnapshot,
+      ]
+    );
+
+    return { betTxId, betExtId: params.betExtId };
   }
 
   // --------------------------------------------------------------------------
@@ -315,20 +570,13 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       expect(diffRefund.failureCode).toBe('REFERENCE_INCOMPATIBLE');
       expect(diffRefund.balance.amount).toBe('75.00');
 
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('75.00');
-      expect(finalWallet.version).toBe(2); // Inalterado pela rejeição
-
-      // Ledger não tem lançamento do refund
-      const ledgerEntries = await ledgerRepo.listByWalletId(wallet.id);
-      expect(ledgerEntries.length).toBe(2); // 1 OPENING + 1 BET
-
-      // Outbox não tem WalletBalanceChanged para o refund
-      const outboxRes = await adminPool.query('SELECT * FROM outbox_messages WHERE aggregate_id = $1;', [wallet.id]);
-      const balanceChangedForRefund = outboxRes.rows.filter(
-        (r: any) => r.event_type === 'WalletBalanceChanged' && r.data?.triggerTransactionId === diffRefund.transactionId
-      );
-      expect(balanceChangedForRefund.length).toBe(0);
+      await assertRejectionAudit({
+        reversalTxId: diffRefund.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '75.00',
+        expectedVersion: 2,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
@@ -371,13 +619,13 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       const reprocessResult = await reprocessWorker.execute(10);
       expect(reprocessResult.rejected).toBe(1);
 
-      const updatedRefundTx = await wagerRepo.findById(oooRefund.transactionId);
-      expect(updatedRefundTx?.status).toBe('REJECTED');
-      expect(updatedRefundTx?.rejectionReason).toBe('REFERENCE_INCOMPATIBLE');
-
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('75.00');
-      expect(finalWallet.version).toBe(2);
+      await assertRejectionAudit({
+        reversalTxId: oooRefund.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '75.00',
+        expectedVersion: 2,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
@@ -423,9 +671,13 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       expect(invalidRefund.failureCode).toBe('REFERENCE_INCOMPATIBLE');
       expect(invalidRefund.balance.amount).toBe('70.00');
 
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('70.00');
-      expect(finalWallet.version).toBe(2);
+      await assertRejectionAudit({
+        reversalTxId: invalidRefund.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '70.00',
+        expectedVersion: 2,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
@@ -468,13 +720,13 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       const reprocessResult = await reprocessWorker.execute(10);
       expect(reprocessResult.rejected).toBe(1);
 
-      const updatedRefundTx = await wagerRepo.findById(oooRefund.transactionId);
-      expect(updatedRefundTx?.status).toBe('REJECTED');
-      expect(updatedRefundTx?.rejectionReason).toBe('REFERENCE_INCOMPATIBLE');
-
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('70.00');
-      expect(finalWallet.version).toBe(2);
+      await assertRejectionAudit({
+        reversalTxId: oooRefund.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '70.00',
+        expectedVersion: 2,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
@@ -519,6 +771,14 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       expect(diffRoundRes.status).toBe('REJECTED');
       expect(diffRoundRes.failureCode).toBe('REFERENCE_INCOMPATIBLE');
 
+      await assertRejectionAudit({
+        reversalTxId: diffRoundRes.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '85.00',
+        expectedVersion: 2,
+      });
+
       // Fora de ordem com rodada divergente
       const betExtId2 = `bet-c5a-2-${crypto.randomUUID()}`;
       const oooRefund = await processWagerUseCase.execute(`key-ref-c5a-ooo-${crypto.randomUUID()}`, {
@@ -550,55 +810,148 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       const reprocessResult = await reprocessWorker.execute(10);
       expect(reprocessResult.rejected).toBe(1);
 
-      const updatedTx = await wagerRepo.findById(oooRefund.transactionId);
-      expect(updatedTx?.status).toBe('REJECTED');
-      expect(updatedTx?.rejectionReason).toBe('REFERENCE_INCOMPATIBLE');
+      await assertRejectionAudit({
+        reversalTxId: oooRefund.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '70.00',
+        expectedVersion: 3,
+      });
+
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('70.00');
     });
 
-    it('5b (Outra carteira / player): Caminho imediato e reprocessado', async () => {
-      // Wallet 1 (Player 1)
-      const wallet1 = await createWalletUseCase.execute({
-        playerId: crypto.randomUUID(),
-        initialBalance: { amount: '100.00', currency: 'BRL' },
-      });
-      // Wallet 2 (Player 2)
-      const wallet2 = await createWalletUseCase.execute({
-        playerId: crypto.randomUUID(),
-        initialBalance: { amount: '100.00', currency: 'BRL' },
+    describe('5b (Outra carteira / player): Caminho imediato e fora de ordem', () => {
+      it('5b - Caminho Imediato: Reversão na Wallet 2 de BET pertencente à Wallet 1 é rejeitada imediatamente', async () => {
+        // Wallet 1 (Player 1)
+        const wallet1 = await createWalletUseCase.execute({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        });
+        // Wallet 2 (Player 2)
+        const wallet2 = await createWalletUseCase.execute({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        });
+
+        const betExtIdWallet1 = `bet-w1-${crypto.randomUUID()}`;
+        await processWagerUseCase.execute(`key-bet-w1-${crypto.randomUUID()}`, {
+          providerId: 'prv-cross',
+          externalTransactionId: betExtIdWallet1,
+          playerId: wallet1.playerId,
+          walletId: wallet1.id,
+          roundId: 'rnd-cross',
+          gameId: 'gm-cross',
+          kind: 'BET',
+          money: { amount: '20.00', currency: 'BRL' },
+        });
+
+        // Wallet 2 tenta estornar a aposta de Wallet 1 (no fluxo imediato)
+        const crossRefund = await processWagerUseCase.execute(`key-cross-imm-${crypto.randomUUID()}`, {
+          providerId: 'prv-cross',
+          externalTransactionId: `ref-cross-imm-${crypto.randomUUID()}`,
+          playerId: wallet2.playerId,
+          walletId: wallet2.id,
+          roundId: 'rnd-cross',
+          gameId: 'gm-cross',
+          kind: 'REFUND',
+          money: { amount: '20.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtIdWallet1,
+        });
+        expect(crossRefund.status).toBe('REJECTED');
+        expect(crossRefund.failureCode).toBe('REFERENCE_INCOMPATIBLE');
+
+        // Auditoria estrita da rejeição na Wallet 2
+        await assertRejectionAudit({
+          reversalTxId: crossRefund.transactionId,
+          walletId: wallet2.id,
+          expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+          expectedBalance: '100.00',
+          expectedVersion: 1,
+        });
+
+        // Reconciliação de ambas as carteiras
+        const recon1 = await reconcileWalletUseCase.execute(wallet1.id);
+        expect(recon1.consistent).toBe(true);
+        expect(recon1.storedBalance.amount).toBe('80.00');
+
+        const recon2 = await reconcileWalletUseCase.execute(wallet2.id);
+        expect(recon2.consistent).toBe(true);
+        expect(recon2.storedBalance.amount).toBe('100.00');
       });
 
-      const betExtIdWallet1 = `bet-w1-${crypto.randomUUID()}`;
-      await processWagerUseCase.execute(`key-bet-w1-${crypto.randomUUID()}`, {
-        providerId: 'prv-cross',
-        externalTransactionId: betExtIdWallet1,
-        playerId: wallet1.playerId,
-        walletId: wallet1.id,
-        roundId: 'rnd-cross',
-        gameId: 'gm-cross',
-        kind: 'BET',
-        money: { amount: '20.00', currency: 'BRL' },
-      });
+      it('5b - Caminho Fora de Ordem: Reversão chega na Wallet 2 antes da BET na Wallet 1, reprocessamento rejeita com REFERENCE_INCOMPATIBLE', async () => {
+        // Wallet 1 (Player 1)
+        const wallet1 = await createWalletUseCase.execute({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        });
+        // Wallet 2 (Player 2)
+        const wallet2 = await createWalletUseCase.execute({
+          playerId: crypto.randomUUID(),
+          initialBalance: { amount: '100.00', currency: 'BRL' },
+        });
 
-      // Wallet 2 tenta estornar a aposta de Wallet 1 (no fluxo imediato)
-      const crossRefund = await processWagerUseCase.execute(`key-cross-imm-${crypto.randomUUID()}`, {
-        providerId: 'prv-cross',
-        externalTransactionId: `ref-cross-imm-${crypto.randomUUID()}`,
-        playerId: wallet2.playerId,
-        walletId: wallet2.id,
-        roundId: 'rnd-cross',
-        gameId: 'gm-cross',
-        kind: 'REFUND',
-        money: { amount: '20.00', currency: 'BRL' },
-        referenceExternalTransactionId: betExtIdWallet1,
-      });
-      expect(crossRefund.status).toBe('REJECTED');
-      expect(crossRefund.failureCode).toBe('REFERENCE_INCOMPATIBLE');
+        const betExtIdCrossOoo = `bet-cross-ooo-${crypto.randomUUID()}`;
 
-      // Ambas as carteiras permanecem íntegras
-      const w1 = await getWalletUseCase.execute(wallet1.id);
-      expect(w1.balance.amount).toBe('80.00');
-      const w2 = await getWalletUseCase.execute(wallet2.id);
-      expect(w2.balance.amount).toBe('100.00');
+        // Reversão chega na Wallet 2 referenciando betExtIdCrossOoo que ainda NÃO existe
+        const oooCrossRefund = await processWagerUseCase.execute(`key-cross-ooo-${crypto.randomUUID()}`, {
+          providerId: 'prv-cross',
+          externalTransactionId: `ref-cross-ooo-${crypto.randomUUID()}`,
+          playerId: wallet2.playerId,
+          walletId: wallet2.id,
+          roundId: 'rnd-cross',
+          gameId: 'gm-cross',
+          kind: 'REFUND',
+          money: { amount: '20.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtIdCrossOoo,
+        });
+        expect(oooCrossRefund.status).toBe('PENDING_REFERENCE');
+
+        // Saldo e versão da Wallet 2 permanecem intactos na chegada da pendência
+        const midWallet2 = await getWalletUseCase.execute(wallet2.id);
+        expect(midWallet2.balance.amount).toBe('100.00');
+        expect(midWallet2.version).toBe(1);
+
+        // A referência chega depois, mas na OUTRA carteira / jogador (Wallet 1 / Player 1)
+        const betWallet1 = await processWagerUseCase.execute(`key-bet-w1-late-${crypto.randomUUID()}`, {
+          providerId: 'prv-cross',
+          externalTransactionId: betExtIdCrossOoo,
+          playerId: wallet1.playerId,
+          walletId: wallet1.id,
+          roundId: 'rnd-cross',
+          gameId: 'gm-cross',
+          kind: 'BET',
+          money: { amount: '20.00', currency: 'BRL' },
+        });
+        expect(betWallet1.status).toBe('PROCESSED');
+        expect(betWallet1.balance.amount).toBe('80.00');
+
+        // Execução manual do reprocessador
+        await makePendingEligible(oooCrossRefund.transactionId);
+        const reprocessResult = await reprocessWorker.execute(10);
+        expect(reprocessResult.rejected).toBe(1);
+
+        // Auditoria estrita da rejeição na Wallet 2
+        await assertRejectionAudit({
+          reversalTxId: oooCrossRefund.transactionId,
+          walletId: wallet2.id,
+          expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+          expectedBalance: '100.00',
+          expectedVersion: 1,
+        });
+
+        // Reconciliação de ambas as carteiras
+        const recon1 = await reconcileWalletUseCase.execute(wallet1.id);
+        expect(recon1.consistent).toBe(true);
+        expect(recon1.storedBalance.amount).toBe('80.00');
+
+        const recon2 = await reconcileWalletUseCase.execute(wallet2.id);
+        expect(recon2.consistent).toBe(true);
+        expect(recon2.storedBalance.amount).toBe('100.00');
+      });
     });
   });
 
@@ -606,32 +959,23 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
   // Cenário 6: Conflito de moeda → rejeição, usando fixture adequada
   // --------------------------------------------------------------------------
   describe('Cenário 6: Conflito de moeda → rejeição, usando fixture adequada', () => {
-    it('Caminho A e B: Referência em USD não pode ser revertida por reversão em BRL', async () => {
+    it('Caminho A (Imediato): Referência em USD existente não pode ser revertida por reversão em BRL', async () => {
       const walletBrl = await createWalletUseCase.execute({
         playerId: crypto.randomUUID(),
         initialBalance: { amount: '100.00', currency: 'BRL' },
       });
 
-      // Fixture: Inserir diretamente uma BET com moeda USD pertencente a uma carteira USD
-      const usdWalletId = crypto.randomUUID();
-      const usdPlayerId = crypto.randomUUID();
-      await adminPool.query(
-        `INSERT INTO wallets (id, player_id, currency, balance, version, created_at, updated_at)
-         VALUES ($1, $2, 'USD', 100.00, 1, NOW(), NOW());`,
-        [usdWalletId, usdPlayerId]
-      );
+      const usdBetImmExtId = `bet-usd-imm-${crypto.randomUUID()}`;
+      const usdFixture = await createAccountingConsistentUsdFixture({
+        betExtId: usdBetImmExtId,
+        initialBalance: '100.00',
+        betAmount: '20.00',
+      });
 
-      const usdBetTxId = crypto.randomUUID();
-      const usdBetExtId = `bet-usd-${crypto.randomUUID()}`;
-      const usdKey = `key-usd-${crypto.randomUUID()}`;
-      const dummyHash = 'a'.repeat(64);
-      await adminPool.query(
-        `INSERT INTO wager_transactions (
-           id, wallet_id, player_id, provider_id, external_transaction_id,
-           round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, created_at, updated_at
-         ) VALUES ($1, $2, $3, 'prv-curr', $4, 'rnd-curr', 'gm-curr', 'BET', 10.00, 'USD', 'PROCESSED', $5, $6, NOW(), NOW());`,
-        [usdBetTxId, usdWalletId, usdPlayerId, usdBetExtId, usdKey, dummyHash]
-      );
+      // Validação prévia de reconciliação da fixture USD
+      const reconUsd = await reconcileWalletUseCase.execute(usdFixture.walletId);
+      expect(reconUsd.consistent).toBe(true);
+      expect(reconUsd.storedBalance.amount).toBe('80.00');
 
       // Reversão em BRL referenciando a BET em USD (Caminho A: Imediato)
       const currConflictRes = await processWagerUseCase.execute(`key-curr-imm-${crypto.randomUUID()}`, {
@@ -642,18 +986,39 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
         roundId: 'rnd-curr',
         gameId: 'gm-curr',
         kind: 'REFUND',
-        money: { amount: '10.00', currency: 'BRL' },
-        referenceExternalTransactionId: usdBetExtId,
+        money: { amount: '20.00', currency: 'BRL' },
+        referenceExternalTransactionId: usdBetImmExtId,
       });
 
       expect(currConflictRes.status).toBe('REJECTED');
       expect(currConflictRes.failureCode).toBe('REFERENCE_INCOMPATIBLE');
 
-      // Carteira BRL permanece intacta
-      const finalWallet = await getWalletUseCase.execute(walletBrl.id);
-      expect(finalWallet.balance.amount).toBe('100.00');
+      await assertRejectionAudit({
+        reversalTxId: currConflictRes.transactionId,
+        walletId: walletBrl.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '100.00',
+        expectedVersion: 1,
+      });
 
-      // Caminho B: Fora de ordem
+      const reconBrl = await reconcileWalletUseCase.execute(walletBrl.id);
+      expect(reconBrl.consistent).toBe(true);
+      expect(reconBrl.storedBalance.amount).toBe('100.00');
+
+      const reconUsdPost = await reconcileWalletUseCase.execute(usdFixture.walletId);
+      expect(reconUsdPost.consistent).toBe(true);
+      expect(reconUsdPost.storedBalance.amount).toBe('80.00');
+    });
+
+    it('Caminho B (Fora de ordem): Reversão em BRL cria pendência antes da inserção da referência USD, reprocessador rejeita sem movimento', async () => {
+      const walletBrl = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const usdBetOooExtId = `bet-usd-ooo-${crypto.randomUUID()}`;
+
+      // 1. Reversão em BRL chega ANTES de existir qualquer registro USD -> PENDING_REFERENCE
       const oooRefundCurr = await processWagerUseCase.execute(`key-curr-ooo-${crypto.randomUUID()}`, {
         providerId: 'prv-curr',
         externalTransactionId: `ref-curr-ooo-${crypto.randomUUID()}`,
@@ -662,12 +1027,49 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
         roundId: 'rnd-curr',
         gameId: 'gm-curr',
         kind: 'REFUND',
-        money: { amount: '10.00', currency: 'BRL' },
-        referenceExternalTransactionId: usdBetExtId,
+        money: { amount: '20.00', currency: 'BRL' },
+        referenceExternalTransactionId: usdBetOooExtId,
       });
-      // Como o usdBetExtId já existe no banco com USD, se for reprocessado ou executado:
-      expect(oooRefundCurr.status).toBe('REJECTED');
-      expect(oooRefundCurr.failureCode).toBe('REFERENCE_INCOMPATIBLE');
+      expect(oooRefundCurr.status).toBe('PENDING_REFERENCE');
+
+      // Carteira BRL intacta
+      const midWalletBrl = await getWalletUseCase.execute(walletBrl.id);
+      expect(midWalletBrl.balance.amount).toBe('100.00');
+      expect(midWalletBrl.version).toBe(1);
+
+      // 2. Cria a referência USD contabilmente consistente depois que a pendência já foi registrada
+      const usdFixture = await createAccountingConsistentUsdFixture({
+        betExtId: usdBetOooExtId,
+        initialBalance: '100.00',
+        betAmount: '20.00',
+      });
+
+      const reconUsd = await reconcileWalletUseCase.execute(usdFixture.walletId);
+      expect(reconUsd.consistent).toBe(true);
+      expect(reconUsd.storedBalance.amount).toBe('80.00');
+
+      // 3. Execução manual do reprocessador
+      await makePendingEligible(oooRefundCurr.transactionId);
+      const reprocessResult = await reprocessWorker.execute(10);
+      expect(reprocessResult.rejected).toBe(1);
+
+      // 4. Auditoria estrita da rejeição sem movimento
+      await assertRejectionAudit({
+        reversalTxId: oooRefundCurr.transactionId,
+        walletId: walletBrl.id,
+        expectedFailureCode: 'REFERENCE_INCOMPATIBLE',
+        expectedBalance: '100.00',
+        expectedVersion: 1,
+      });
+
+      // 5. Reconciliação das carteiras envolvidas
+      const reconBrl = await reconcileWalletUseCase.execute(walletBrl.id);
+      expect(reconBrl.consistent).toBe(true);
+      expect(reconBrl.storedBalance.amount).toBe('100.00');
+
+      const reconUsdPost = await reconcileWalletUseCase.execute(usdFixture.walletId);
+      expect(reconUsdPost.consistent).toBe(true);
+      expect(reconUsdPost.storedBalance.amount).toBe('80.00');
     });
   });
 
@@ -675,7 +1077,7 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
   // Cenário 7: Referência REJECTED/FAILED → rejeição auditável
   // --------------------------------------------------------------------------
   describe('Cenário 7: Referência REJECTED/FAILED → rejeição auditável', () => {
-    it('Caminho A (Imediato): Reversão de BET previamente rejeitada resulta em REFERENCE_NOT_PROCESSED', async () => {
+    it('Caminho A1 (Imediato - Referência REJECTED): Reversão de BET previamente rejeitada resulta em REFERENCE_NOT_PROCESSED', async () => {
       const wallet = await createWalletUseCase.execute({
         playerId: crypto.randomUUID(),
         initialBalance: { amount: '10.00', currency: 'BRL' },
@@ -712,16 +1114,20 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       expect(refundRes.status).toBe('REJECTED');
       expect(refundRes.failureCode).toBe('REFERENCE_NOT_PROCESSED');
 
-      const reloaded = await getWalletUseCase.execute(wallet.id);
-      expect(reloaded.balance.amount).toBe('10.00');
-      expect(reloaded.version).toBe(1);
+      await assertRejectionAudit({
+        reversalTxId: refundRes.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_NOT_PROCESSED',
+        expectedBalance: '10.00',
+        expectedVersion: 1,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
       expect(recon.storedBalance.amount).toBe('10.00');
     });
 
-    it('Caminho B (Fora de ordem): REFUND chega primeiro, BET é rejeitada depois, reprocessamento marca auditável', async () => {
+    it('Caminho B1 (Fora de ordem - Referência REJECTED): REFUND chega primeiro, BET é rejeitada depois, reprocessamento marca auditável', async () => {
       const wallet = await createWalletUseCase.execute({
         playerId: crypto.randomUUID(),
         initialBalance: { amount: '10.00', currency: 'BRL' },
@@ -757,17 +1163,115 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       const reprocessResult = await reprocessWorker.execute(10);
       expect(reprocessResult.rejected).toBe(1);
 
-      const updatedRefundTx = await wagerRepo.findById(oooRefund.transactionId);
-      expect(updatedRefundTx?.status).toBe('REJECTED');
-      expect(updatedRefundTx?.rejectionReason).toBe('REFERENCE_NOT_PROCESSED');
-
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('10.00');
-      expect(finalWallet.version).toBe(1);
+      await assertRejectionAudit({
+        reversalTxId: oooRefund.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_NOT_PROCESSED',
+        expectedBalance: '10.00',
+        expectedVersion: 1,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
       expect(recon.storedBalance.amount).toBe('10.00');
+    });
+
+    it('Caminho A2 (Imediato - Referência FAILED): Reversão de BET em status FAILED resulta em REFERENCE_NOT_PROCESSED', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const failedBetExtId = `bet-failed-imm-${crypto.randomUUID()}`;
+      await createFailedBetFixture({
+        walletId: wallet.id,
+        playerId: wallet.playerId,
+        betExtId: failedBetExtId,
+        amount: '25.00',
+        currency: 'BRL',
+      });
+
+      // REFUND da BET que falhou terminalmente
+      const refundRes = await processWagerUseCase.execute(`key-ref-failed-imm-${crypto.randomUUID()}`, {
+        providerId: 'prv-failed',
+        externalTransactionId: `ref-failed-imm-${crypto.randomUUID()}`,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'rnd-failed',
+        gameId: 'gm-failed',
+        kind: 'REFUND',
+        money: { amount: '25.00', currency: 'BRL' },
+        referenceExternalTransactionId: failedBetExtId,
+      });
+
+      expect(refundRes.status).toBe('REJECTED');
+      expect(refundRes.failureCode).toBe('REFERENCE_NOT_PROCESSED');
+
+      await assertRejectionAudit({
+        reversalTxId: refundRes.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_NOT_PROCESSED',
+        expectedBalance: '100.00',
+        expectedVersion: 1,
+      });
+
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('100.00');
+    });
+
+    it('Caminho B2 (Fora de ordem - Referência FAILED): REFUND chega primeiro, BET falha depois, reprocessamento marca auditável', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const failedBetOooExtId = `bet-failed-ooo-${crypto.randomUUID()}`;
+
+      // 1. REFUND chega antes da BET
+      const oooRefund = await processWagerUseCase.execute(`key-ref-failed-ooo-${crypto.randomUUID()}`, {
+        providerId: 'prv-failed',
+        externalTransactionId: `ref-failed-ooo-${crypto.randomUUID()}`,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'rnd-failed',
+        gameId: 'gm-failed',
+        kind: 'REFUND',
+        money: { amount: '25.00', currency: 'BRL' },
+        referenceExternalTransactionId: failedBetOooExtId,
+      });
+      expect(oooRefund.status).toBe('PENDING_REFERENCE');
+
+      // Carteira inalterada
+      const midWallet = await getWalletUseCase.execute(wallet.id);
+      expect(midWallet.balance.amount).toBe('100.00');
+      expect(midWallet.version).toBe(1);
+
+      // 2. BET chega depois e encerra no estado terminal FAILED (sem desativar triggers)
+      await createFailedBetFixture({
+        walletId: wallet.id,
+        playerId: wallet.playerId,
+        betExtId: failedBetOooExtId,
+        amount: '25.00',
+        currency: 'BRL',
+      });
+
+      // 3. Execução manual do reprocessador
+      await makePendingEligible(oooRefund.transactionId);
+      const reprocessResult = await reprocessWorker.execute(10);
+      expect(reprocessResult.rejected).toBe(1);
+
+      await assertRejectionAudit({
+        reversalTxId: oooRefund.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REFERENCE_NOT_PROCESSED',
+        expectedBalance: '100.00',
+        expectedVersion: 1,
+      });
+
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('100.00');
     });
   });
 
@@ -824,10 +1328,13 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       expect(ref2.status).toBe('REJECTED');
       expect(ref2.failureCode).toBe('REVERSAL_ALREADY_PROCESSED');
 
-      // Garantir nenhum efeito adicional: saldo 100.00, version 3
-      const walletFinal = await getWalletUseCase.execute(wallet.id);
-      expect(walletFinal.balance.amount).toBe('100.00');
-      expect(walletFinal.version).toBe(3);
+      await assertRejectionAudit({
+        reversalTxId: ref2.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REVERSAL_ALREADY_PROCESSED',
+        expectedBalance: '100.00',
+        expectedVersion: 3,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
@@ -902,10 +1409,15 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       const rejectedTx = tx1?.status === 'REJECTED' ? tx1 : tx2;
       expect(rejectedTx?.rejectionReason).toBe('REVERSAL_ALREADY_PROCESSED');
 
-      // Saldo final 100.00, versão 3
-      const walletFinal = await getWalletUseCase.execute(wallet.id);
-      expect(walletFinal.balance.amount).toBe('100.00');
-      expect(walletFinal.version).toBe(3);
+      if (rejectedTx) {
+        await assertRejectionAudit({
+          reversalTxId: rejectedTx.id,
+          walletId: wallet.id,
+          expectedFailureCode: 'REVERSAL_ALREADY_PROCESSED',
+          expectedBalance: '100.00',
+          expectedVersion: 3,
+        });
+      }
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
@@ -973,6 +1485,18 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       });
       expect(dupRbRes.status).toBe('REJECTED');
       expect(dupRbRes.failureCode).toBe('REVERSAL_ALREADY_PROCESSED');
+
+      await assertRejectionAudit({
+        reversalTxId: dupRbRes.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REVERSAL_ALREADY_PROCESSED',
+        expectedBalance: '150.00',
+        expectedVersion: 4,
+      });
+
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('150.00');
     });
   });
 
@@ -1027,9 +1551,13 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       expect(rbRes.failureCode).toBe('REVERSAL_INSUFFICIENT_FUNDS');
       expect(rbRes.balance.amount).toBe('10.00');
 
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('10.00');
-      expect(finalWallet.version).toBe(3); // 1 (opening) + 1 (win) + 1 (drain bet)
+      await assertRejectionAudit({
+        reversalTxId: rbRes.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REVERSAL_INSUFFICIENT_FUNDS',
+        expectedBalance: '10.00',
+        expectedVersion: 3,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
@@ -1087,17 +1615,133 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
       const reprocessResult = await reprocessWorker.execute(10);
       expect(reprocessResult.rejected).toBe(1);
 
-      const updatedTx = await wagerRepo.findById(oooRb.transactionId);
-      expect(updatedTx?.status).toBe('REJECTED');
-      expect(updatedTx?.rejectionReason).toBe('REVERSAL_INSUFFICIENT_FUNDS');
-
-      const finalWallet = await getWalletUseCase.execute(wallet.id);
-      expect(finalWallet.balance.amount).toBe('10.00');
-      expect(finalWallet.version).toBe(3);
+      await assertRejectionAudit({
+        reversalTxId: oooRb.transactionId,
+        walletId: wallet.id,
+        expectedFailureCode: 'REVERSAL_INSUFFICIENT_FUNDS',
+        expectedBalance: '10.00',
+        expectedVersion: 3,
+      });
 
       const recon = await reconcileWalletUseCase.execute(wallet.id);
       expect(recon.consistent).toBe(true);
       expect(recon.storedBalance.amount).toBe('10.00');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Prova de Sensibilidade dos Seletores da Outbox
+  // --------------------------------------------------------------------------
+  describe('Sensibilidade dos Seletores da Outbox (Discriminação de Ausência vs Presença)', () => {
+    it('comprova que seletores encontram eventos reais (payload.triggerTransactionId / payload.transactionId) e discriminam ausência', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: crypto.randomUUID(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // 1. Processar uma BET válida
+      const betExtIdSens = `bet-sens-${crypto.randomUUID()}`;
+      const validBet = await processWagerUseCase.execute(`key-valid-bet-${crypto.randomUUID()}`, {
+        providerId: 'prv-sens',
+        externalTransactionId: betExtIdSens,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'rnd-sens',
+        gameId: 'gm-sens',
+        kind: 'BET',
+        money: { amount: '25.00', currency: 'BRL' },
+      });
+      expect(validBet.status).toBe('PROCESSED');
+
+      // Consultar outbox da carteira
+      const outboxRows1 = (
+        await adminPool.query('SELECT * FROM outbox_messages WHERE aggregate_id = $1;', [wallet.id])
+      ).rows;
+
+      // Demonstrar que para a transação válida, o seletor com payload.transactionId e payload.triggerTransactionId RETORNA 1
+      const processedMatchesForBet = outboxRows1.filter((r: any) => {
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        return r.event_type === 'WagerTransactionProcessed' && payload?.transactionId === validBet.transactionId;
+      });
+      expect(processedMatchesForBet.length).toBe(1);
+
+      const balanceChangedMatchesForBet = outboxRows1.filter((r: any) => {
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        return r.event_type === 'WalletBalanceChanged' && payload?.triggerTransactionId === validBet.transactionId;
+      });
+      expect(balanceChangedMatchesForBet.length).toBe(1);
+
+      // E para a transação válida, WagerTransactionRejected retorna 0
+      const rejectedMatchesForBet = outboxRows1.filter((r: any) => {
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        return r.event_type === 'WagerTransactionRejected' && payload?.transactionId === validBet.transactionId;
+      });
+      expect(rejectedMatchesForBet.length).toBe(0);
+
+      // 2. Submeter uma reversão inválida imediata (valor divergente da BET existente)
+      const invalidRefundImmediate = await processWagerUseCase.execute(`key-inv-ref-imm-${crypto.randomUUID()}`, {
+        providerId: 'prv-sens',
+        externalTransactionId: `ref-sens-imm-${crypto.randomUUID()}`,
+        playerId: wallet.playerId,
+        walletId: wallet.id,
+        roundId: 'rnd-sens',
+        gameId: 'gm-sens',
+        kind: 'REFUND',
+        money: { amount: '35.00', currency: 'BRL' }, // divergente de 25.00
+        referenceExternalTransactionId: betExtIdSens,
+      });
+      expect(invalidRefundImmediate.status).toBe('REJECTED');
+
+      const outboxRows2 = (
+        await adminPool.query('SELECT * FROM outbox_messages WHERE aggregate_id = $1;', [wallet.id])
+      ).rows;
+
+      // Demonstrar que para a reversão rejeitada, o seletor com payload.transactionId RETORNA 1 em Rejected
+      const rejectedMatchesForRefund = outboxRows2.filter((r: any) => {
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        return (
+          r.event_type === 'WagerTransactionRejected' &&
+          payload?.transactionId === invalidRefundImmediate.transactionId
+        );
+      });
+      expect(rejectedMatchesForRefund.length).toBe(1);
+
+      // E RETORNA 0 para Processed e BalanceChanged
+      const processedMatchesForRefund = outboxRows2.filter((r: any) => {
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        return (
+          r.event_type === 'WagerTransactionProcessed' &&
+          payload?.transactionId === invalidRefundImmediate.transactionId
+        );
+      });
+      expect(processedMatchesForRefund.length).toBe(0);
+
+      const balanceChangedMatchesForRefund = outboxRows2.filter((r: any) => {
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        return (
+          r.event_type === 'WalletBalanceChanged' &&
+          payload?.triggerTransactionId === invalidRefundImmediate.transactionId
+        );
+      });
+      expect(balanceChangedMatchesForRefund.length).toBe(0);
+
+      // Prova de discriminação: se um payload sintético contivesse o triggerTransactionId da rejeição,
+      // a mesma expressão de filtro acusaria > 0 (comprovando que não é um no-op por undefined)
+      const syntheticRow = {
+        event_type: 'WalletBalanceChanged',
+        payload: { triggerTransactionId: invalidRefundImmediate.transactionId },
+      };
+      const testFilter = (r: any) => {
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        return (
+          r.event_type === 'WalletBalanceChanged' &&
+          payload?.triggerTransactionId === invalidRefundImmediate.transactionId
+        );
+      };
+      expect(testFilter(syntheticRow)).toBe(true);
+
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
     });
   });
 });

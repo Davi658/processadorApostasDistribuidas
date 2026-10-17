@@ -18,6 +18,7 @@
 | **Bloco C** | 12. Testar Novas Operações e Reconciliação Final | **CONCLUÍDO** | `tests/integration/wager-operations.test.ts`, `tests/integration/http-endpoints.test.ts` |
 | **Frente M02** | 13. Estabilização da Frente Money (NUMERIC 18,2, overflow no domínio, round-trip real) | **CONCLUÍDO** | `tests/unit/money.test.ts`, `tests/integration/money-postgres-roundtrip.test.ts` |
 | **Frente M03** | 14. Estabilização da Abertura de Carteira (Contrato, atomicidade SQL, 20 concorrentes, rollback em falhas injetadas, reconciliação, limite Money) | **CONCLUÍDO** | `tests/integration/wallet-opening.test.ts` |
+| **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
 
 ---
 
@@ -93,13 +94,45 @@
   - Toda carteira aberta tem seu saldo reconciliado com a soma dos lançamentos do ledger (`balance = SUM(CREDIT) - SUM(DEBIT)`).
   - Aberturas com o valor limite de `Money` (`"9999999999999999.99"`) são persistidas com precisão integral. Valores que excedem o limite são rejeitados com HTTP 400 sem efeitos colaterais no banco.
 
+
+### 2.7 Frente Reversões Financeiras e Reprocessamento Unificado (M08)
+- **Motor Compartilhado (`ReversalProcessor`):** Centraliza integralmente as regras de reversão sem divergência entre o fluxo síncrono e o reprocessador assíncrono.
+- **Validações Pré-Movimento e Rejeição Auditada:**
+  1. *Outra Carteira / Jogador (Cross-Wallet):*
+     - Imediato: Reversão na Wallet 2 de transação da Wallet 1 é rejeitada imediatamente com `REFERENCE_INCOMPATIBLE`.
+     - Fora de Ordem: Reversão chega na Wallet 2 sem referência e transiciona para `PENDING_REFERENCE`. A referência chega posteriormente na Wallet 1. A execução manual do reprocessador transiciona a pendência para `REJECTED` com `REFERENCE_INCOMPATIBLE` sem qualquer débito/crédito na Wallet 2.
+  2. *Moeda Divergente (Fixture Contabilmente Consistente):*
+     - O caminho fora de ordem registra a pendência BRL antes da inserção da referência USD.
+     - A fixture USD é criada com consistência relacional e contábil completa (carteira USD, transação OPENING, crédito ledger, transação BET e débito ledger, respeitando constraints, versions e a FK composta `(transaction_id, wallet_id, currency)`).
+     - O reprocessador rejeita a reversão BRL com `REFERENCE_INCOMPATIBLE` sem mutação de saldo ou ledger, e ambas as carteiras (BRL e USD) reconciliam perfeitamente.
+  3. *Referência em Estado Terminal FAILED / REJECTED:*
+     - Cobertura explícita para referências nos estados `REJECTED` e `FAILED`, tanto no fluxo imediato quanto no fora de ordem.
+     - Todas as rejeições resultam no código estável `REFERENCE_NOT_PROCESSED`.
+     - Fixtures criadas diretamente no estado correto sem violação ou desativação dos triggers de proteção terminal.
+  4. *Auditoria Rigorosa da Outbox e Ledger:*
+     - Consultas corrigidas para ler da coluna física `payload` (JSONB) no PostgreSQL, selecionando eventos pelo `transactionId` e `triggerTransactionId`.
+     - Para cada reversão rejeitada, comprova-se:
+       - Exatamente um evento `WagerTransactionRejectedEvent` com o `failureCode` esperado;
+       - Zero eventos `WalletBalanceChangedEvent` emitidos para a transação;
+       - Zero eventos `WagerTransactionProcessedEvent` emitidos para a transação;
+       - Zero lançamentos contábeis em `wallet_ledger_entries` vinculados à transação;
+       - Saldo (`balance`) e versão (`version`) da carteira rigorosamente inalterados;
+       - Snapshot terminal completo e coerente (`response_snapshot` em `wager_transactions`).
+     - Prova de sensibilidade dos seletores demonstrando que a ausência constatada decorre da efetiva não-emissão de eventos indevidos, e não de propriedades nulas ou filtros inoperantes.
+  5. *Reconciliação Integral:*
+     - Todas as carteiras envolvidas em todos os cenários (inclusive fixtures de moedas alternativas) passam por validação contábil via `ReconcileWalletUseCase` (`storedBalance == calculatedBalance`).
+
 ---
 
-## 3. Próxima Rodada (Fatia de Mensageria e Resiliência)
+## 3. Próxima Rodada (Fatia de Mensageria e Resiliência — M10)
 
-Itens explicitamente delimitados para a próxima rodada (não implementados nesta entrega):
-1. **Inbox Transacional:** Deduplicação e consumo idempotente na recepção de mensagens assíncronas.
-2. **Integração SQS / LocalStack:** Conexão real com filas SQS simuladas localmente no LocalStack via Docker.
-3. **Publisher Concorrente da Outbox:** Processador em background com polling distribuído (`SKIP LOCKED`), envio ao broker e marcação transacional de mensagens publicadas.
-4. **Mecanismo de Retries e Dead-Letter Queue (DLQ):** Políticas de repetição com backoff exponencial e encaminhamento para DLQ após esgotamento.
-5. **Crash Recovery:** Recuperação de falhas e reprocessamento consistente após reinicialização súbita de instâncias.
+> [!IMPORTANT]
+> **Delimitação de Escopo (M08 vs M10):**
+> A execução manual do reprocessador (`ReprocessPendingReferencesUseCase.execute()`) nos testes de M08 comprova exclusivamente a lógica de decisão, transição de estados e consistência contábil de reversões pendentes. **Não comprova e não implementa M10**.
+> Os seguintes componentes permanecem explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**:
+> 1. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
+> 2. **Concorrência entre Múltiplos Workers com `SKIP LOCKED`:** **NÃO VALIDADO**
+> 3. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída:** **NÃO VALIDADO**
+> 4. **Publisher Concorrente da Outbox com Broker:** **NÃO VALIDADO**
+> 5. **Mecanismo de Retries Distribuído e DLQ:** **NÃO VALIDADO**
+> 6. **Crash Recovery de Instâncias:** **NÃO VALIDADO**
