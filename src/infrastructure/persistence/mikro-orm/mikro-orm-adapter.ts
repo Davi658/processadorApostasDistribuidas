@@ -32,7 +32,7 @@ export type FailureHookPoint =
 export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModuleDestroy {
   private orm!: MikroORM;
   private readonly asyncLocalStorage = new AsyncLocalStorage<EntityManager>();
-  private readonly testHooks = new Map<FailureHookPoint, () => void>();
+  private readonly testHooks = new Map<FailureHookPoint, (entity?: any) => void>();
 
   constructor(@Optional() private readonly customConfig?: Options) {}
 
@@ -73,7 +73,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     return this.orm.em.fork();
   }
 
-  public setTestFailurePoint(point: FailureHookPoint, callback?: () => void): void {
+  public setTestFailurePoint(point: FailureHookPoint, callback?: (entity?: any) => void): void {
     this.testHooks.set(
       point,
       callback ??
@@ -83,7 +83,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     );
   }
 
-  public setTestHook(point: FailureHookPoint, callback?: () => void): void {
+  public setTestHook(point: FailureHookPoint, callback?: (entity?: any) => void): void {
     this.setTestFailurePoint(point, callback);
   }
 
@@ -95,10 +95,10 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     this.clearTestFailurePoints();
   }
 
-  public triggerTestHook(point: FailureHookPoint): void {
+  public triggerTestHook(point: FailureHookPoint, entity?: any): void {
     const hook = this.testHooks.get(point);
     if (hook) {
-      hook();
+      hook(entity);
     }
   }
 
@@ -186,7 +186,7 @@ export class MikroOrmWalletRepository implements WalletRepositoryPort {
     ormEntity.updatedAt = new Date(wallet.updatedAt);
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_wallet_save');
+    this.uow.triggerTestHook('after_wallet_save', ormEntity);
   }
 }
 
@@ -295,7 +295,7 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
     ormEntity.updatedAt = new Date(transaction.updatedAt);
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_tx_save');
+    this.uow.triggerTestHook('after_tx_save', ormEntity);
   }
 
   private toDomain(orm: WagerTransactionOrmEntity): WagerTransaction {
@@ -345,7 +345,7 @@ export class MikroOrmWalletLedgerRepository implements WalletLedgerRepositoryPor
     ormEntity.createdAt = new Date(entry.createdAt);
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_ledger_save');
+    this.uow.triggerTestHook('after_ledger_save', ormEntity);
   }
 
   public async listByWalletId(walletId: string): Promise<WalletLedgerEntry[]> {
@@ -395,7 +395,7 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
     ormEntity.createdAt = new Date();
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_outbox_save');
+    this.uow.triggerTestHook('after_outbox_save', ormEntity);
   }
 
   public async listUnpublished(limit = 100): Promise<IntegrationEventEnvelope[]> {

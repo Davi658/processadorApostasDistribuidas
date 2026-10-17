@@ -68,22 +68,29 @@
 ### 2.6 Frente Abertura de Carteira Estabilizada (M03)
 - **Contrato e Semântica de Ausência:**
   - O contrato exige `{ playerId, initialBalance?: { amount, currency } }`.
-  - Ausência explícita (chave omitida ou `undefined`) é tratada como abertura padrão com saldo zero `"0.00"` BRL.
-  - Valores presentes mas não-conformes como `null`, `false`, `0`, `""`, strings primitivas ou objetos com campos faltando/extras são estritamente rejeitados na camada de transporte (`HttpValidator.validateCreateWalletBody`) com HTTP 400 (`code: 'INVALID_ARGUMENT'`).
+  - Ausência explícita (chave omitida ou `undefined`) é tratada como abertura padrão com saldo zero `"0.00"` BRL, versão 1, sem geração de OPENING, ledger ou outbox.
+  - Valores presentes mas não-conformes como `null`, `false`, `0`, `""`, strings primitivas, numbers ou objetos incompletos são estritamente rejeitados na camada de transporte (`HttpValidator.validateCreateWalletBody`) com HTTP 400 Bad Request (`{ statusCode: 400, error: 'Bad Request', message: '...' }`).
+- **Validação Defensiva do Caso de Uso:**
+  - O caso de uso `CreateWalletUseCase` possui validação defensiva autônoma e desacoplada do validador HTTP:
+    - Normalização consistente de `playerId` com `.trim()`, rejeitando strings vazias.
+    - Exigência estrita de objeto com `amount` e `currency` quando `initialBalance` for fornecido, rejeitando `null`, `false`, `0`, `""`, números ou arrays antes de chamar métodos de string.
+    - Restrição operacional estrita a `"BRL"`, rejeitando qualquer outra moeda com erro de domínio.
 - **Atomicidade SQL e Efeitos Colaterais:**
   - **Abertura Positiva:** Em uma única transação SQL (`EntityManager.transactional`), cria a entidade `Wallet`, a transação interna `WagerTransaction` com `kind: 'OPENING'`, o lançamento de crédito `WalletLedgerEntry` (`CREDIT`) e os dois eventos de outbox (`WagerTransactionProcessed` e `WalletBalanceChanged`). A versão final resultante da carteira é garantidamente `1`.
   - **Abertura Zero:** Cria exclusivamente a entidade `Wallet` com saldo `"0.00"` e versão `1`. Não gera transação `OPENING`, nenhum lançamento contábil no ledger e nenhum evento na outbox.
-- **Proteção Concorrente e Unicidade:**
+- **Proteção Concorrente e Conflitos Específicos:**
   - A unicidade de `(player_id, currency)` é resguardada a nível relacional no PostgreSQL pela constraint `uq_wallets_player_currency`.
-  - Disputas concorrentes (validadas com 20 requisições simultâneas via `Promise.allSettled`) resultam em exatamente uma carteira criada (HTTP 201) e as demais 19 rejeitadas com HTTP 409 Conflict (`code: 'DUPLICATE_WALLET'`), sem qualquer estado órfão.
+  - Somente a violação de `uq_wallets_player_currency` (identificada inclusive em erros encapsulados no driver ou `cause`) é convertida em `DuplicateWalletError`. Violações de outras constraints (ex: `23505` em outras chaves) não são malclassificadas como carteira duplicada e são re-propagadas fielmente.
+  - Disputas concorrentes via HTTP (validadas com 20 requisições simultâneas via `fetch`) resultam em exatamente 1 resposta HTTP 201 Created e 19 respostas HTTP 409 Conflict (`{ statusCode: 409, error: 'Conflict', code: 'DUPLICATE_WALLET' }`), com exatamente uma carteira, uma OPENING, um CREDIT e dois eventos persistidos no PostgreSQL.
 - **Resiliência a Falhas Injetadas e Rollback Integral:**
   - Falhas simuladas em 4 estágios da persistência atômica (`after_wallet_save`, `after_tx_save`, `after_ledger_save`, `after_outbox_save`) executam `ROLLBACK` total.
-  - O reenvio da requisição após o rollback persiste a carteira com sucesso sem conflito.
+  - Todos os identificadores são capturados antes do rollback para atestar a ausência de registros órfãos por ID, e hooks são devidamente limpos em `finally`.
+  - Para cada ponto de falha, o reenvio após rollback realiza com sucesso a criação única da carteira.
 - **Bloqueio de Submissão Externa de OPENING:**
-  - Requisições ao endpoint externo `POST /transactions` com `kind: "OPENING"` são rejeitadas tanto pelo validador HTTP quanto pelas invariantes de domínio com HTTP 400 (`code: 'INVALID_TRANSACTION_KIND'`).
+  - Requisições ao endpoint externo `POST /wagering/transactions` com `kind: "OPENING"` são rejeitadas pelo validador HTTP e pelas invariantes de domínio com HTTP 400 Bad Request (`{ statusCode: 400, error: 'Bad Request', message: '...' }`).
 - **Reconciliação e Limites de Valor:**
   - Toda carteira aberta tem seu saldo reconciliado com a soma dos lançamentos do ledger (`balance = SUM(CREDIT) - SUM(DEBIT)`).
-  - Aberturas com o valor limite de `Money` (`"9999999999999999.99"`) são persistidas com precisão integral. Valores que excedem o limite são rejeitados com HTTP 400 (`code: 'MONEY_OVERFLOW'`) sem efeitos colaterais no banco.
+  - Aberturas com o valor limite de `Money` (`"9999999999999999.99"`) são persistidas com precisão integral. Valores que excedem o limite são rejeitados com HTTP 400 sem efeitos colaterais no banco.
 
 ---
 

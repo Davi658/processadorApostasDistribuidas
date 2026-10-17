@@ -24,28 +24,60 @@ export class CreateWalletUseCase {
   ) {}
 
   public async execute(dto: CreateWalletDto): Promise<WalletResponseDto> {
-    if (!dto || typeof dto !== 'object') {
+    // 1. Defesa de entrada básica
+    if (!dto || typeof dto !== 'object' || Array.isArray(dto)) {
       throw new InvalidWagerOperationError('CreateWalletDto must be an object');
     }
-    if (!dto.playerId || typeof dto.playerId !== 'string' || !dto.playerId.trim()) {
+
+    if (typeof dto.playerId !== 'string' || !dto.playerId.trim()) {
       throw new InvalidWagerOperationError('PlayerId is mandatory and must be a non-empty string');
     }
 
-    const currency = dto.initialBalance?.currency ? dto.initialBalance.currency.trim().toUpperCase() : 'BRL';
-    const initialAmount = dto.initialBalance?.amount ?? '0.00';
-    const initialMoney = Money.create(initialAmount, currency);
+    const normalizedPlayerId = dto.playerId.trim();
+    const currency = 'BRL';
+    let initialMoney: Money;
+
+    // 2. Defesa rigorosa de initialBalance (sem importar validador HTTP)
+    const hasInitialBalance = 'initialBalance' in dto && dto.initialBalance !== undefined;
+    if (!hasInitialBalance) {
+      initialMoney = Money.zero(currency);
+    } else {
+      const ib = (dto as any).initialBalance;
+      if (ib === null || typeof ib !== 'object' || Array.isArray(ib)) {
+        throw new InvalidWagerOperationError(
+          'initialBalance cannot be null, empty, false, or 0. To open with zero balance, omit initialBalance or explicitly specify { "amount": "0.00", "currency": "BRL" }'
+        );
+      }
+
+      if (typeof ib.amount !== 'string' || typeof ib.currency !== 'string') {
+        throw new InvalidWagerOperationError(
+          'initialBalance must be an object containing string properties "amount" and "currency"'
+        );
+      }
+
+      const rawAmount = ib.amount.trim();
+      const rawCurrency = ib.currency.trim().toUpperCase();
+
+      if (rawCurrency !== 'BRL') {
+        throw new InvalidWagerOperationError(
+          `Only BRL currency is supported operationally, received: "${ib.currency}"`
+        );
+      }
+
+      initialMoney = Money.create(rawAmount, currency);
+    }
 
     try {
       return await this.uow.runInTransaction(async () => {
-        const existing = await this.walletRepo.findByPlayerIdAndCurrency(dto.playerId, currency);
+        const existing = await this.walletRepo.findByPlayerIdAndCurrency(normalizedPlayerId, currency);
         if (existing) {
-          throw new DuplicateWalletError(dto.playerId, currency);
+          throw new DuplicateWalletError(normalizedPlayerId, currency);
         }
 
         const walletId = crypto.randomUUID();
         const creationResult = Wallet.create({
           id: walletId,
-          playerId: dto.playerId,
+          playerId: normalizedPlayerId,
           currency,
           initialBalance: initialMoney,
         });
@@ -66,7 +98,7 @@ export class CreateWalletUseCase {
             data: {
               transactionId: creationResult.openingTransaction!.id,
               walletId,
-              playerId: dto.playerId,
+              playerId: normalizedPlayerId,
               providerId: 'SYSTEM',
               externalTransactionId: `OPENING_${walletId}`,
               roundId: 'OPENING',
@@ -89,7 +121,7 @@ export class CreateWalletUseCase {
             correlationId: creationResult.openingTransaction!.id,
             data: {
               walletId,
-              playerId: dto.playerId,
+              playerId: normalizedPlayerId,
               currency,
               previousBalance: {
                 amount: '0.00',
@@ -117,23 +149,49 @@ export class CreateWalletUseCase {
         };
       });
     } catch (error: any) {
-      const extractErrorCode = (target: unknown): string => {
-        if (!target || typeof target !== 'object') return '';
-        const rec = target as Record<string, unknown>;
-        if (typeof rec.code === 'string') return rec.code;
-        if (rec.cause && typeof (rec.cause as any).code === 'string') return (rec.cause as any).code;
-        if (rec.originalError && typeof (rec.originalError as any).code === 'string') return (rec.originalError as any).code;
-        if (rec.driverException && typeof (rec.driverException as any).code === 'string') return (rec.driverException as any).code;
-        if (rec.driverError && typeof (rec.driverError as any).code === 'string') return (rec.driverError as any).code;
-        return '';
-      };
-
-      const code = extractErrorCode(error);
-      const msg = String(error?.message || '') + ' ' + String(error?.cause?.message || '');
-      if (code === '23505' || msg.includes('23505') || msg.includes('uq_wallets_player_currency')) {
-        throw new DuplicateWalletError(dto.playerId, currency);
+      if (this.isDuplicateWalletConstraintViolation(error)) {
+        throw new DuplicateWalletError(normalizedPlayerId, currency);
       }
       throw error;
     }
+  }
+
+  private isDuplicateWalletConstraintViolation(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const visited = new Set<unknown>();
+    const queue: unknown[] = [error];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || typeof current !== 'object' || visited.has(current)) {
+        continue;
+      }
+      visited.add(current);
+
+      const rec = current as Record<string, unknown>;
+
+      const constraint = typeof rec.constraint === 'string' ? rec.constraint : '';
+      const message = typeof rec.message === 'string' ? rec.message : '';
+      const detail = typeof rec.detail === 'string' ? rec.detail : '';
+
+      if (constraint === 'uq_wallets_player_currency') {
+        return true;
+      }
+
+      const fullText = `${constraint} ${message} ${detail}`;
+      if (fullText.includes('uq_wallets_player_currency')) {
+        return true;
+      }
+
+      if (rec.cause) queue.push(rec.cause);
+      if (rec.originalError) queue.push(rec.originalError);
+      if (rec.driverException) queue.push(rec.driverException);
+      if (rec.driverError) queue.push(rec.driverError);
+    }
+
+    return false;
   }
 }
