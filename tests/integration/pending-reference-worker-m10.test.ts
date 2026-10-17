@@ -654,35 +654,41 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       '600'
     );
 
-    // Aguarda handshake por marco confirmando que o filho adquiriu o claim no PostgreSQL
-    const milestone = await childWorker.milestonePromise;
-    expect(milestone).toContain('CLAIM_CONFIRMED');
+    try {
+      // Aguarda handshake por marco confirmando que o filho adquiriu o claim no PostgreSQL
+      const milestone = await childWorker.milestonePromise;
+      expect(milestone).toContain('CLAIM_CONFIRMED');
 
-    // Confirma que a transação está reservada pelo processo filho real no PostgreSQL
-    const claimedState = await captureDbState(wallet.id, txId);
-    expect(claimedState.transaction.status).toBe('PENDING_REFERENCE');
-    expect(claimedState.transaction.leaseToken).not.toBeNull();
-    expect(claimedState.transaction.leaseOwner).toContain('runner-');
+      // Confirma que a transação está reservada pelo processo filho real no PostgreSQL
+      const claimedState = await captureDbState(wallet.id, txId);
+      expect(claimedState.transaction.status).toBe('PENDING_REFERENCE');
+      expect(claimedState.transaction.leaseToken).not.toBeNull();
+      expect(claimedState.transaction.leaseOwner).toContain('runner-');
 
-    // O coordenador mata o filho real abruptamente (SIGKILL)
-    childWorker.proc.kill('SIGKILL');
+      // O coordenador mata o filho real abruptamente (SIGKILL)
+      childWorker.proc.kill('SIGKILL');
 
-    // Imediatamente tenta reservar com Worker 2: não deve conseguir pois o lease ainda está ativo no PostgreSQL
-    const initialClaim = await wagerRepo.claimPendingReferences(10, 30000, 'worker-2');
-    expect(initialClaim.some((c) => c.id === txId)).toBe(false);
+      // Imediatamente tenta reservar com Worker 2: não deve conseguir pois o lease ainda está ativo no PostgreSQL
+      const initialClaim = await wagerRepo.claimPendingReferences(10, 30000, 'worker-2');
+      expect(initialClaim.some((c) => c.id === txId)).toBe(false);
 
-    // Aguarda a expiração natural do lease no PostgreSQL (700ms)
-    await new Promise((resolve) => setTimeout(resolve, 700));
+      // Aguarda a expiração natural do lease no PostgreSQL (700ms)
+      await new Promise((resolve) => setTimeout(resolve, 700));
 
-    // Agora Worker 2 deve conseguir reivindicar e processar
-    const result = await reprocessUseCase.execute(10, 30000, 'worker-2');
-    expect(result.processed).toBe(1);
+      // Agora Worker 2 deve conseguir reivindicar e processar
+      const result = await reprocessUseCase.execute(10, 30000, 'worker-2');
+      expect(result.processed).toBe(1);
 
-    const finalState = await captureDbState(wallet.id, txId);
-    expect(finalState.transaction.status).toBe('PROCESSED');
-    expect(finalState.transaction.leaseToken).toBeNull();
-    expect(finalState.wallet.balance).toBe('110.00'); // 90.00 + 20.00
-  });
+      const finalState = await captureDbState(wallet.id, txId);
+      expect(finalState.transaction.status).toBe('PROCESSED');
+      expect(finalState.transaction.leaseToken).toBeNull();
+      expect(finalState.wallet.balance).toBe('110.00'); // 90.00 + 20.00
+    } finally {
+      try {
+        childWorker.proc.kill('SIGKILL');
+      } catch {}
+    }
+  }, 30000);
 
   it('F. Reserva expira e outro worker assume: token antigo não pode finalizar indevidamente', async () => {
     const playerId = crypto.randomUUID();
@@ -1391,10 +1397,15 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       expect(stateValid.wallet.balance).toBe('100.00'); // 80 + 20
     } finally {
       uow.clearTestHooks();
+      await adminPool.query('DELETE FROM wager_transactions WHERE id = $1;', [txDefectId]);
     }
   });
 
-  it('P. Timeout de drenagem no shutdown cancela trabalho em andamento com rollback e preserva recuperação das reservas', async () => {
+  it('P. Timeout de drenagem no shutdown cancela trabalho em andamento com rollback e comprova fechamento do ORM (Aplicação Nest Real e Handshake)', async () => {
+    // Limpa quaisquer pendências residuais de testes anteriores para garantir isolamento estrito
+    await adminPool.query("DELETE FROM wager_transactions WHERE status = 'PENDING_REFERENCE';");
+
+    // 1. Prepara dados no banco através de uma operação inicial
     const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
@@ -1411,7 +1422,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       gameId: 'slots',
       kind: 'BET',
       money: { amount: '15.00', currency: 'BRL' },
-    });
+    }); // Saldo atual: 85.00
 
     const txId = crypto.randomUUID();
     const snap = {
@@ -1421,6 +1432,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       idempotentReplay: false,
     };
 
+    // Insere pendência elegível com lease curto de 800ms
     await adminPool.query(
       `INSERT INTO wager_transactions 
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
@@ -1428,46 +1440,116 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       [txId, wallet.id, playerId, `win-p-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
     );
 
-    // Worker configurado com timeout de drenagem agressivo de 100ms e lease de 500ms
-    const shortDrainWorker = new PendingReferenceWorkerService(reprocessUseCase, {
-      enabled: false,
-      batchSize: 5,
-      leaseDurationMs: 500,
-      drainTimeoutMs: 100,
-      workerId: 'timeout-worker',
-    });
+    // 2. Inicializa aplicação Nest real dedicada para o teste de timeout de drenagem
+    // Configura timeout de drenagem agressivo (150ms) via variável de ambiente
+    const prevDrainTimeout = process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS;
+    process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS = '150';
 
-    // Injeta retardo de 400ms na transação (excede o limite de drenagem de 100ms)
-    uow.setTestHook('after_wallet_save', async () => {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-    });
+    let timeoutApp: INestApplication | null = null;
+    let releaseBarrierFn: (() => void) | null = null;
 
     try {
-      // Inicia a execução do batch
-      const batchPromise = shortDrainWorker.executeBatch();
+      timeoutApp = await NestFactory.create(AppModule, { logger: false });
+      await timeoutApp.init();
 
-      // Dispara o shutdown via onModuleDestroy logo após o início
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      const shutdownPromise = shortDrainWorker.onModuleDestroy();
+      const testUow = timeoutApp.get(MikroOrmUnitOfWork);
+      const testWorkerService = timeoutApp.get(PendingReferenceWorkerService);
 
-      await Promise.all([batchPromise, shutdownPromise]);
+      // A. Iniciar uma pendência e pausar após escrita, com handshake (sem sleep fixo!)
+      let signalWriteReached!: () => void;
+      const writeReachedPromise = new Promise<void>((resolve) => {
+        signalWriteReached = resolve;
+      });
 
-      // Comprova que nenhuma mutação financeira parcial ocorreu (rollback preservado)
-      const stateDuringTimeout = await captureDbState(wallet.id, txId);
-      expect(stateDuringTimeout.wallet.balance).toBe('85.00'); // Saldo permaneceu inalterado
+      const barrierPromise = new Promise<void>((resolve) => {
+        releaseBarrierFn = resolve;
+      });
 
-      // Aguarda expiração do lease no PostgreSQL (600ms)
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // Hook no ponto após a escrita do saldo da carteira na transação (after_wallet_save)
+      testUow.setTestHook('after_wallet_save', async () => {
+        signalWriteReached();
+        await barrierPromise;
+      });
 
-      // Outro worker retoma a reserva preservada com recuperação 100% íntegra
+      // Inicia a execução do batch na aplicação real (lease de 800ms)
+      const executionPromise = testWorkerService.executeBatch(5, 800);
+
+      // Aguarda handshake comprovar que a escrita foi realizada no banco
+      await writeReachedPromise;
+
+      // B. Disparar app.close() e forçar timeout de drenagem
+      let isAppClosed = false;
+      const closePromise = timeoutApp.close().then(() => {
+        isAppClosed = true;
+      });
+
+      // Aguarda o timeout de drenagem (150ms) expirar e o cancelamento ser solicitado
+      const cancelTriggeredPromise = new Promise<void>((resolve) => {
+        const check = () => {
+          if (testWorkerService.isAbortRequested()) {
+            resolve();
+          } else {
+            setTimeout(check, 10);
+          }
+        };
+        check();
+      });
+      await cancelTriggeredPromise;
+
+      // C. Confirmar solicitação de cancelamento e que o ORM permanece disponível até a transação encerrar
+      expect(testWorkerService.isAbortRequested()).toBe(true);
+      expect(isAppClosed).toBe(false); // app.close() NÃO pode ter finalizado ainda!
+      expect(testUow.isClosed()).toBe(false); // ORM permanece aberto e ativo para suportar o rollback!
+
+      // D. Liberar a barreira e comprovar rollback integral
+      if (releaseBarrierFn) {
+        (releaseBarrierFn as () => void)();
+      }
+
+      // Aguarda conclusão da execução do worker e do encerramento da aplicação
+      await executionPromise;
+      await closePromise;
+
+      // Comprova rollback integral via adminPool independente
+      const stateAfterRollback = await captureDbState(wallet.id, txId);
+      expect(stateAfterRollback.wallet.balance).toBe('85.00'); // Saldo inalterado (rollback do WIN de 30.00)
+      expect(stateAfterRollback.transaction.status).toBe('PENDING_REFERENCE'); // Transação continua pendente
+      expect(stateAfterRollback.transaction.attempts).toBe(1); // Tentativas de negócio NÃO foram consumidas
+      expect(stateAfterRollback.transaction.operationalBlockReason).toBeNull();
+      expect(stateAfterRollback.ledgerCount).toBe(2); // Apenas 1 OPENING + 1 BET
+
+      // E. Confirmar encerramento das conexões
+      expect(isAppClosed).toBe(true);
+      expect(testUow.isClosed()).toBe(true); // ORM fechou com sucesso apenas após a conclusão do rollback
+      expect(() => testUow.getOrm()).toThrow(); // Chamadas subsequentes confirmam pool fechado
+
+      // F. Outra instância retoma e aplica exatamente um efeito
+      // Aguarda o lease curto de 800ms expirar no relógio do PostgreSQL
+      await new Promise((resolve) => setTimeout(resolve, 900));
+
       const recoveryResult = await reprocessUseCase.execute(5, 30000, 'recovery-worker');
       expect(recoveryResult.processed).toBe(1);
 
       const finalState = await captureDbState(wallet.id, txId);
       expect(finalState.transaction.status).toBe('PROCESSED');
-      expect(finalState.wallet.balance).toBe('115.00'); // 85 + 30
+      expect(finalState.wallet.balance).toBe('115.00'); // 85.00 + 30.00
+      expect(finalState.ledgerCount).toBe(3); // 1 OPENING + 1 BET + 1 WIN
     } finally {
-      uow.clearTestHooks();
+      if (releaseBarrierFn) {
+        try {
+          (releaseBarrierFn as () => void)();
+        } catch {}
+      }
+      if (prevDrainTimeout !== undefined) {
+        process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS = prevDrainTimeout;
+      } else {
+        delete process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS;
+      }
+      if (timeoutApp) {
+        try {
+          await timeoutApp.close();
+        } catch {}
+      }
     }
-  });
+  }, 30000);
 });

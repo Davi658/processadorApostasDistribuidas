@@ -35,10 +35,12 @@ export type FailureHookPoint =
   | 'after_commit';
 
 export interface TransactionContext {
+  id?: string;
   em: EntityManager;
   depth: number;
   rollbackOnly: boolean;
   rollbackReason?: unknown;
+  cleanup?: () => void;
 }
 
 @Injectable()
@@ -46,8 +48,14 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
   private orm?: MikroORM;
   private readonly asyncLocalStorage = new AsyncLocalStorage<TransactionContext>();
   private readonly testHooks = new Map<FailureHookPoint, (entity?: any) => void | Promise<void>>();
+  private readonly activeTransactions = new Set<TransactionContext>();
+  private readonly lockTimeoutMs: number;
+  private readonly statementTimeoutMs: number;
 
-  constructor(@Optional() private readonly customConfig?: Options) {}
+  constructor(@Optional() private readonly customConfig?: Options) {
+    this.lockTimeoutMs = Number(process.env.DB_LOCK_TIMEOUT_MS) || 5000;
+    this.statementTimeoutMs = Number(process.env.DB_STATEMENT_TIMEOUT_MS) || 10000;
+  }
 
   public async onModuleInit(): Promise<void> {
     if (!this.orm) {
@@ -69,8 +77,26 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
     if (this.orm) {
       const ormInstance = this.orm;
       this.orm = undefined;
+      this.markAllRollbackOnly(new Error('ORM_CLOSED'));
       await ormInstance.close(true);
     }
+  }
+
+  public isClosed(): boolean {
+    return !this.orm;
+  }
+
+  public markAllRollbackOnly(reason?: unknown): void {
+    for (const ctx of this.activeTransactions) {
+      ctx.rollbackOnly = true;
+      if (!ctx.rollbackReason) {
+        ctx.rollbackReason = reason;
+      }
+    }
+  }
+
+  public getActiveTransactionsCount(): number {
+    return this.activeTransactions.size;
   }
 
   public getOrm(): MikroORM {
@@ -159,10 +185,20 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
     // Outermost transaction (depth 0)
     const committedResult = await orm.em.transactional(async (forkedEm) => {
       const context: TransactionContext = {
+        id: crypto.randomUUID(),
         em: forkedEm,
         depth: 0,
         rollbackOnly: false,
       };
+      this.activeTransactions.add(context);
+
+      try {
+        await forkedEm.execute(
+          `SET LOCAL lock_timeout = '${this.lockTimeoutMs}ms'; SET LOCAL statement_timeout = '${this.statementTimeoutMs}ms';`
+        );
+      } catch {
+        // Fallback for mocks or drivers without SET LOCAL support
+      }
 
       return await this.asyncLocalStorage.run(context, async () => {
         try {
@@ -174,12 +210,31 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
             );
           }
           await this.triggerTestHook('before_commit');
+          if (context.rollbackOnly) {
+            throw new TransactionRollbackOnlyError(
+              'Transaction cannot be committed because it has been marked as rollback-only before commit',
+              context.rollbackReason
+            );
+          }
           await forkedEm.flush();
+          if (context.rollbackOnly) {
+            throw new TransactionRollbackOnlyError(
+              'Transaction cannot be committed because it has been marked as rollback-only during flush',
+              context.rollbackReason
+            );
+          }
           return result;
 
         } catch (error) {
           // Re-throwing causes MikroORM transactional() to execute ROLLBACK on the DB connection
           throw error;
+        } finally {
+          try {
+            context.cleanup?.();
+          } catch {
+            // Ignore cleanup errors
+          }
+          this.activeTransactions.delete(context);
         }
       });
     });
