@@ -173,7 +173,7 @@ Todos os demais campos ficam imutáveis, incluindo id, created_at, wallet_id, pl
 
 O papel app_user continua sem DELETE; sua recusa por privilégio é complementada por prova administrativa do trigger. Atualizações operacionais e limpeza de lease permanecem permitidas, inclusive após resolução terminal; mudanças financeiras na mesma instrução continuam proibidas. Transições a partir de PENDING e PENDING_REFERENCE permanecem disponíveis ao M10.
 
-A função histórica da migration 003 referencia observed_balance, coluna inexistente. A migration 006 corrige a função sem alterar o histórico. Seu DOWN restaura exatamente o comportamento anterior, inclusive esse defeito e a ausência de proteção a DELETE; destina-se à reversibilidade, não à manutenção das garantias M11.
+A função histórica da migration 003 referencia observed_balance, coluna inexistente. A migration 006 corrige a função sem alterar o histórico. Seu DOWN restaura exatamente o comportamento anterior, inclusive a referência inválida a observed_balance e a ausência de proteção a DELETE. O rollback remove as garantias M11 e não constitui uma configuração operacional saudável; a operação normal deve manter 006 aplicada. UP/DOWN/UP foi testado sem perda de dados. Essa prova de reversibilidade não demonstra um procedimento de rollback operacional seguro.
 
 ---
 

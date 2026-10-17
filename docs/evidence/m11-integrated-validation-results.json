@@ -1,0 +1,632 @@
+{
+  "date": "2026-10-17",
+  "timezone": "America/Sao_Paulo",
+  "base": "58c124e0d97af35244de1cf2db4da826c1aa587c",
+  "branch": "codex/m11-integrated-validation",
+  "worktree": "D:/processadorApostasDistribuidas/.worktrees/m11-integrated-validation",
+  "remoteRead": "https://github.com/Davi658/processadorApostasDistribuidas.git",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "bun": "1.4.3",
+    "postgres": {
+      "host": "127.0.0.1",
+      "port": 55412,
+      "version": "PostgreSQL 16.8, compiled by Visual C++ build 1942, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on"
+    },
+    "applicationRole": {
+      "rolname": "app_user",
+      "rolsuper": false,
+      "rolbypassrls": false,
+      "rolcreatedb": false,
+      "rolcreaterole": false
+    },
+    "clusterInitialization": "initdb --no-sync: skips initial cluster installation flush only; server runtime durability settings remain on",
+    "dockerValidated": false,
+    "linuxValidated": false
+  },
+  "typecheck": {
+    "command": "bun run typecheck",
+    "exitCode": 0,
+    "log": "m11-integrated-typecheck.log",
+    "logSha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9"
+  },
+  "discoveredFiles": [
+    "tests/concurrency/concurrency.test.ts",
+    "tests/integration/http-endpoints.test.ts",
+    "tests/integration/m17-read-endpoints.test.ts",
+    "tests/integration/migrations.test.ts",
+    "tests/integration/mikro-orm-uow-m05.test.ts",
+    "tests/integration/money-postgres-roundtrip.test.ts",
+    "tests/integration/pending-reference-worker-m10.test.ts",
+    "tests/integration/postgres-invariants.test.ts",
+    "tests/integration/terminal-protection-m11.test.ts",
+    "tests/integration/wager-bet-replay.test.ts",
+    "tests/integration/wager-operations.test.ts",
+    "tests/integration/wager-pending-replay-m09.test.ts",
+    "tests/integration/wager-reversals-m07.test.ts",
+    "tests/integration/wager-reversals-m08.test.ts",
+    "tests/integration/wager-win-loss-m06.test.ts",
+    "tests/integration/wallet-opening.test.ts",
+    "tests/unit/money.test.ts",
+    "tests/unit/payload-hash.test.ts",
+    "tests/unit/test-runner.test.ts",
+    "tests/unit/wallet-ledger-entry.test.ts",
+    "tests/unit/wallet.test.ts"
+  ],
+  "result": {
+    "command": "bun run test",
+    "exitCode": 0,
+    "log": "m11-integrated-test-approved.log",
+    "logSha256": "7d77bfaf389a7a477e254ea71076ef7337f2fa01ab1621295657d017c4326974",
+    "filesDiscovered": 21,
+    "filesFailed": 0,
+    "testsPassed": 333,
+    "testsFailed": 0,
+    "files": [
+      {
+        "file": "tests/concurrency/concurrency.test.ts",
+        "exitCode": 0,
+        "pass": 6,
+        "fail": 0,
+        "assertions": 218,
+        "summary": "Ran 6 tests across 1 file. [5.63s]"
+      },
+      {
+        "file": "tests/integration/http-endpoints.test.ts",
+        "exitCode": 0,
+        "pass": 21,
+        "fail": 0,
+        "assertions": 126,
+        "summary": "Ran 21 tests across 1 file. [3.25s]"
+      },
+      {
+        "file": "tests/integration/m17-read-endpoints.test.ts",
+        "exitCode": 0,
+        "pass": 21,
+        "fail": 0,
+        "assertions": 290,
+        "summary": "Ran 21 tests across 1 file. [3.49s]"
+      },
+      {
+        "file": "tests/integration/migrations.test.ts",
+        "exitCode": 0,
+        "pass": 1,
+        "fail": 0,
+        "assertions": 18,
+        "summary": "Ran 1 test across 1 file. [1.92s]"
+      },
+      {
+        "file": "tests/integration/mikro-orm-uow-m05.test.ts",
+        "exitCode": 0,
+        "pass": 18,
+        "fail": 0,
+        "assertions": 87,
+        "summary": "Ran 18 tests across 1 file. [7.33s]"
+      },
+      {
+        "file": "tests/integration/money-postgres-roundtrip.test.ts",
+        "exitCode": 0,
+        "pass": 9,
+        "fail": 0,
+        "assertions": 108,
+        "summary": "Ran 9 tests across 1 file. [2.66s]"
+      },
+      {
+        "file": "tests/integration/pending-reference-worker-m10.test.ts",
+        "exitCode": 0,
+        "pass": 21,
+        "fail": 0,
+        "assertions": 348,
+        "summary": "Ran 21 tests across 1 file. [10.83s]"
+      },
+      {
+        "file": "tests/integration/postgres-invariants.test.ts",
+        "exitCode": 0,
+        "pass": 22,
+        "fail": 0,
+        "assertions": 104,
+        "summary": "Ran 22 tests across 1 file. [3.51s]"
+      },
+      {
+        "file": "tests/integration/terminal-protection-m11.test.ts",
+        "exitCode": 0,
+        "pass": 9,
+        "fail": 0,
+        "assertions": 672,
+        "summary": "Ran 9 tests across 1 file. [20.66s]"
+      },
+      {
+        "file": "tests/integration/wager-bet-replay.test.ts",
+        "exitCode": 0,
+        "pass": 16,
+        "fail": 0,
+        "assertions": 332,
+        "summary": "Ran 16 tests across 1 file. [5.76s]"
+      },
+      {
+        "file": "tests/integration/wager-operations.test.ts",
+        "exitCode": 0,
+        "pass": 8,
+        "fail": 0,
+        "assertions": 53,
+        "summary": "Ran 8 tests across 1 file. [3.96s]"
+      },
+      {
+        "file": "tests/integration/wager-pending-replay-m09.test.ts",
+        "exitCode": 0,
+        "pass": 22,
+        "fail": 0,
+        "assertions": 469,
+        "summary": "Ran 22 tests across 1 file. [5.27s]"
+      },
+      {
+        "file": "tests/integration/wager-reversals-m07.test.ts",
+        "exitCode": 0,
+        "pass": 28,
+        "fail": 0,
+        "assertions": 364,
+        "summary": "Ran 28 tests across 1 file. [6.29s]"
+      },
+      {
+        "file": "tests/integration/wager-reversals-m08.test.ts",
+        "exitCode": 0,
+        "pass": 23,
+        "fail": 0,
+        "assertions": 460,
+        "summary": "Ran 23 tests across 1 file. [4.27s]"
+      },
+      {
+        "file": "tests/integration/wager-win-loss-m06.test.ts",
+        "exitCode": 0,
+        "pass": 38,
+        "fail": 0,
+        "assertions": 575,
+        "summary": "Ran 38 tests across 1 file. [10.10s]"
+      },
+      {
+        "file": "tests/integration/wallet-opening.test.ts",
+        "exitCode": 0,
+        "pass": 30,
+        "fail": 0,
+        "assertions": 318,
+        "summary": "Ran 30 tests across 1 file. [3.71s]"
+      },
+      {
+        "file": "tests/unit/money.test.ts",
+        "exitCode": 0,
+        "pass": 21,
+        "fail": 0,
+        "assertions": 104,
+        "summary": "Ran 21 tests across 1 file. [17.00ms]"
+      },
+      {
+        "file": "tests/unit/payload-hash.test.ts",
+        "exitCode": 0,
+        "pass": 6,
+        "fail": 0,
+        "assertions": 10,
+        "summary": "Ran 6 tests across 1 file. [25.00ms]"
+      },
+      {
+        "file": "tests/unit/test-runner.test.ts",
+        "exitCode": 0,
+        "pass": 1,
+        "fail": 0,
+        "assertions": 7,
+        "summary": "Ran 1 test across 1 file. [201.00ms]"
+      },
+      {
+        "file": "tests/unit/wallet-ledger-entry.test.ts",
+        "exitCode": 0,
+        "pass": 5,
+        "fail": 0,
+        "assertions": 12,
+        "summary": "Ran 5 tests across 1 file. [13.00ms]"
+      },
+      {
+        "file": "tests/unit/wallet.test.ts",
+        "exitCode": 0,
+        "pass": 7,
+        "fail": 0,
+        "assertions": 37,
+        "summary": "Ran 7 tests across 1 file. [15.00ms]"
+      }
+    ]
+  },
+  "priorAttempts": [
+    {
+      "command": "bun run test",
+      "exitCode": 1,
+      "log": "m11-integrated-test.log",
+      "logSha256": "153b83f14fe51ea8c405fcf4c3f200d7d7c266c88c368a939e4b37abc3670d55",
+      "filesDiscovered": 21,
+      "filesFailed": 16,
+      "testsPassed": 40,
+      "testsFailed": 19,
+      "files": [
+        {
+          "file": "tests/concurrency/concurrency.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 2,
+          "assertions": 0,
+          "summary": "Ran 2 tests across 1 file. [30.61s]"
+        },
+        {
+          "file": "tests/integration/http-endpoints.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [4.91s]"
+        },
+        {
+          "file": "tests/integration/m17-read-endpoints.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [1398.00ms]"
+        },
+        {
+          "file": "tests/integration/migrations.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [94.00ms]"
+        },
+        {
+          "file": "tests/integration/mikro-orm-uow-m05.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [1288.00ms]"
+        },
+        {
+          "file": "tests/integration/money-postgres-roundtrip.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [573.00ms]"
+        },
+        {
+          "file": "tests/integration/pending-reference-worker-m10.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [745.00ms]"
+        },
+        {
+          "file": "tests/integration/postgres-invariants.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 2,
+          "assertions": 0,
+          "summary": "Ran 2 tests across 1 file. [589.00ms]"
+        },
+        {
+          "file": "tests/integration/terminal-protection-m11.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [78.00ms]"
+        },
+        {
+          "file": "tests/integration/wager-bet-replay.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [655.00ms]"
+        },
+        {
+          "file": "tests/integration/wager-operations.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 2,
+          "assertions": 0,
+          "summary": "Ran 2 tests across 1 file. [975.00ms]"
+        },
+        {
+          "file": "tests/integration/wager-pending-replay-m09.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [691.00ms]"
+        },
+        {
+          "file": "tests/integration/wager-reversals-m07.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [607.00ms]"
+        },
+        {
+          "file": "tests/integration/wager-reversals-m08.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [514.00ms]"
+        },
+        {
+          "file": "tests/integration/wager-win-loss-m06.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [599.00ms]"
+        },
+        {
+          "file": "tests/integration/wallet-opening.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [1086.00ms]"
+        },
+        {
+          "file": "tests/unit/money.test.ts",
+          "exitCode": 0,
+          "pass": 21,
+          "fail": 0,
+          "assertions": 104,
+          "summary": "Ran 21 tests across 1 file. [71.00ms]"
+        },
+        {
+          "file": "tests/unit/payload-hash.test.ts",
+          "exitCode": 0,
+          "pass": 6,
+          "fail": 0,
+          "assertions": 10,
+          "summary": "Ran 6 tests across 1 file. [52.00ms]"
+        },
+        {
+          "file": "tests/unit/test-runner.test.ts",
+          "exitCode": 0,
+          "pass": 1,
+          "fail": 0,
+          "assertions": 7,
+          "summary": "Ran 1 test across 1 file. [214.00ms]"
+        },
+        {
+          "file": "tests/unit/wallet-ledger-entry.test.ts",
+          "exitCode": 0,
+          "pass": 5,
+          "fail": 0,
+          "assertions": 12,
+          "summary": "Ran 5 tests across 1 file. [29.00ms]"
+        },
+        {
+          "file": "tests/unit/wallet.test.ts",
+          "exitCode": 0,
+          "pass": 7,
+          "fail": 0,
+          "assertions": 37,
+          "summary": "Ran 7 tests across 1 file. [43.00ms]"
+        }
+      ]
+    },
+    {
+      "command": "bun run test",
+      "exitCode": 1,
+      "log": "m11-integrated-test-final.log",
+      "logSha256": "d7ed452fbc0c9acd8c6b7bbb3c131e26ebf1d5ff54142660881ceedad7a19379",
+      "filesDiscovered": 21,
+      "filesFailed": 2,
+      "testsPassed": 311,
+      "testsFailed": 2,
+      "files": [
+        {
+          "file": "tests/concurrency/concurrency.test.ts",
+          "exitCode": 0,
+          "pass": 6,
+          "fail": 0,
+          "assertions": 218,
+          "summary": "Ran 6 tests across 1 file. [44.41s]"
+        },
+        {
+          "file": "tests/integration/http-endpoints.test.ts",
+          "exitCode": 1,
+          "pass": 0,
+          "fail": 1,
+          "assertions": 0,
+          "summary": "Ran 1 test across 1 file. [80.23s]"
+        },
+        {
+          "file": "tests/integration/m17-read-endpoints.test.ts",
+          "exitCode": 0,
+          "pass": 21,
+          "fail": 0,
+          "assertions": 290,
+          "summary": "Ran 21 tests across 1 file. [18.90s]"
+        },
+        {
+          "file": "tests/integration/migrations.test.ts",
+          "exitCode": 0,
+          "pass": 1,
+          "fail": 0,
+          "assertions": 18,
+          "summary": "Ran 1 test across 1 file. [4.00s]"
+        },
+        {
+          "file": "tests/integration/mikro-orm-uow-m05.test.ts",
+          "exitCode": 0,
+          "pass": 18,
+          "fail": 0,
+          "assertions": 87,
+          "summary": "Ran 18 tests across 1 file. [38.55s]"
+        },
+        {
+          "file": "tests/integration/money-postgres-roundtrip.test.ts",
+          "exitCode": 0,
+          "pass": 9,
+          "fail": 0,
+          "assertions": 108,
+          "summary": "Ran 9 tests across 1 file. [15.07s]"
+        },
+        {
+          "file": "tests/integration/pending-reference-worker-m10.test.ts",
+          "exitCode": 1,
+          "pass": 20,
+          "fail": 1,
+          "assertions": 326,
+          "summary": "Ran 21 tests across 1 file. [28.88s]"
+        },
+        {
+          "file": "tests/integration/postgres-invariants.test.ts",
+          "exitCode": 0,
+          "pass": 22,
+          "fail": 0,
+          "assertions": 104,
+          "summary": "Ran 22 tests across 1 file. [7.73s]"
+        },
+        {
+          "file": "tests/integration/terminal-protection-m11.test.ts",
+          "exitCode": 0,
+          "pass": 9,
+          "fail": 0,
+          "assertions": 672,
+          "summary": "Ran 9 tests across 1 file. [33.18s]"
+        },
+        {
+          "file": "tests/integration/wager-bet-replay.test.ts",
+          "exitCode": 0,
+          "pass": 16,
+          "fail": 0,
+          "assertions": 332,
+          "summary": "Ran 16 tests across 1 file. [18.16s]"
+        },
+        {
+          "file": "tests/integration/wager-operations.test.ts",
+          "exitCode": 0,
+          "pass": 8,
+          "fail": 0,
+          "assertions": 53,
+          "summary": "Ran 8 tests across 1 file. [3.38s]"
+        },
+        {
+          "file": "tests/integration/wager-pending-replay-m09.test.ts",
+          "exitCode": 0,
+          "pass": 22,
+          "fail": 0,
+          "assertions": 469,
+          "summary": "Ran 22 tests across 1 file. [5.33s]"
+        },
+        {
+          "file": "tests/integration/wager-reversals-m07.test.ts",
+          "exitCode": 0,
+          "pass": 28,
+          "fail": 0,
+          "assertions": 364,
+          "summary": "Ran 28 tests across 1 file. [6.03s]"
+        },
+        {
+          "file": "tests/integration/wager-reversals-m08.test.ts",
+          "exitCode": 0,
+          "pass": 23,
+          "fail": 0,
+          "assertions": 460,
+          "summary": "Ran 23 tests across 1 file. [7.72s]"
+        },
+        {
+          "file": "tests/integration/wager-win-loss-m06.test.ts",
+          "exitCode": 0,
+          "pass": 38,
+          "fail": 0,
+          "assertions": 575,
+          "summary": "Ran 38 tests across 1 file. [8.48s]"
+        },
+        {
+          "file": "tests/integration/wallet-opening.test.ts",
+          "exitCode": 0,
+          "pass": 30,
+          "fail": 0,
+          "assertions": 318,
+          "summary": "Ran 30 tests across 1 file. [3.77s]"
+        },
+        {
+          "file": "tests/unit/money.test.ts",
+          "exitCode": 0,
+          "pass": 21,
+          "fail": 0,
+          "assertions": 104,
+          "summary": "Ran 21 tests across 1 file. [40.00ms]"
+        },
+        {
+          "file": "tests/unit/payload-hash.test.ts",
+          "exitCode": 0,
+          "pass": 6,
+          "fail": 0,
+          "assertions": 10,
+          "summary": "Ran 6 tests across 1 file. [26.00ms]"
+        },
+        {
+          "file": "tests/unit/test-runner.test.ts",
+          "exitCode": 0,
+          "pass": 1,
+          "fail": 0,
+          "assertions": 7,
+          "summary": "Ran 1 test across 1 file. [1047.00ms]"
+        },
+        {
+          "file": "tests/unit/wallet-ledger-entry.test.ts",
+          "exitCode": 0,
+          "pass": 5,
+          "fail": 0,
+          "assertions": 12,
+          "summary": "Ran 5 tests across 1 file. [27.00ms]"
+        },
+        {
+          "file": "tests/unit/wallet.test.ts",
+          "exitCode": 0,
+          "pass": 7,
+          "fail": 0,
+          "assertions": 37,
+          "summary": "Ran 7 tests across 1 file. [17.00ms]"
+        }
+      ]
+    }
+  ],
+  "migration006Files": [
+    {
+      "file": "src/infrastructure/persistence/migrations/006_terminal_transaction_protection.sql",
+      "unchangedFromBase": true,
+      "workingTreeSha256": "b284164daacef09445b685aa8051e872fe69842eeda2211d1e15e2cf7d337b98"
+    },
+    {
+      "file": "src/infrastructure/persistence/migrations/006_terminal_transaction_protection.down.sql",
+      "unchangedFromBase": true,
+      "workingTreeSha256": "078299520750960a289ab9032566d453139949fb5044c46c403357d00acacd36"
+    }
+  ],
+  "limitations": [
+    "Windows execution only; Docker/Compose/WSL/Linux not executed",
+    "Initial shared PostgreSQL unavailable; attempts preserved separately",
+    "initdb --no-sync omitted initial cluster installation flush only; runtime fsync, synchronous_commit and full_page_writes remained on",
+    "Raw logs are local ignored files; hashes and per-file summaries are committed"
+  ],
+  "codeAndTestsChanged": false,
+  "cleanup": {
+    "disposableDatabasesRemaining": 0,
+    "remainingDatabasesBeforeShutdown": [
+      "postgres",
+      "template0",
+      "template1"
+    ],
+    "exclusiveClusterStopExitCode": 0,
+    "exclusiveClusterRemoved": true,
+    "originalCluster": "stopped; data and WAL preserved; next startup requires recovery"
+  }
+}
