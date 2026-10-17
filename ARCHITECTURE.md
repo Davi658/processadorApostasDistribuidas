@@ -314,18 +314,18 @@ O `MikroOrmUnitOfWork` rastreia a profundidade de execução (`depth`) e o estad
 3. **Falha Externa Desfaz Trabalho Interno:** Caso o bloco interno execute com sucesso e ocorra uma falha subsequente no bloco externo, todo o trabalho — interno e externo — é revertido atomicamente no PostgreSQL.
 4. **Estratégia Rollback-Only para Falha Interna Capturada:**
    - Se uma chamada aninhada falhar com erro e a camada externa capturar o erro em bloco `try/catch` para tentar commitar dados parciais, o Unit of Work marca o contexto com `rollbackOnly = true` e armazena `rollbackReason`.
-   - Ao finalizar o bloco raiz (depth 0), o Unit of Work inspeciona `context.rollbackOnly`. Se verdadeiro, impede a execução de `flush()` e lança `TransactionRollbackOnlyError` (ou o `rollbackReason` original).
+   - Ao finalizar o bloco raiz (depth 0), o Unit of Work inspeciona `context.rollbackOnly`. Se verdadeiro, impede a execução de `flush()` e lança `TransactionRollbackOnlyError`, preservando o erro original em `cause`. Da mesma forma, qualquer chamada aninhada subsequente que tente executar trabalho sobre um contexto já marcado como `rollbackOnly` é imediatamente rejeitada com `TransactionRollbackOnlyError`, preservando `cause`.
    - O wrapper transacional do MikroORM captura o erro e emite `ROLLBACK` ao PostgreSQL, garantindo que nenhum commit parcial ocorra no banco.
 
 ### 10.4 Ciclo de Vida NestJS e Liberação de Recursos
 - `MikroOrmUnitOfWork` implementa `OnModuleInit` e `OnModuleDestroy`.
-- Na inicialização (`onModuleInit`), o pool MikroORM é provisionado sob demanda ou na inicialização do módulo NestJS.
-- No encerramento (`onModuleDestroy` / `close`), o pool e as conexões físicas são encerradas via `await this.orm.close(true)`. A suíte dedicada M05 atesta via `pg_stat_activity` que zero conexões ativas ou penduradas permanecem no PostgreSQL após o shutdown.
+- Na inicialização (`app.init()`), o pool MikroORM é provisionado e conectado sem necessidade de chamadas manuais a `onModuleInit`.
+- No encerramento da aplicação Nest (`app.close()`), os pools e conexões físicas são fechados automaticamente. A suíte dedicada M05 atesta via `pg_stat_activity` (usando conexão administrativa identificada separadamente) que zero conexões ativas da aplicação permanecem no PostgreSQL após o shutdown.
 
 ### 10.5 Delimitação e Não-Validação de Escopos Futuros
 > [!IMPORTANT]
-> A presente estabilização de M05 comprova a atomicidade e isolamento de `wallet`, `wager_transactions`, `wallet_ledger_entries` e `outbox_messages`.
-> **Tabela Inbox ainda não existe no modelo atual.** A atomicidade entre Inbox e SQS pertence ao marco **M15** e permanece explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**.
-> Da mesma forma, workers concorrentes distribuídos e filas SQS (M10) e reconciliação assíncrona (M09) permanecem como **NÃO VALIDADOS**.
+> A presente estabilização de M05 comprova exclusivamente a atomicidade e o isolamento de `wallet`, `wager_transactions`, `wallet_ledger_entries` e `outbox_messages` via MikroORM sob ciclo NestJS real.
+> **Tabela Inbox e integração SQS ainda não existem no modelo atual.** A atomicidade entre Inbox e SQS pertence ao marco **M15** e permanece explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**.
+> Da mesma forma, workers concorrentes distribuídos e filas SQS (M10) e replay completo de PENDING_REFERENCE (M09) permanecem como **NÃO VALIDADOS**.
 
 

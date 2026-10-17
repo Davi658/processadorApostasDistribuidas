@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { INestApplication } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { EntityManager } from '@mikro-orm/postgresql';
+import { AppModule } from '../../src/interfaces/http/app.module';
 import {
   MikroOrmOutboxRepository,
   MikroOrmUnitOfWork,
@@ -19,6 +22,7 @@ import {
   TransactionRollbackOnlyError,
 } from '../../src/domain/errors/domain.error';
 import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
+
 
 function createDeferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -554,8 +558,9 @@ describe('M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable Post
       const walletId = uuidv4();
       const playerId = uuidv4();
       const eventId = uuidv4();
+      const innerFailureReason = new Error('Erro interno que será capturado pela camada externa');
 
-      let caught = false;
+      let capturedError: any = null;
 
       try {
         await uow.runInTransaction(async () => {
@@ -568,7 +573,7 @@ describe('M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable Post
               const event = createTestOutboxEvent(eventId, walletId);
               await outboxRepo.save(event);
 
-              throw new Error('Erro interno que será capturado pela camada externa');
+              throw innerFailureReason;
             });
           } catch (innerErr) {
             // A camada externa tenta engolir a falha interna e continuar
@@ -578,16 +583,13 @@ describe('M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable Post
           return { success: true };
         });
       } catch (err: any) {
-        caught = true;
-        // Exige que o UoW rejeite o commit com rollback-only ou a causa do erro interno
-        expect(
-          err instanceof TransactionRollbackOnlyError ||
-          err.message.includes('rollback-only') ||
-          err.message.includes('Erro interno que será capturado')
-        ).toBe(true);
+        capturedError = err;
       }
 
-      expect(caught).toBe(true);
+      // Exige a classe e a causa exatas, sem aceitar alternativamente qualquer mensagem de erro
+      expect(capturedError).toBeInstanceOf(TransactionRollbackOnlyError);
+      expect((capturedError as TransactionRollbackOnlyError).code).toBe('TRANSACTION_ROLLBACK_ONLY');
+      expect((capturedError as TransactionRollbackOnlyError).cause).toBe(innerFailureReason);
 
       // PROVA NO POSTGRESQL: Absolutamente NADA foi commitado (nem a wallet externa, nem a outbox interna)
       const checkWallet = await adminPool.query('SELECT count(*) FROM wallets WHERE id = $1', [walletId]);
@@ -595,6 +597,41 @@ describe('M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable Post
 
       expect(Number(checkWallet.rows[0].count)).toBe(0);
       expect(Number(checkOutbox.rows[0].count)).toBe(0);
+    });
+
+    it('D.4: chamada aninhada subsequente em contexto rollback-only é rejeitada com TransactionRollbackOnlyError preservando cause', async () => {
+      const walletId = uuidv4();
+      const playerId = uuidv4();
+      const initialError = new Error('Falha inicial marcando rollback-only');
+
+      let capturedError: any = null;
+
+      try {
+        await uow.runInTransaction(async () => {
+          try {
+            await uow.runInTransaction(async () => {
+              throw initialError;
+            });
+          } catch {
+            // engole erro interno
+          }
+
+          // Tentativa de executar novo bloco aninhado em transação já abortada
+          await uow.runInTransaction(async () => {
+            const wallet = createTestWallet(walletId, playerId, '100.00', 'BRL');
+            await walletRepo.save(wallet);
+          });
+        });
+      } catch (err: any) {
+        capturedError = err;
+      }
+
+      expect(capturedError).toBeInstanceOf(TransactionRollbackOnlyError);
+      expect((capturedError as TransactionRollbackOnlyError).code).toBe('TRANSACTION_ROLLBACK_ONLY');
+      expect((capturedError as TransactionRollbackOnlyError).cause).toBe(initialError);
+
+      const checkWallet = await adminPool.query('SELECT count(*) FROM wallets WHERE id = $1', [walletId]);
+      expect(Number(checkWallet.rows[0].count)).toBe(0);
     });
   });
 
@@ -732,49 +769,88 @@ describe('M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable Post
   });
 
   // =========================================================================
-  // G. Ciclo da Aplicação NestJS:
-  //    iniciar, executar operação e encerrar sem conexões penduradas.
+  // G. Ciclo da Aplicação NestJS Real:
+  //    app.init(), executar transação via provider real,
+  //    confirmar persistência externa, app.close() e conferir 0 conexões
+  //    em pg_stat_activity, com teardown garantido em finally.
   // =========================================================================
-  describe('G. Ciclo da Aplicação NestJS e Liberação de Recursos', () => {
-    it('deve inicializar, executar operações e encerrar liberando todas as conexões do pool', async () => {
-      const lifecycleDb = await createIsolatedTestDatabase('lifecycle_');
-      const lifecycleAdminPool = new pg.Pool({
-        ...lifecycleDb.adminConfig,
-        application_name: 'admin_pool',
-      });
+  describe('G. Ciclo da Aplicação NestJS Real e Liberação de Recursos', () => {
+    it('deve inicializar via app.init(), executar transação e encerrar via app.close() liberando conexões', async () => {
+      const lifecycleDb = await createIsolatedTestDatabase('nest_lifecycle_');
+      let lifecycleAdminPool: pg.Pool | null = null;
+      let app: INestApplication | null = null;
 
-      const lifecycleUow = new MikroOrmUnitOfWork();
-      await lifecycleUow.onModuleInit();
+      try {
+        lifecycleAdminPool = new pg.Pool({
+          ...lifecycleDb.adminConfig,
+          application_name: 'admin_pool_lifecycle_test',
+        });
 
-      const testWalletRepo = new MikroOrmWalletRepository(lifecycleUow);
+        // 1. Inicializa uma aplicação Nest com o provider real da UoW
+        app = await NestFactory.create(AppModule, { logger: false });
 
-      // Executar uma operação com sucesso
-      const walletId = uuidv4();
-      await lifecycleUow.runInTransaction(async () => {
-        const wallet = createTestWallet(walletId, uuidv4(), '100.00', 'BRL');
-        await testWalletRepo.save(wallet);
-      });
+        // 2. Utiliza app.init(), sem chamar onModuleInit manualmente
+        await app.init();
 
-      // Confirmar que a gravação ocorreu
-      const checkRecord = await lifecycleAdminPool.query('SELECT count(*) FROM wallets WHERE id = $1', [walletId]);
-      expect(Number(checkRecord.rows[0].count)).toBe(1);
+        // 3. Executa uma operação transacional via provider real
+        const nestUow = app.get(MikroOrmUnitOfWork);
+        const nestWalletRepo = app.get(MikroOrmWalletRepository);
 
-      // Simula encerramento do ciclo NestJS
-      await lifecycleUow.onModuleDestroy();
+        const walletId = uuidv4();
+        const playerId = uuidv4();
+        await nestUow.runInTransaction(async () => {
+          const wallet = createTestWallet(walletId, playerId, '150.00', 'BRL');
+          await nestWalletRepo.save(wallet);
+        });
 
-      // Prova de ausência de conexões penduradas via pg_stat_activity
-      const activeConnectionsResult = await lifecycleAdminPool.query(`
-        SELECT count(*) as count 
-        FROM pg_stat_activity 
-        WHERE datname = $1 
-          AND application_name != 'admin_pool' 
-          AND pid != pg_backend_pid();
-      `, [lifecycleDb.dbName]);
+        // 4. Confirma a persistência por conexão externa (conexão administrativa identificada separadamente)
+        const checkRecord = await lifecycleAdminPool.query(
+          'SELECT balance, version FROM wallets WHERE id = $1',
+          [walletId]
+        );
+        expect(checkRecord.rows.length).toBe(1);
+        expect(checkRecord.rows[0].balance).toBe('150.00');
+        expect(Number(checkRecord.rows[0].version)).toBe(1);
 
-      expect(Number(activeConnectionsResult.rows[0].count)).toBe(0);
+        // 5. Encerra por app.close(), sem chamar close/onModuleDestroy manualmente
+        await app.close();
+        app = null;
 
-      await lifecycleAdminPool.end();
-      await lifecycleDb.closeAndDrop();
+        // 6. Confere em pg_stat_activity a ausência de conexões da aplicação
+        const activeConnectionsResult = await lifecycleAdminPool.query(
+          `
+          SELECT count(*) as count 
+          FROM pg_stat_activity 
+          WHERE datname = $1 
+            AND application_name != 'admin_pool_lifecycle_test' 
+            AND pid != pg_backend_pid();
+          `,
+          [lifecycleDb.dbName]
+        );
+
+        expect(Number(activeConnectionsResult.rows[0].count)).toBe(0);
+      } finally {
+        // Teardown garantido em finally, inclusive se alguma asserção falhar
+        if (app) {
+          try {
+            await (app as INestApplication).close();
+          } catch {
+            // Ignorar erro se já encerrado
+          }
+        }
+        if (lifecycleAdminPool) {
+          try {
+            await lifecycleAdminPool.end();
+          } catch {
+            // Ignorar erro no encerramento do pool
+          }
+        }
+        try {
+          await lifecycleDb.closeAndDrop();
+        } catch {
+          // Ignorar erro na destruição da base descartável
+        }
+      }
     }, 30000);
   });
 

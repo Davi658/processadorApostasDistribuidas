@@ -135,26 +135,29 @@
 - **Semântica de Aninhamento e Estratégia Rollback-Only (Teste D):**
   - *D.1 (Não confirmação independente):* Bloco aninhado conclui sem confirmar no banco antes do bloco externo.
   - *D.2 (Falha externa desfaz trabalho interno):* Erro no bloco externo aborta e reverte tanto o trabalho externo quanto o trabalho do bloco aninhado.
-  - *D.3 (Falha interna capturada / Rollback-Only):* Quando o bloco aninhado falha e a camada externa captura a exceção para tentar comitar parcialmente, o Unit of Work detecta `rollbackOnly = true`, rejeita com `TransactionRollbackOnlyError` e força `ROLLBACK` no PostgreSQL.
-- **Limpeza de Contexto e Ciclo de Vida NestJS (Testes E e G):**
+  - *D.3 (Falha interna capturada / Rollback-Only):* Quando o bloco aninhado falha e a camada externa captura a exceção para tentar comitar parcialmente, o Unit of Work detecta `rollbackOnly = true`, rejeita a tentativa de commit com `TransactionRollbackOnlyError` (preservando o erro original em `cause`) e força `ROLLBACK` total no PostgreSQL.
+  - *D.4 (Rejeição de continuação aninhada em Rollback-Only):* Tentativa subsequente de executar novo bloco aninhado em transação já abortada é rejeitada imediatamente com `TransactionRollbackOnlyError` preservando `cause`.
+- **Limpeza de Contexto e Ciclo de Vida NestJS Real (Testes E e G):**
   - Após falhas, o contexto transacional é limpo e uma nova execução opera com novo contexto válido.
-  - `onModuleInit` e `onModuleDestroy` liberam os pools, e o encerramento do módulo NestJS resulta em 0 conexões penduradas no PostgreSQL (`pg_stat_activity`).
+  - Teste G com PostgreSQL descartável inicializa aplicação Nest via `NestFactory.create(AppModule)` e `await app.init()` (sem chamar `onModuleInit` manualmente), executa operação transacional via provider real, confirma persistência por conexão externa administrativa identificada (`admin_pool_lifecycle_test`), encerra via `await app.close()` (sem chamar `close` manualmente) e atesta via `pg_stat_activity` que zero conexões da aplicação permanecem abertas. Teardown garantido em bloco `finally`.
 - **Proteção Contra Escrita Acidental sem UoW (Teste F):**
   - Chamadas de `.save()` em qualquer um dos 4 repositórios fora de transação lançam `TransactionRequiredError` sem persistir dados no banco.
   - Locks pessimistas fora de transação são rejeitados com `TransactionRequiredError`. Consultas simples de leitura funcionam normalmente.
 
 ---
 
-## 3. Próxima Rodada (Fatia de Mensageria e Resiliência — M10 e Integrações)
-
+## 3. Próxima Rodada (Fatia de Mensageria e Resiliência — M09, M10, M15)
 
 > [!IMPORTANT]
-> **Delimitação de Escopo (M08 vs M10):**
-> A execução manual do reprocessador (`ReprocessPendingReferencesUseCase.execute()`) nos testes de M08 comprova exclusivamente a lógica de decisão, transição de estados e consistência contábil de reversões pendentes. **Não comprova e não implementa M10**.
+> **Delimitação de Escopo (M05/M08 vs M09/M10/M15):**
+> A presente suíte comprova a atomicidade e isolamento de `wallet`, `wager_transactions`, `wallet_ledger_entries` e `outbox_messages` via MikroORM e NestJS real.
+> O reprocessador manual (`ReprocessPendingReferencesUseCase.execute()`) comprova a consistência financeira sob referências fora de ordem.
 > Os seguintes componentes permanecem explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**:
-> 1. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
-> 2. **Concorrência entre Múltiplos Workers com `SKIP LOCKED`:** **NÃO VALIDADO**
-> 3. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída:** **NÃO VALIDADO**
-> 4. **Publisher Concorrente da Outbox com Broker:** **NÃO VALIDADO**
-> 5. **Mecanismo de Retries Distribuído e DLQ:** **NÃO VALIDADO**
-> 6. **Crash Recovery de Instâncias:** **NÃO VALIDADO**
+> 1. **Replay Completo de PENDING_REFERENCE (M09):** **NÃO VALIDADO**
+> 2. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
+> 3. **Concorrência entre Múltiplos Workers com `SKIP LOCKED` (M10):** **NÃO VALIDADO**
+> 4. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída (M10):** **NÃO VALIDADO**
+> 5. **Atomicidade Inbox / SQS (M15):** **NÃO VALIDADO / NÃO IMPLEMENTADO**
+> 6. **Publisher Concorrente da Outbox com Broker:** **NÃO VALIDADO**
+> 7. **Mecanismo de Retries Distribuído e DLQ:** **NÃO VALIDADO**
+> 8. **Crash Recovery de Instâncias:** **NÃO VALIDADO**

@@ -36,7 +36,7 @@ export interface TransactionContext {
   em: EntityManager;
   depth: number;
   rollbackOnly: boolean;
-  rollbackReason?: Error;
+  rollbackReason?: unknown;
 }
 
 @Injectable()
@@ -136,11 +136,9 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
       existingStore.depth++;
       try {
         if (existingStore.rollbackOnly) {
-          throw (
-            existingStore.rollbackReason ??
-            new TransactionRollbackOnlyError(
-              'Cannot execute work in nested transaction marked as rollback-only'
-            )
+          throw new TransactionRollbackOnlyError(
+            'Cannot execute work in nested transaction marked as rollback-only',
+            existingStore.rollbackReason
           );
         }
         return await work();
@@ -148,8 +146,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
         // Internal failure marks outer transaction as rollback-only to prevent partial commits
         existingStore.rollbackOnly = true;
         if (!existingStore.rollbackReason) {
-          existingStore.rollbackReason =
-            innerErr instanceof Error ? innerErr : new Error(String(innerErr));
+          existingStore.rollbackReason = innerErr;
         }
         throw innerErr;
       } finally {
@@ -169,15 +166,14 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
         try {
           const result = await work();
           if (context.rollbackOnly) {
-            throw (
-              context.rollbackReason ??
-              new TransactionRollbackOnlyError(
-                'Transaction cannot be committed because it has been marked as rollback-only'
-              )
+            throw new TransactionRollbackOnlyError(
+              'Transaction cannot be committed because it has been marked as rollback-only',
+              context.rollbackReason
             );
           }
           await forkedEm.flush();
           return result;
+
         } catch (error) {
           // Re-throwing causes MikroORM transactional() to execute ROLLBACK on the DB connection
           throw error;

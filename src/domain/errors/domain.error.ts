@@ -81,9 +81,15 @@ export class TransactionRequiredError extends DomainError {
 
 export class TransactionRollbackOnlyError extends DomainError {
   public readonly code = 'TRANSACTION_ROLLBACK_ONLY';
+  public override readonly cause?: unknown;
 
-  constructor(message = 'Transaction cannot be committed because it has been marked as rollback-only') {
+  constructor(
+    message = 'Transaction cannot be committed because it has been marked as rollback-only',
+    cause?: unknown
+  ) {
     super(message);
+    this.cause = cause;
   }
 }
+
 
