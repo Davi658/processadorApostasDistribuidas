@@ -111,10 +111,17 @@ export class ProcessWagerUseCase {
       });
     } catch (err: any) {
       // 6. Safe 23505 race resolution outside aborted PostgreSQL transaction
-      if (err?.code === '23505' || err?.message?.includes('23505') || err?.cause?.code === '23505') {
-        const committedTx = await this.uow.runInTransaction(async () => {
-          return this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
-        });
+      const uniqueConstraintCause = this.identifyWagerUniqueConstraint(err);
+
+      if (uniqueConstraintCause === 'IDEMPOTENCY_KEY') {
+        let committedTx: WagerTransaction | null = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          committedTx = await this.uow.runInTransaction(async () => {
+            return this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
+          });
+          if (committedTx) break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
 
         if (committedTx) {
           if (committedTx.payloadHash === payloadHash) {
@@ -130,23 +137,24 @@ export class ProcessWagerUseCase {
           }
         }
 
-        // Check if conflict occurred on provider external ID or reversal index
-        const committedByProvider = await this.uow.runInTransaction(async () => {
-          return this.wagerRepo.findByProviderAndExternalId(dto.providerId, dto.externalTransactionId);
-        });
-        if (committedByProvider) {
-          throw new IdempotencyConflictError(
-            `Concurrent conflict: Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was registered by a racing request`
-          );
-        }
-
-        if (dto.referenceExternalTransactionId) {
-          throw new IdempotencyConflictError(
-            `Concurrent conflict: A reversal of type "${dto.kind}" for reference "${dto.referenceExternalTransactionId}" was already processed`
-          );
-        }
+        throw new IdempotencyConflictError(
+          `Concurrent conflict: Idempotency key "${cleanIdempotencyKey}" collided during transaction processing`
+        );
       }
 
+      if (uniqueConstraintCause === 'PROVIDER_EXTERNAL') {
+        throw new IdempotencyConflictError(
+          `Concurrent conflict: Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was registered by a racing request`
+        );
+      }
+
+      if (uniqueConstraintCause === 'REVERSAL_REFERENCE') {
+        throw new IdempotencyConflictError(
+          `Concurrent conflict: A reversal of type "${dto.kind}" for reference "${dto.referenceExternalTransactionId}" was already processed`
+        );
+      }
+
+      // Unrelated 23505 or other database error: rethrow without transforming into IdempotencyConflictError
       throw err;
     }
   }
@@ -1018,5 +1026,78 @@ export class ProcessWagerUseCase {
 
     const canonicalJson = ProcessWagerUseCase.canonicalStringify(normalized);
     return createHash('sha256').update(canonicalJson).digest('hex');
+  }
+
+  private identifyWagerUniqueConstraint(
+    error: unknown
+  ): 'IDEMPOTENCY_KEY' | 'PROVIDER_EXTERNAL' | 'REVERSAL_REFERENCE' | 'OTHER' | null {
+    if (!error || typeof error !== 'object') {
+      return null;
+    }
+
+    const visited = new Set<unknown>();
+    const queue: unknown[] = [error];
+    let has23505 = false;
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || typeof current !== 'object' || visited.has(current)) {
+        continue;
+      }
+      visited.add(current);
+
+      const rec = current as Record<string, unknown>;
+
+      const code = typeof rec.code === 'string' ? rec.code : '';
+      const constraint = typeof rec.constraint === 'string' ? rec.constraint : '';
+      const message = typeof rec.message === 'string' ? rec.message : '';
+      const detail = typeof rec.detail === 'string' ? rec.detail : '';
+
+      const is23505 = code === '23505' || message.includes('23505');
+
+      if (is23505) {
+        has23505 = true;
+
+        if (constraint === 'uq_wager_transactions_idempotency_key') {
+          return 'IDEMPOTENCY_KEY';
+        }
+        if (constraint === 'uq_wager_transactions_provider_external') {
+          return 'PROVIDER_EXTERNAL';
+        }
+        if (constraint === 'uq_processed_reversal_per_reference') {
+          return 'REVERSAL_REFERENCE';
+        }
+
+        const fullText = `${constraint} ${message} ${detail}`;
+        if (
+          fullText.includes('uq_wager_transactions_idempotency_key') ||
+          detail.includes('(idempotency_key)=') ||
+          detail.includes('Key (idempotency_key)')
+        ) {
+          return 'IDEMPOTENCY_KEY';
+        }
+        if (
+          fullText.includes('uq_wager_transactions_provider_external') ||
+          detail.includes('(provider_id, external_transaction_id)=') ||
+          detail.includes('Key (provider_id, external_transaction_id)')
+        ) {
+          return 'PROVIDER_EXTERNAL';
+        }
+        if (fullText.includes('uq_processed_reversal_per_reference')) {
+          return 'REVERSAL_REFERENCE';
+        }
+      }
+
+      if (rec.cause) queue.push(rec.cause);
+      if (rec.originalError) queue.push(rec.originalError);
+      if (rec.driverException) queue.push(rec.driverException);
+      if (rec.driverError) queue.push(rec.driverError);
+    }
+
+    if (has23505) {
+      return 'OTHER';
+    }
+
+    return null;
   }
 }

@@ -400,4 +400,205 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
       }
     }
   }, 30000);
+
+  it('Repeat duplicate submissions with at least THREE independent OS application processes using synchronization barrier', async () => {
+    const wallet = await createWalletUseCase.execute({
+      playerId: crypto.randomUUID(),
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const bunBin = process.execPath;
+    const workerScript = join(import.meta.dir, 'worker.ts');
+    const barrierPath = join(tmpdir(), `barrier_dup_${Date.now()}_${Math.random().toString(36).substring(7)}.tmp`);
+
+    const spawnWorker = (idempKey: string, payload: ProcessBetDto) => {
+      let markReady: () => void;
+      const readyPromise = new Promise<void>((resolve) => {
+        markReady = resolve;
+      });
+
+      const resultPromise = new Promise<any>((resolve, reject) => {
+        let child: any;
+        try {
+          child = spawn(bunBin, ['run', workerScript, idempKey, JSON.stringify(payload), barrierPath], {
+            env: {
+              ...process.env,
+              DB_NAME: isolatedDb.dbName,
+            },
+          });
+        } catch (err) {
+          return reject(err);
+        }
+
+        child.on('error', (err: any) => reject(err));
+
+        let stdout = '';
+        let stderr = '';
+        let signaledReady = false;
+
+        child.stdout.on('data', (d: any) => {
+          stdout += d.toString();
+          if (!signaledReady && stdout.includes('READY')) {
+            signaledReady = true;
+            markReady();
+          }
+        });
+
+        child.stderr.on('data', (d: any) => (stderr += d.toString()));
+
+        const timer = setTimeout(() => {
+          try { child.kill(); } catch {}
+          reject(new Error(`Worker timed out after 20000ms: stdout="${stdout}" stderr="${stderr}"`));
+        }, 20000);
+
+        child.on('close', (code: any) => {
+          clearTimeout(timer);
+          if (code !== 0) {
+            reject(new Error(`Worker exited with code ${code}: ${stderr}`));
+            return;
+          }
+          try {
+            const jsonLine = stdout.split('\n').filter((l) => l.trim().startsWith('{')).pop();
+            if (!jsonLine) throw new Error('No JSON output found in stdout');
+            const parsed = JSON.parse(jsonLine.trim());
+            resolve(parsed);
+          } catch {
+            reject(new Error(`Worker output invalid JSON: "${stdout}"`));
+          }
+        });
+      });
+
+      return { readyPromise, resultPromise };
+    };
+
+    const sharedIdempKey = `idemp-dup-3p-${crypto.randomUUID()}`;
+    const sharedPayload: ProcessBetDto = {
+      providerId: 'provider-dup-3p',
+      externalTransactionId: `ext-dup-3p-${crypto.randomUUID()}`,
+      playerId: wallet.playerId,
+      walletId: wallet.id,
+      roundId: 'round-dup-3p',
+      gameId: 'game-dup-3p',
+      kind: 'BET',
+      money: { amount: '25.00', currency: 'BRL' },
+    };
+
+    const w1 = spawnWorker(sharedIdempKey, sharedPayload);
+    const w2 = spawnWorker(sharedIdempKey, sharedPayload);
+    const w3 = spawnWorker(sharedIdempKey, sharedPayload);
+
+    await Promise.all([w1.readyPromise, w2.readyPromise, w3.readyPromise]);
+
+    writeFileSync(barrierPath, 'RELEASE');
+
+    try {
+      const results = await Promise.all([w1.resultPromise, w2.resultPromise, w3.resultPromise]);
+      expect(results.length).toBe(3);
+      for (const r of results) {
+        if (!r.ok) {
+          throw new Error(`Worker returned error: ${r.error} (code: ${r.code})`);
+        }
+      }
+
+      for (const r of results) {
+        expect(r.data.status).toBe('PROCESSED');
+        expect(r.data.balance.amount).toBe('75.00');
+      }
+
+      const firstProcessed = results.filter((r) => !r.data.idempotentReplay);
+      const replays = results.filter((r) => r.data.idempotentReplay);
+      expect(firstProcessed.length).toBe(1);
+      expect(replays.length).toBe(2);
+
+      const finalWallet = await getWalletUseCase.execute(wallet.id);
+      expect(finalWallet.balance.amount).toBe('75.00');
+      expect(finalWallet.version).toBe(2);
+
+      const txRows = await testPool.query(
+        "SELECT COUNT(*) FROM wager_transactions WHERE wallet_id = $1 AND kind = 'BET';",
+        [wallet.id]
+      );
+      expect(Number(txRows.rows[0].count)).toBe(1);
+
+      const ledgerDebitRows = await testPool.query(
+        "SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1 AND entry_type = 'DEBIT';",
+        [wallet.id]
+      );
+      expect(Number(ledgerDebitRows.rows[0].count)).toBe(1);
+
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('75.00');
+      expect(recon.calculatedBalance.amount).toBe('75.00');
+    } finally {
+      if (existsSync(barrierPath)) {
+        unlinkSync(barrierPath);
+      }
+    }
+  }, 30000);
+
+  it('mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409', async () => {
+    const wallet = await createWalletUseCase.execute({
+      playerId: crypto.randomUUID(),
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const sharedExtTxId = `ext-shared-${crypto.randomUUID()}`;
+    const key1 = `idemp-ext-1-${crypto.randomUUID()}`;
+    const key2 = `idemp-ext-2-${crypto.randomUUID()}`;
+
+    const bet1: ProcessBetDto = {
+      providerId: 'prv-ext-shared',
+      externalTransactionId: sharedExtTxId,
+      playerId: wallet.playerId,
+      walletId: wallet.id,
+      roundId: 'round-ext-shared',
+      gameId: 'game-ext-shared',
+      kind: 'BET',
+      money: { amount: '35.00', currency: 'BRL' },
+    };
+
+    const bet2: ProcessBetDto = {
+      providerId: 'prv-ext-shared',
+      externalTransactionId: sharedExtTxId,
+      playerId: wallet.playerId,
+      walletId: wallet.id,
+      roundId: 'round-ext-shared',
+      gameId: 'game-ext-shared',
+      kind: 'BET',
+      money: { amount: '35.00', currency: 'BRL' },
+    };
+
+    const [settled1, settled2] = await Promise.allSettled([
+      processBetUseCase.execute(key1, bet1),
+      processBetUseCase.execute(key2, bet2),
+    ]);
+
+    const fulfilled = [settled1, settled2].filter((s) => s.status === 'fulfilled') as PromiseFulfilledResult<any>[];
+    const rejected = [settled1, settled2].filter((s) => s.status === 'rejected') as PromiseRejectedResult[];
+
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(1);
+    expect(rejected[0].reason).toBeInstanceOf(IdempotencyConflictError);
+
+    const updatedWallet = await getWalletUseCase.execute(wallet.id);
+    expect(updatedWallet.balance.amount).toBe('65.00');
+    expect(updatedWallet.version).toBe(2);
+
+    const txRows = await testPool.query(
+      "SELECT COUNT(*) FROM wager_transactions WHERE wallet_id = $1 AND kind = 'BET';",
+      [wallet.id]
+    );
+    expect(Number(txRows.rows[0].count)).toBe(1);
+
+    const ledgerDebitRows = await testPool.query(
+      "SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1 AND entry_type = 'DEBIT';",
+      [wallet.id]
+    );
+    expect(Number(ledgerDebitRows.rows[0].count)).toBe(1);
+
+    const recon = await reconcileWalletUseCase.execute(wallet.id);
+    expect(recon.consistent).toBe(true);
+    expect(recon.storedBalance.amount).toBe('65.00');
+  });
 });

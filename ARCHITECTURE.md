@@ -238,4 +238,45 @@ O endpoint `POST /wallets` aceita o corpo `{ playerId: string, initialBalance?: 
 - A operação `OPENING` é estritamente interna e gerada exclusivamente pelo ciclo de criação de carteira.
 - Qualquer tentativa de cliente submeter uma transação externa com `kind: "OPENING"` no endpoint `POST /wagering/transactions` é rejeitada na validação de domínio e HTTP com `400 Bad Request`.
 
+---
+
+## 9. BET e Replay Terminal (M04)
+
+### 9.1 Atomicidade e Ciclo de Vida da Operação BET
+- **Débito Único:** Uma operação `BET` com valor positivo debita os fundos da carteira exatamente uma vez, persistindo a transação com `status = 'PROCESSED'`, inserindo um lançamento contábil `DEBIT` no ledger, e gravando na outbox os eventos `WagerTransactionProcessed` e `WalletBalanceChanged`.
+- **Saldo Insuficiente:**
+  - Se `wallet.balance < betMoney`, a transação é persistida com `status = 'REJECTED'` e código estável `failureCode = 'INSUFFICIENT_FUNDS'`.
+  - O saldo da carteira (`balance`) e o número de versão (`version`) permanecem **intactos**.
+  - **Nenhum** lançamento de débito é gerado no ledger contábil (`wallet_ledger_entries`).
+  - É publicado exclusivamente o evento `WagerTransactionRejectedEvent` na outbox, sem emitir `WalletBalanceChangedEvent`.
+  - No HTTP, retorna status `422 Unprocessable Entity` contendo o payload de rejeição com `idempotentReplay: false`.
+- **Atomicidade SQL:** Todas as mutações (`wallets`, `wager_transactions`, `wallet_ledger_entries`, `outbox_messages`) executam na mesma transação PostgreSQL sob lock pessimista na carteira (`SELECT ... FOR UPDATE`), garantindo que falhas em qualquer etapa abortem integralmente as operações.
+
+### 9.2 Semântica de Replay Terminal e Imutabilidade
+- **Replay de PROCESSED:** Retorna `transactionId`, `status: 'PROCESSED'`, `balance` (o saldo resultante original no momento da aposta) e `idempotentReplay: true`.
+- **Replay de REJECTED:** Retorna `transactionId`, `status: 'REJECTED'`, `failureCode: 'INSUFFICIENT_FUNDS'`, `balance` (o saldo original no momento da rejeição) e `idempotentReplay: true`.
+- **Preservação do Saldo Atual:** O replay terminal preserva o snapshot da operação original sem sobrescrever o saldo corrente da carteira no banco de dados. Caso operações subsequentes tenham alterado o saldo (ex: outra BET ou um crédito via WIN), o replay reporta o saldo original da transação consultada e mantém o saldo atual no banco intacto.
+- **Inércia Contábil e de Eventos:** O replay não realiza novas mutações contábeis no ledger e não insere novas mensagens na tabela de outbox.
+
+### 9.3 Deduplicação e Conflitos de Idempotência
+- **Mesma Chave com Payload Divergente:** Quando uma mesma `idempotencyKey` é submetida com parâmetros divergentes (verificados pelo hash SHA-256 canônico), o processador lança `IdempotencyConflictError`, resultando em HTTP `409 Conflict`. Nenhum efeito financeiro é gerado.
+- **Chave Disputada por Carteiras Diferentes:** Se duas carteiras disputarem a mesma chave de idempotência concorrentemente, o PostgreSQL resolve a constraint única: a vencedora completa o débito e a perdedora recebe 409 Conflict sem nenhuma alteração parcial em seu saldo, ledger ou outbox.
+- **Deduplicação de Provedor (`providerId + externalTransactionId`):** O par `(providerId, externalTransactionId)` é único no banco (`uq_wager_transactions_provider_external`). Se um identificador de provedor já processado for reenviado sob outra chave de idempotência, a solicitação é recusada com `409 Conflict`, impedindo duplo efeito financeiro.
+
+### 9.4 Classificação Estrita de Violações de Unicidade (PostgreSQL 23505)
+O processador inspeciona a causa raiz exata de erros com código `23505` (`unique_violation`):
+- `uq_wager_transactions_idempotency_key`: Identifica colisão de chave de idempotência concorrente. Realiza consulta segura fora da transação abortada; se o hash canônico coincidir, retorna o snapshot terminal com `idempotentReplay: true`; se diferir, lança `IdempotencyConflictError` (409).
+- `uq_wager_transactions_provider_external`: Identifica colisão em transação de provedor, lançando `IdempotencyConflictError` (409).
+- `uq_processed_reversal_per_reference`: Identifica colisão em reversão duplicada para mesma referência, lançando `IdempotencyConflictError` (409).
+- **Outras Constraints:** Violações de outras constraints (ex: `uq_wallets_player_currency` ou constraints arbitrárias) **não** são convertidas indevidamente em conflito de idempotência, sendo repassadas integralmente com seu código e tipo de exceção originais.
+
+### 9.5 Rollback Integral e Injeção de Falhas
+- Quatro pontos de hook auditados garantem a reversão completa em caso de exceções:
+  1. `after_wallet_save`: Falha após atualizar saldo da carteira.
+  2. `after_tx_save`: Falha após salvar transação `wager_transactions`.
+  3. `after_ledger_save`: Falha após salvar lançamento no ledger.
+  4. `after_outbox_save`: Falha após salvar primeira mensagem na outbox.
+- Todos os identificadores da tentativa são capturados e auditados diretamente no PostgreSQL, confirmando ausência total de registros órfãos após rollback.
+- O reenvio subsequente da operação confirma a conclusão bem-sucedida com um único efeito final consolidado.
+
 

@@ -67,7 +67,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should create wallet with zero balance without ledger or opening transaction', async () => {
-    const playerId = `player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '0.00', currency: 'BRL' },
@@ -103,7 +103,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should create wallet with positive balance, generating OPENING tx, CREDIT ledger, outbox events, with version 1', async () => {
-    const playerId = `player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '100.00', currency: 'BRL' },
@@ -142,7 +142,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should return DuplicateWalletError when creating duplicate wallet for same player and currency', async () => {
-    const playerId = `dup-player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '50.00', currency: 'BRL' },
@@ -157,7 +157,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should process BET, deduct balance, increment version, and record DEBIT ledger entry and outbox', async () => {
-    const playerId = `bet-player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '100.00', currency: 'BRL' },
@@ -197,7 +197,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should reject BET on insufficient funds without balance mutation or ledger entry', async () => {
-    const playerId = `insufficient-player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '30.00', currency: 'BRL' },
@@ -231,7 +231,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should replay saved result with original observed balance when same idempotency key and payload are submitted', async () => {
-    const playerId = `replay-player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '100.00', currency: 'BRL' },
@@ -289,7 +289,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should throw IdempotencyConflictError when same idempotency key is submitted with different payload', async () => {
-    const playerId = `conflict-player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '100.00', currency: 'BRL' },
@@ -322,7 +322,7 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
   });
 
   it('should throw IdempotencyConflictError when different key is submitted for same provider and externalTransactionId', async () => {
-    const playerId = `dup-ext-player-${crypto.randomUUID()}`;
+    const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
       initialBalance: { amount: '100.00', currency: 'BRL' },
