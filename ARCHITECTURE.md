@@ -111,7 +111,7 @@ Quando uma reversão (`REFUND` ou `ROLLBACK`) chega antes da transação de refe
 1. No fluxo imediato, o use case persiste a transação com status `PENDING_REFERENCE`, `attempts = 1` e agendamento de retry em `next_attempt_at`.
 2. Publica o evento `WagerTransactionPendingReferenceEvent` na outbox e responde imediatamente com HTTP 202 Accepted.
 3. O serviço `ReprocessPendingReferencesUseCase` pesquisa transações pendentes elegíveis para reprocessamento manual (a consulta concorrente distribuída com lock pessimista `FOR UPDATE SKIP LOCKED` e agendamento contínuo é reservada exclusivamente para o marco M10), delegando a validação e movimentação aos serviços `WinProcessor` e `ReversalProcessor` sob as mesmas regras do fluxo imediato.
-4. Se a referência ainda estiver ausente ou pendente: aplica backoff exponencial com jitter (até 5 tentativas). Esgotadas as tentativas, transiciona terminalmente para `REJECTED` com código `REFERENCE_NOT_FOUND`.
+4. Se a referência ainda estiver ausente ou pendente: aplica backoff exponencial determinístico (`Math.min(500 * 2^attempts, 10000)` ms, até 5 tentativas). Esgotadas as tentativas, transiciona terminalmente para `REJECTED` com código `REFERENCE_NOT_FOUND`.
 5. Se a referência for posteriormente confirmada (ou rejeitada/falhada/incompatível), ambos os caminhos (referência prévia imediata ou referência tardia com reprocessador) produzem exatamente o mesmo resultado contábil, saldo, versão, ledger, outbox e reconciliação.
 6. **Delimitação Estrita de Escopo (M08 vs M09/M10):** A validação de M08 abrange exclusivamente a integridade contábil, a compatibilidade de regras e o reprocessamento determinístico das pendências. O replay completo de pendências pertence a M09. O agendamento contínuo em background, a concorrência distribuída entre múltiplos workers com `SKIP LOCKED` e a integração com SQS pertencem à frente M10 e permanecem marcados como **NÃO VALIDADO** nesta etapa.
 
@@ -464,15 +464,16 @@ A estabilização do marco M09 garante respostas completas, determinísticas e a
    - O reenvio da mesma `Idempotency-Key` com payload divergente retorna HTTP 409 Conflict em qualquer estado (pendente ou terminal).
    - O conflito não altera a pendência existente, não incrementa `attempts` e não produz efeitos contábeis colaterais.
 
-### 12.3 Reprocessamento, Retries e Compatibilidade com Registros Legados
+### 12.3 Reprocessamento, Retries e Tratamento Estrito de Registros Legados
 1. **Preservação do Snapshot durante Reprocessamento:**
-   - Quando o reprocessador executa uma tentativa e a referência ainda não está disponível, aplica backoff exponencial com jitter e atualiza exclusivamente os metadados de retry (`attempts`, `next_attempt_at`). O snapshot de aceitação original permanece rigorosamente inalterado.
-2. **Tratamento Explícito de Pendências Legadas sem Snapshot:**
-   - Para transações pendentes legadas (criadas antes da implementação do snapshot, onde `response_snapshot` é `NULL`), o `ProcessWagerUseCase.buildReplayResponse` adota fallback determinístico auditável:
-     - Reconstitui o saldo histórico observado no momento da criação consultando `wallet_ledger_entries` até o timestamp `tx.createdAt`.
-     - Se não houver lançamentos anteriores, assume `"0.00"` na moeda da transação.
-     - **Proibição Absoluta:** O saldo histórico **nunca** é fabricado a partir do saldo atual da carteira (`wallet.balance`), evitando anacronismo contábil.
-   - Transações terminais existentes nunca são regravadas e nenhum dado é apagado silenciosamente.
+   - Quando o reprocessador executa uma tentativa e a referência ainda não está disponível, aplica backoff exponencial determinístico (`Math.min(500 * 2^attempts, 10000)` ms sem jitter) e atualiza exclusivamente os metadados de retry (`attempts`, `next_attempt_at`). O snapshot de aceitação original permanece rigorosamente inalterado.
+2. **Remoção de Fallbacks Inseguros e Tratamento Estrito de Registros Legados:**
+   - **Proibição de Fallbacks Inseguros:** É terminantemente proibido reconstruir saldo histórico por timestamps do ledger, usar o saldo atual da carteira (`wallet.balance`), ou assumir `"0.00"` como substituto monetário. Tais heurísticas são anacrônicas e contabilisticamente fraudulentas.
+   - **Erro Tipado `REPLAY_SNAPSHOT_UNAVAILABLE`:** Na ausência de snapshot íntegro e validado (`response_snapshot` nulo, incompleto, com divergência de identificador/status/moeda/failureCode ou valor monetário inválido), o sistema lança `ReplaySnapshotUnavailableError`, que é mapeado para uma resposta HTTP 500 genérica e estável (`code: 'REPLAY_SNAPSHOT_UNAVAILABLE'`), sem expor detalhes internos da infraestrutura ou do banco de dados.
+   - **Limitação dos Registros Legados e Procedimento de Diagnóstico Operacional:**
+     - *Limitação:* Registros pendentes ou terminais legados gerados sem snapshot estruturado íntegro não possuem saldo histórico comprovável. Repetir a requisição via replay não é capaz de reconstruir ou recuperar esse histórico faltante.
+     - *Procedimento de Diagnóstico:* Qualquer ocorrência de `REPLAY_SNAPSHOT_UNAVAILABLE` exige análise operacional e intervenção manual da equipe de operações/auditoria contábil para verificação do histórico contábil no provedor e conciliação direta, em vez de reenvios automáticos da requisição.
+   - **Política Fail-Closed em Reagendamento (`WinProcessor` e `ReversalProcessor`):** A mesma recusa estrita se aplica a tentativas de reagendamento de pendências legadas sem snapshot válido; o processador aborta com `REPLAY_SNAPSHOT_UNAVAILABLE`, recusando-se a gravar fallbacks artificiais de saldo (`"0.00"`) ou a alterar silenciosamente registros legados ou terminais.
 
 ### 12.4 Nomes Reais de Eventos e Índices no PostgreSQL
 - **Eventos na Tabela `outbox_messages` (`event_type`):**

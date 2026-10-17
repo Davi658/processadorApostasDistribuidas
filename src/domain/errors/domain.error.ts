@@ -93,4 +93,15 @@ export class TransactionRollbackOnlyError extends DomainError {
   }
 }
 
+export class ReplaySnapshotUnavailableError extends DomainError {
+  public readonly code = 'REPLAY_SNAPSHOT_UNAVAILABLE';
+
+  constructor(
+    message = 'Replay snapshot is unavailable. Repeating the operation will not recover historical state; operational analysis is required.'
+  ) {
+    super(message);
+  }
+}
+
+
 

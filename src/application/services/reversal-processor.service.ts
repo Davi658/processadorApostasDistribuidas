@@ -14,6 +14,8 @@ import {
   WalletBalanceChangedEvent,
 } from '../../domain/events/events';
 import { WagerResponseDto } from '../dto/wager.dto';
+import { InvalidWagerOperationError } from '../../domain/errors/domain.error';
+import { validateReplaySnapshot } from '../validators/snapshot.validator';
 
 export interface ProcessReversalParams {
   transactionId: string;
@@ -50,6 +52,15 @@ export class ReversalProcessor {
     wallet: Wallet,
     params: ProcessReversalParams
   ): Promise<ProcessReversalResult> {
+    if (params.existingPendingTx) {
+      if (params.existingPendingTx.isTerminal()) {
+        throw new InvalidWagerOperationError(
+          `Cannot transition transaction from terminal status "${params.existingPendingTx.status}"`
+        );
+      }
+      validateReplaySnapshot(params.existingPendingTx.responseSnapshot, params.existingPendingTx);
+    }
+
     const refId = params.referenceExternalTransactionId;
 
     const getPendingTx = (): WagerTransaction => {
@@ -126,17 +137,17 @@ export class ReversalProcessor {
         const updatedTx = params.existingPendingTx.markPendingReference(nextAttemptAt);
         await this.wagerRepo.save(updatedTx);
 
-        const snapshot = params.existingPendingTx.responseSnapshot as WagerResponseDto | null;
+        const validatedSnapshot = validateReplaySnapshot(
+          params.existingPendingTx.responseSnapshot,
+          params.existingPendingTx
+        );
+
         return {
           outcome: 'RESCHEDULED',
-          response: snapshot
-            ? { ...snapshot, idempotentReplay: false }
-            : {
-                transactionId: params.transactionId,
-                status: 'PENDING_REFERENCE',
-                balance: { amount: '0.00', currency: wallet.currency },
-                idempotentReplay: false,
-              },
+          response: {
+            ...validatedSnapshot,
+            idempotentReplay: false,
+          },
         };
       } else {
         // Immediate flow

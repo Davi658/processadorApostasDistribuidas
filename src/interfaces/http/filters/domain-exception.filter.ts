@@ -10,6 +10,7 @@ import {
   InvalidWagerOperationError,
   WalletNotFoundError,
   CurrencyMismatchError,
+  ReplaySnapshotUnavailableError,
 } from '../../../domain/errors/domain.error';
 
 @Catch()
@@ -68,6 +69,16 @@ export class DomainExceptionFilter implements ExceptionFilter {
       return response.status(HttpStatus.UNPROCESSABLE_ENTITY).json({
         statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
         error: 'Unprocessable Entity',
+        code: exception.code,
+        message: exception.message,
+      });
+    }
+
+    // 4b. Replay snapshot unavailable (500 Internal Server Error)
+    if (exception instanceof ReplaySnapshotUnavailableError) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        error: 'Internal Server Error',
         code: exception.code,
         message: exception.message,
       });

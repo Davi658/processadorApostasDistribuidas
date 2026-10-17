@@ -24,6 +24,7 @@ import {
 } from '../../domain/events/events';
 import { ReversalProcessor } from '../services/reversal-processor.service';
 import { WinProcessor } from '../services/win-processor.service';
+import { validateReplaySnapshot } from '../validators/snapshot.validator';
 
 export class ProcessWagerUseCase {
   protected readonly reversalProcessor: ReversalProcessor;
@@ -601,47 +602,16 @@ export class ProcessWagerUseCase {
     return null;
   }
 
-  private async buildReplayResponse(tx: WagerTransaction): Promise<WagerResponseDto> {
-    const snap = tx.responseSnapshot as Partial<WagerResponseDto> | null;
-    if (snap && snap.transactionId && snap.status && snap.balance) {
-      return {
-        transactionId: snap.transactionId,
-        status: snap.status as any,
-        balance: {
-          amount: snap.balance.amount,
-          currency: snap.balance.currency,
-        },
-        failureCode: snap.failureCode ?? (tx.status === 'REJECTED' ? tx.rejectionReason ?? undefined : undefined),
-        idempotentReplay: true,
-      };
-    }
-
-    // Explicit fallback for legacy records without responseSnapshot:
-    // Never fabricate historical balance using current wallet balance!
-    // Try to resolve balance at acceptance time from ledger, or fallback to '0.00'.
-    let historicalBalanceAmount = '0.00';
-    try {
-      const ledgerEntries = await this.ledgerRepo.listByWalletId(tx.walletId);
-      const txCreatedAtMs = new Date(tx.createdAt).getTime();
-      const priorEntries = ledgerEntries
-        .filter((e) => new Date(e.createdAt).getTime() <= txCreatedAtMs)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      if (priorEntries.length > 0) {
-        historicalBalanceAmount = priorEntries[0].balanceAfter.getAmount();
-      }
-    } catch {
-      historicalBalanceAmount = '0.00';
-    }
-
-    return {
-      transactionId: tx.id,
-      status: tx.status === 'PENDING' ? 'PENDING_REFERENCE' : (tx.status as any),
-      balance: {
-        amount: historicalBalanceAmount,
-        currency: tx.currency,
-      },
-      failureCode: tx.status === 'REJECTED' ? (tx.rejectionReason ?? undefined) : undefined,
-      idempotentReplay: true,
-    };
+  /**
+   * Replays an existing transaction using its immutable responseSnapshot.
+   *
+   * Insecure fallbacks (such as estimating balance from ledger timestamps or using "0.00")
+   * are strictly forbidden. If the transaction has no valid or coherent snapshot,
+   * a typed ReplaySnapshotUnavailableError is thrown. Repeating the operation
+   * will NOT recover historical state; manual operational analysis is required.
+   */
+  private buildReplayResponse(tx: WagerTransaction): WagerResponseDto {
+    return validateReplaySnapshot(tx.responseSnapshot, tx);
   }
 }
+

@@ -18,6 +18,9 @@ import { ReconcileWalletUseCase } from '../../src/application/use-cases/reconcil
 import { ReprocessPendingReferencesUseCase } from '../../src/application/use-cases/reprocess-pending-references.use-case';
 import { ProcessWagerDto, WagerResponseDto } from '../../src/application/dto/wager.dto';
 import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
+import { ReplaySnapshotUnavailableError } from '../../src/domain/errors/domain.error';
+import { WinProcessor } from '../../src/application/services/win-processor.service';
+import { ReversalProcessor } from '../../src/application/services/reversal-processor.service';
 
 describe('M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável)', () => {
   let isolatedDb: IsolatedTestDatabase;
@@ -1216,18 +1219,749 @@ describe('M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL 
     });
   });
 
-  describe('Compatibilidade com Pendências Legadas sem Snapshot', () => {
-    it('deve fornecer resposta determinística e completa para pendência legada sem response_snapshot sem usar saldo atual', async () => {
+  describe('Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots', () => {
+    async function assertDbStateUnchanged(
+      walletId: string,
+      txId: string,
+      before: DbStateSnapshot
+    ): Promise<void> {
+      const after = await captureDbState(walletId, txId);
+      expect(after.wallet.balance).toBe(before.wallet.balance);
+      expect(after.wallet.version).toBe(before.wallet.version);
+      expect(after.transaction.status).toBe(before.transaction.status);
+      expect(after.transaction.attempts).toBe(before.transaction.attempts);
+      expect(after.transaction.nextAttemptAt).toBe(before.transaction.nextAttemptAt);
+      expect(after.transaction.responseSnapshot).toEqual(before.transaction.responseSnapshot);
+      expect(after.transaction.updatedAt).toBe(before.transaction.updatedAt);
+      expect(after.ledgerCount).toBe(before.ledgerCount);
+      expect(after.outboxCount).toBe(before.outboxCount);
+    }
+
+    it('1. Snapshot nulo: deve retornar HTTP 500 genérico com código REPLAY_SNAPSHOT_UNAVAILABLE sem efeitos colaterais', async () => {
       const playerId = crypto.randomUUID();
       const wallet = await createWalletUseCase.execute({
         playerId,
         initialBalance: { amount: '100.00', currency: 'BRL' },
       });
 
-      // Simula uma transação legada que foi salva com response_snapshot NULL
+      const txId = crypto.randomUUID();
+      const idempotencyKey = `idemp-null-snap-${Date.now()}`;
+      const payload: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-null-snap-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const payloadHash = ProcessWagerUseCase.computePayloadHash(payload, idempotencyKey);
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, NULL, $14,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId,
+          wallet.id,
+          playerId,
+          payload.providerId,
+          payload.externalTransactionId,
+          payload.roundId,
+          payload.gameId,
+          payload.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempotencyKey,
+          payloadHash,
+          'bet-ref-1',
+        ]
+      );
+
+      const before = await captureDbState(wallet.id, txId);
+
+      const res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempotencyKey },
+        body: JSON.stringify(payload),
+      });
+
+      expect(res.status).toBe(500);
+      const json = (await res.json()) as any;
+      expect(json.statusCode).toBe(500);
+      expect(json.error).toBe('Internal Server Error');
+      expect(json.code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      expect(typeof json.message).toBe('string');
+      // Não vaza detalhes de infraestrutura ou banco
+      expect(JSON.stringify(json)).not.toContain('SELECT');
+      expect(JSON.stringify(json)).not.toContain('wager_transactions');
+      expect(JSON.stringify(json)).not.toContain(txId);
+
+      await assertDbStateUnchanged(wallet.id, txId, before);
+    });
+
+    it('2. Snapshot incompleto: deve rejeitar com REPLAY_SNAPSHOT_UNAVAILABLE (500) se faltar balance, transactionId ou status', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // 2a: Falta balance
+      const txId1 = crypto.randomUUID();
+      const idempKey1 = `idemp-inc-bal-${Date.now()}`;
+      const payload1: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-inc-bal-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash1 = ProcessWagerUseCase.computePayloadHash(payload1, idempKey1);
+      const snapMissingBalance = { transactionId: txId1, status: 'PENDING_REFERENCE' };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId1,
+          wallet.id,
+          playerId,
+          payload1.providerId,
+          payload1.externalTransactionId,
+          payload1.roundId,
+          payload1.gameId,
+          payload1.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey1,
+          hash1,
+          JSON.stringify(snapMissingBalance),
+          'bet-ref-1',
+        ]
+      );
+
+      const before1 = await captureDbState(wallet.id, txId1);
+      const res1 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey1 },
+        body: JSON.stringify(payload1),
+      });
+      expect(res1.status).toBe(500);
+      const json1 = (await res1.json()) as any;
+      expect(json1.code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId1, before1);
+
+      // 2b: Falta transactionId
+      const txId2 = crypto.randomUUID();
+      const idempKey2 = `idemp-inc-txid-${Date.now()}`;
+      const payload2: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-inc-txid-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash2 = ProcessWagerUseCase.computePayloadHash(payload2, idempKey2);
+      const snapMissingTxId = {
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '100.00', currency: 'BRL' },
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId2,
+          wallet.id,
+          playerId,
+          payload2.providerId,
+          payload2.externalTransactionId,
+          payload2.roundId,
+          payload2.gameId,
+          payload2.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey2,
+          hash2,
+          JSON.stringify(snapMissingTxId),
+          'bet-ref-1',
+        ]
+      );
+
+      const before2 = await captureDbState(wallet.id, txId2);
+      const res2 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey2 },
+        body: JSON.stringify(payload2),
+      });
+      expect(res2.status).toBe(500);
+      const json2 = (await res2.json()) as any;
+      expect(json2.code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId2, before2);
+
+      // 2c: Falta status
+      const txId3 = crypto.randomUUID();
+      const idempKey3 = `idemp-inc-status-${Date.now()}`;
+      const payload3: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-inc-status-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash3 = ProcessWagerUseCase.computePayloadHash(payload3, idempKey3);
+      const snapMissingStatus = {
+        transactionId: txId3,
+        balance: { amount: '100.00', currency: 'BRL' },
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId3,
+          wallet.id,
+          playerId,
+          payload3.providerId,
+          payload3.externalTransactionId,
+          payload3.roundId,
+          payload3.gameId,
+          payload3.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey3,
+          hash3,
+          JSON.stringify(snapMissingStatus),
+          'bet-ref-1',
+        ]
+      );
+
+      const before3 = await captureDbState(wallet.id, txId3);
+      const res3 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey3 },
+        body: JSON.stringify(payload3),
+      });
+      expect(res3.status).toBe(500);
+      const json3 = (await res3.json()) as any;
+      expect(json3.code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId3, before3);
+    });
+
+    it('3. Incompatibilidade de ID, status, moeda ou failureCode: deve retornar 500 sem normalizar ou alterar banco', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // 3a: ID incompatível
+      const txId1 = crypto.randomUUID();
+      const idempKey1 = `idemp-incomp-id-${Date.now()}`;
+      const payload1: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-incomp-id-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash1 = ProcessWagerUseCase.computePayloadHash(payload1, idempKey1);
+      const snapWrongId = {
+        transactionId: crypto.randomUUID(), // ID diferente do registro!
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '100.00', currency: 'BRL' },
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId1,
+          wallet.id,
+          playerId,
+          payload1.providerId,
+          payload1.externalTransactionId,
+          payload1.roundId,
+          payload1.gameId,
+          payload1.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey1,
+          hash1,
+          JSON.stringify(snapWrongId),
+          'bet-ref-1',
+        ]
+      );
+
+      const before1 = await captureDbState(wallet.id, txId1);
+      const res1 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey1 },
+        body: JSON.stringify(payload1),
+      });
+      expect(res1.status).toBe(500);
+      expect(((await res1.json()) as any).code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId1, before1);
+
+      // 3b: Status incompatível (persistido PENDING_REFERENCE, snapshot PROCESSED)
+      const txId2 = crypto.randomUUID();
+      const idempKey2 = `idemp-incomp-st-${Date.now()}`;
+      const payload2: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-incomp-st-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash2 = ProcessWagerUseCase.computePayloadHash(payload2, idempKey2);
+      const snapWrongStatus = {
+        transactionId: txId2,
+        status: 'PROCESSED', // Incompatível com PENDING_REFERENCE persistido!
+        balance: { amount: '110.00', currency: 'BRL' },
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId2,
+          wallet.id,
+          playerId,
+          payload2.providerId,
+          payload2.externalTransactionId,
+          payload2.roundId,
+          payload2.gameId,
+          payload2.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey2,
+          hash2,
+          JSON.stringify(snapWrongStatus),
+          'bet-ref-1',
+        ]
+      );
+
+      const before2 = await captureDbState(wallet.id, txId2);
+      const res2 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey2 },
+        body: JSON.stringify(payload2),
+      });
+      expect(res2.status).toBe(500);
+      expect(((await res2.json()) as any).code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId2, before2);
+
+      // 3c: Moeda incompatível (persistido BRL, snapshot USD)
+      const txId3 = crypto.randomUUID();
+      const idempKey3 = `idemp-incomp-curr-${Date.now()}`;
+      const payload3: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-incomp-curr-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash3 = ProcessWagerUseCase.computePayloadHash(payload3, idempKey3);
+      const snapWrongCurrency = {
+        transactionId: txId3,
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '100.00', currency: 'USD' }, // Moeda incompatível!
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId3,
+          wallet.id,
+          playerId,
+          payload3.providerId,
+          payload3.externalTransactionId,
+          payload3.roundId,
+          payload3.gameId,
+          payload3.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey3,
+          hash3,
+          JSON.stringify(snapWrongCurrency),
+          'bet-ref-1',
+        ]
+      );
+
+      const before3 = await captureDbState(wallet.id, txId3);
+      const res3 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey3 },
+        body: JSON.stringify(payload3),
+      });
+      expect(res3.status).toBe(500);
+      expect(((await res3.json()) as any).code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId3, before3);
+
+      // 3d: failureCode incompatível em estado REJECTED (rejectionReason diverge de failureCode)
+      const txId4 = crypto.randomUUID();
+      const idempKey4 = `idemp-incomp-fc-${Date.now()}`;
+      const payload4: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-incomp-fc-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'BET',
+        money: { amount: '200.00', currency: 'BRL' },
+      };
+      const hash4 = ProcessWagerUseCase.computePayloadHash(payload4, idempKey4);
+      const snapWrongFailureCode = {
+        transactionId: txId4,
+        status: 'REJECTED',
+        failureCode: 'REFERENCE_NOT_FOUND', // Diverge de INSUFFICIENT_FUNDS persistido!
+        balance: { amount: '100.00', currency: 'BRL' },
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status, rejection_reason,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11, $12,
+          $13, $14, $15, NULL,
+          0, NULL, NOW(), NOW()
+        );`,
+        [
+          txId4,
+          wallet.id,
+          playerId,
+          payload4.providerId,
+          payload4.externalTransactionId,
+          payload4.roundId,
+          payload4.gameId,
+          payload4.kind,
+          '200.00',
+          'BRL',
+          'REJECTED',
+          'INSUFFICIENT_FUNDS',
+          idempKey4,
+          hash4,
+          JSON.stringify(snapWrongFailureCode),
+        ]
+      );
+
+      const before4 = await captureDbState(wallet.id, txId4);
+      const res4 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey4 },
+        body: JSON.stringify(payload4),
+      });
+      expect(res4.status).toBe(500);
+      expect(((await res4.json()) as any).code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId4, before4);
+
+      // 3e: failureCode indevido em estado não rejeitado (PROCESSED com failureCode)
+      const txId5 = crypto.randomUUID();
+      const idempKey5 = `idemp-incomp-fc-proc-${Date.now()}`;
+      const payload5: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-incomp-fc-proc-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'BET',
+        money: { amount: '10.00', currency: 'BRL' },
+      };
+      const hash5 = ProcessWagerUseCase.computePayloadHash(payload5, idempKey5);
+      const snapProcWithFailureCode = {
+        transactionId: txId5,
+        status: 'PROCESSED',
+        failureCode: 'INSUFFICIENT_FUNDS', // Indevido para estado PROCESSED!
+        balance: { amount: '90.00', currency: 'BRL' },
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, NULL,
+          0, NULL, NOW(), NOW()
+        );`,
+        [
+          txId5,
+          wallet.id,
+          playerId,
+          payload5.providerId,
+          payload5.externalTransactionId,
+          payload5.roundId,
+          payload5.gameId,
+          payload5.kind,
+          '10.00',
+          'BRL',
+          'PROCESSED',
+          idempKey5,
+          hash5,
+          JSON.stringify(snapProcWithFailureCode),
+        ]
+      );
+
+      const before5 = await captureDbState(wallet.id, txId5);
+      const res5 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey5 },
+        body: JSON.stringify(payload5),
+      });
+      expect(res5.status).toBe(500);
+      expect(((await res5.json()) as any).code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId5, before5);
+    });
+
+    it('4. Valor monetário inválido no snapshot: valores negativos ou não-canônicos disparam 500 sem mutação', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // 4a: Saldo negativo no snapshot
+      const txId1 = crypto.randomUUID();
+      const idempKey1 = `idemp-inv-amt-neg-${Date.now()}`;
+      const payload1: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-inv-amt-neg-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash1 = ProcessWagerUseCase.computePayloadHash(payload1, idempKey1);
+      const snapNegativeAmount = {
+        transactionId: txId1,
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '-10.00', currency: 'BRL' }, // Negativo!
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId1,
+          wallet.id,
+          playerId,
+          payload1.providerId,
+          payload1.externalTransactionId,
+          payload1.roundId,
+          payload1.gameId,
+          payload1.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey1,
+          hash1,
+          JSON.stringify(snapNegativeAmount),
+          'bet-ref-1',
+        ]
+      );
+
+      const before1 = await captureDbState(wallet.id, txId1);
+      const res1 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey1 },
+        body: JSON.stringify(payload1),
+      });
+      expect(res1.status).toBe(500);
+      expect(((await res1.json()) as any).code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId1, before1);
+
+      // 4b: Formato não canônico no snapshot ("100" sem casas decimais)
+      const txId2 = crypto.randomUUID();
+      const idempKey2 = `idemp-inv-amt-format-${Date.now()}`;
+      const payload2: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-inv-amt-format-${Date.now()}`,
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '10.00', currency: 'BRL' },
+        referenceExternalTransactionId: 'bet-ref-1',
+      };
+      const hash2 = ProcessWagerUseCase.computePayloadHash(payload2, idempKey2);
+      const snapNonCanonical = {
+        transactionId: txId2,
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '100', currency: 'BRL' }, // Não canônico (falta .00)!
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          txId2,
+          wallet.id,
+          playerId,
+          payload2.providerId,
+          payload2.externalTransactionId,
+          payload2.roundId,
+          payload2.gameId,
+          payload2.kind,
+          '10.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          idempKey2,
+          hash2,
+          JSON.stringify(snapNonCanonical),
+          'bet-ref-1',
+        ]
+      );
+
+      const before2 = await captureDbState(wallet.id, txId2);
+      const res2 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKey2 },
+        body: JSON.stringify(payload2),
+      });
+      expect(res2.status).toBe(500);
+      expect(((await res2.json()) as any).code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      await assertDbStateUnchanged(wallet.id, txId2, before2);
+    });
+
+    it('5. Ausência de saldo histórico comprovável: recusa reconstrução por timestamp e não usa "0.00" ou saldo atual', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // Transação legada sem snapshot
       const legacyTxId = crypto.randomUUID();
-      const legacyKey = `idemp-legacy-${Date.now()}`;
-      const extTxId = `ext-legacy-${Date.now()}`;
+      const legacyKey = `idemp-no-hist-${Date.now()}`;
+      const extTxId = `ext-no-hist-${Date.now()}`;
       const legacyPayload: ProcessWagerDto = {
         walletId: wallet.id,
         playerId,
@@ -1271,16 +2005,16 @@ describe('M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL 
         ]
       );
 
-      // Altera o saldo atual da carteira via operação independente (de 100.00 para 60.00)
+      // Movimentação contábil posterior alterando saldo de 100.00 para 60.00
       await fetch(`${serverUrl}/wagering/transactions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'idempotency-key': `bet-alter-${Date.now()}` },
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `bet-move-${Date.now()}` },
         body: JSON.stringify({
           walletId: wallet.id,
           playerId,
           providerId: 'EVOLUTION',
-          externalTransactionId: `ext-alter-${Date.now()}`,
-          roundId: 'round-alter',
+          externalTransactionId: `ext-move-${Date.now()}`,
+          roundId: 'round-move',
           gameId: 'roulette',
           kind: 'BET',
           money: { amount: '40.00', currency: 'BRL' },
@@ -1290,22 +2024,404 @@ describe('M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL 
       const currentWallet = await getWalletUseCase.execute(wallet.id);
       expect(currentWallet.balance.amount).toBe('60.00');
 
-      // Replay da transação legada que não tinha response_snapshot:
-      // Não pode fabricar o saldo histórico usando o saldo atual da carteira (60.00)
-      // Deve recuperar o saldo histórico a partir dos lançamentos da época (100.00)
+      const before = await captureDbState(wallet.id, legacyTxId);
+
+      // Replay da transação legada: NUNCA deve tentar buscar no ledger (100.00) nem usar saldo atual (60.00) nem "0.00"
       const replayRes = await fetch(`${serverUrl}/wagering/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'idempotency-key': legacyKey },
         body: JSON.stringify(legacyPayload),
       });
 
-      expect(replayRes.status).toBe(202);
-      const replayData = (await replayRes.json()) as WagerResponseDto;
-      expect(replayData.transactionId).toBe(legacyTxId);
-      expect(replayData.status).toBe('PENDING_REFERENCE');
-      expect(replayData.idempotentReplay).toBe(true);
-      // Saldo histórico recuperado do ledger da época: 100.00 (e NÃO 60.00 atual)
-      expect(replayData.balance).toEqual({ amount: '100.00', currency: 'BRL' });
+      expect(replayRes.status).toBe(500);
+      const replayJson = (await replayRes.json()) as any;
+      expect(replayJson.code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      expect(replayJson.error).toBe('Internal Server Error');
+
+      await assertDbStateUnchanged(wallet.id, legacyTxId, before);
+    });
+
+    it('6. Falha de infraestrutura propagada sem resposta financeira falsa', async () => {
+      // Invocação direta do use case com erro de infraestrutura na busca por idempotência
+      const mockUow = {
+        runInTransaction: async (cb: any) => cb(),
+      } as any;
+      const mockWagerRepo = {
+        findByIdempotencyKey: async () => {
+          const dbErr = new Error('getaddrinfo ENOTFOUND pg-cluster');
+          (dbErr as any).code = 'ENOTFOUND';
+          throw dbErr;
+        },
+      } as any;
+      const mockWalletRepo = {
+        findById: async () => ({ id: 'w-1', currency: 'BRL', playerId: 'p-1' }),
+      } as any;
+
+      const failingUseCase = new ProcessWagerUseCase(
+        mockWalletRepo,
+        mockWagerRepo,
+        ledgerRepo,
+        outboxRepo,
+        mockUow
+      );
+
+      const payload: ProcessWagerDto = {
+        walletId: 'w-1',
+        playerId: 'p-1',
+        providerId: 'EVOLUTION',
+        externalTransactionId: 'ext-infra-err',
+        roundId: 'round-1',
+        gameId: 'roulette',
+        kind: 'BET',
+        money: { amount: '10.00', currency: 'BRL' },
+      };
+
+      // Confirma que a falha de infraestrutura propaga como exceção e NUNCA retorna resposta de sucesso falso
+      let caughtError: any = null;
+      try {
+        await failingUseCase.execute('some-key', payload);
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeDefined();
+      expect(caughtError.code).toBe('ENOTFOUND');
+      // Filtro HTTP mapearia este código para 503 Service Unavailable, nunca 200/202 falso
+      const filter = new DomainExceptionFilter();
+      let capturedStatus = 0;
+      let capturedBody: any = null;
+      const mockHost = {
+        switchToHttp: () => ({
+          getResponse: () => ({
+            status: (code: number) => {
+              capturedStatus = code;
+              return {
+                json: (body: any) => {
+                  capturedBody = body;
+                },
+              };
+            },
+          }),
+        }),
+      } as any;
+
+      filter.catch(caughtError, mockHost);
+      expect(capturedStatus).toBe(503);
+      expect(capturedBody.code).toBe('SERVICE_UNAVAILABLE');
+      expect(capturedBody.idempotentReplay).toBeUndefined();
+    });
+
+    it('7. Reagendamento em WinProcessor e ReversalProcessor: recusa registros legados/sem snapshot sem alterar banco', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const winProcessor = new WinProcessor(walletRepo, wagerRepo, ledgerRepo, outboxRepo);
+      const reversalProcessor = new ReversalProcessor(walletRepo, wagerRepo, ledgerRepo, outboxRepo);
+
+      // 7a: WIN pendente legada sem snapshot
+      const legacyWinTxId = crypto.randomUUID();
+      const legacyWinKey = `idemp-win-proc-${Date.now()}`;
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, NULL, $14,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          legacyWinTxId,
+          wallet.id,
+          playerId,
+          'EVOLUTION',
+          `ext-win-proc-${Date.now()}`,
+          'round-1',
+          'roulette',
+          'WIN',
+          '20.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          legacyWinKey,
+          'dummy-hash',
+          'missing-ref-1',
+        ]
+      );
+
+      const beforeWin = await captureDbState(wallet.id, legacyWinTxId);
+
+      const domainWallet = await uow.runInTransaction(async () => {
+        return walletRepo.findById(wallet.id);
+      });
+      const legacyWinTx = await uow.runInTransaction(async () => {
+        return wagerRepo.findById(legacyWinTxId);
+      });
+
+      // Tentativa de reagendar sem snapshot válido deve lançar ReplaySnapshotUnavailableError
+      let winError: any = null;
+      try {
+        await uow.runInTransaction(async () => {
+          await winProcessor.processWin(domainWallet!, {
+            transactionId: legacyWinTxId,
+            providerId: 'EVOLUTION',
+            externalTransactionId: legacyWinTx!.externalTransactionId,
+            playerId,
+            walletId: wallet.id,
+            roundId: 'round-1',
+            gameId: 'roulette',
+            money: legacyWinTx!.money,
+            referenceExternalTransactionId: 'missing-ref-1',
+            correlationId: crypto.randomUUID(),
+            existingPendingTx: legacyWinTx!,
+          });
+        });
+      } catch (err) {
+        winError = err;
+      }
+
+      expect(winError).toBeInstanceOf(ReplaySnapshotUnavailableError);
+      expect(winError.code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      // Transação no banco permanece inalterada (sem incremento de attempts, sem alteração de next_attempt_at)
+      await assertDbStateUnchanged(wallet.id, legacyWinTxId, beforeWin);
+
+      // 7b: REFUND pendente legada sem snapshot
+      const legacyRefundTxId = crypto.randomUUID();
+      const legacyRefundKey = `idemp-ref-proc-${Date.now()}`;
+      await adminPool.query(
+        `INSERT INTO wager_transactions (
+          id, wallet_id, player_id, provider_id, external_transaction_id,
+          round_id, game_id, kind, amount, currency, status,
+          idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id,
+          attempts, next_attempt_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, NULL, $14,
+          1, NOW() + INTERVAL '10 seconds', NOW(), NOW()
+        );`,
+        [
+          legacyRefundTxId,
+          wallet.id,
+          playerId,
+          'EVOLUTION',
+          `ext-ref-proc-${Date.now()}`,
+          'round-1',
+          'roulette',
+          'REFUND',
+          '15.00',
+          'BRL',
+          'PENDING_REFERENCE',
+          legacyRefundKey,
+          'dummy-hash-refund',
+          'missing-ref-2',
+        ]
+      );
+
+      const beforeRefund = await captureDbState(wallet.id, legacyRefundTxId);
+
+      const legacyRefundTx = await uow.runInTransaction(async () => {
+        return wagerRepo.findById(legacyRefundTxId);
+      });
+
+      let refundError: any = null;
+      try {
+        await uow.runInTransaction(async () => {
+          await reversalProcessor.processReversal(domainWallet!, {
+            transactionId: legacyRefundTxId,
+            providerId: 'EVOLUTION',
+            externalTransactionId: legacyRefundTx!.externalTransactionId,
+            playerId,
+            walletId: wallet.id,
+            roundId: 'round-1',
+            gameId: 'roulette',
+            kind: 'REFUND',
+            money: legacyRefundTx!.money,
+            referenceExternalTransactionId: 'missing-ref-2',
+            correlationId: crypto.randomUUID(),
+            existingPendingTx: legacyRefundTx!,
+          });
+        });
+      } catch (err) {
+        refundError = err;
+      }
+
+      expect(refundError).toBeInstanceOf(ReplaySnapshotUnavailableError);
+      expect(refundError.code).toBe('REPLAY_SNAPSHOT_UNAVAILABLE');
+      // Transação no banco permanece inalterada
+      await assertDbStateUnchanged(wallet.id, legacyRefundTxId, beforeRefund);
+
+      // 7c: Execução do reprocessWorker não altera transações legadas sem snapshot
+      await makePendingEligible(legacyWinTxId);
+      await makePendingEligible(legacyRefundTxId);
+
+      await reprocessWorker.execute(10);
+
+      // Confirma que ambos os registros legados permaneceram rigorosamente intocados
+
+      // Confirma que ambos os registros legados permaneceram rigorosamente intocados
+      const afterWorkerWin = await captureDbState(wallet.id, legacyWinTxId);
+      expect(afterWorkerWin.transaction.attempts).toBe(beforeWin.transaction.attempts);
+      expect(afterWorkerWin.transaction.status).toBe('PENDING_REFERENCE');
+
+      const afterWorkerRefund = await captureDbState(wallet.id, legacyRefundTxId);
+      expect(afterWorkerRefund.transaction.attempts).toBe(beforeRefund.transaction.attempts);
+      expect(afterWorkerRefund.transaction.status).toBe('PENDING_REFERENCE');
+    });
+
+    it('8. Snapshots válidos mantêm replay 202, 200, 422, saldo histórico e zero efeitos colaterais', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // 8a: Aceite pendente com snapshot válido (HTTP 202)
+      const idempKeyPending = `idemp-val-pend-${Date.now()}`;
+      const pendingPayload: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-val-pend-${Date.now()}`,
+        roundId: 'round-val-1',
+        gameId: 'roulette',
+        kind: 'WIN',
+        money: { amount: '50.00', currency: 'BRL' },
+        referenceExternalTransactionId: `bet-missing-${Date.now()}`,
+      };
+
+      const pendingRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKeyPending },
+        body: JSON.stringify(pendingPayload),
+      });
+      expect(pendingRes.status).toBe(202);
+      const pendingData = (await pendingRes.json()) as WagerResponseDto;
+      expect(pendingData.status).toBe('PENDING_REFERENCE');
+      expect(pendingData.balance).toEqual({ amount: '100.00', currency: 'BRL' });
+      expect(pendingData.idempotentReplay).toBe(false);
+
+      // Movimentação independente na carteira (de 100.00 para 80.00)
+      await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `bet-move-8-${Date.now()}` },
+        body: JSON.stringify({
+          walletId: wallet.id,
+          playerId,
+          providerId: 'EVOLUTION',
+          externalTransactionId: `ext-move-8-${Date.now()}`,
+          roundId: 'round-move-8',
+          gameId: 'roulette',
+          kind: 'BET',
+          money: { amount: '20.00', currency: 'BRL' },
+        }),
+      });
+
+      const beforeReplayPend = await captureDbState(wallet.id, pendingData.transactionId);
+
+      // Replay do estado pendente: deve retornar 202 com saldo histórico de aceitação (100.00 e NÃO 80.00)
+      const replayPendRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKeyPending },
+        body: JSON.stringify(pendingPayload),
+      });
+      expect(replayPendRes.status).toBe(202);
+      const replayPendData = (await replayPendRes.json()) as WagerResponseDto;
+      expect(replayPendData.transactionId).toBe(pendingData.transactionId);
+      expect(replayPendData.status).toBe('PENDING_REFERENCE');
+      expect(replayPendData.balance).toEqual({ amount: '100.00', currency: 'BRL' });
+      expect(replayPendData.idempotentReplay).toBe(true);
+
+      // Invariância absoluta no replay
+      await assertDbStateUnchanged(wallet.id, pendingData.transactionId, beforeReplayPend);
+
+      // 8b: Replay terminal PROCESSED (HTTP 200)
+      const idempKeyProcessed = `idemp-val-proc-${Date.now()}`;
+      const procPayload: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-val-proc-${Date.now()}`,
+        roundId: 'round-proc',
+        gameId: 'roulette',
+        kind: 'BET',
+        money: { amount: '30.00', currency: 'BRL' },
+      };
+
+      const procRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKeyProcessed },
+        body: JSON.stringify(procPayload),
+      });
+      expect(procRes.status).toBe(200);
+      const procData = (await procRes.json()) as WagerResponseDto;
+      expect(procData.status).toBe('PROCESSED');
+      expect(procData.balance).toEqual({ amount: '50.00', currency: 'BRL' }); // 80 - 30 = 50.00
+      expect(procData.idempotentReplay).toBe(false);
+
+      const beforeReplayProc = await captureDbState(wallet.id, procData.transactionId);
+
+      // Replay do terminal PROCESSED
+      const replayProcRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKeyProcessed },
+        body: JSON.stringify(procPayload),
+      });
+      expect(replayProcRes.status).toBe(200);
+      const replayProcData = (await replayProcRes.json()) as WagerResponseDto;
+      expect(replayProcData.transactionId).toBe(procData.transactionId);
+      expect(replayProcData.status).toBe('PROCESSED');
+      expect(replayProcData.balance).toEqual({ amount: '50.00', currency: 'BRL' });
+      expect(replayProcData.idempotentReplay).toBe(true);
+      await assertDbStateUnchanged(wallet.id, procData.transactionId, beforeReplayProc);
+
+      // 8c: Replay terminal REJECTED (HTTP 422)
+      const idempKeyRejected = `idemp-val-rej-${Date.now()}`;
+      const rejPayload: ProcessWagerDto = {
+        walletId: wallet.id,
+        playerId,
+        providerId: 'EVOLUTION',
+        externalTransactionId: `ext-val-rej-${Date.now()}`,
+        roundId: 'round-rej',
+        gameId: 'roulette',
+        kind: 'BET',
+        money: { amount: '500.00', currency: 'BRL' }, // Saldo insuficiente (tem 50.00)
+      };
+
+      const rejRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKeyRejected },
+        body: JSON.stringify(rejPayload),
+      });
+      expect(rejRes.status).toBe(422);
+      const rejData = (await rejRes.json()) as WagerResponseDto;
+      expect(rejData.status).toBe('REJECTED');
+      expect(rejData.failureCode).toBe('INSUFFICIENT_FUNDS');
+      expect(rejData.balance).toEqual({ amount: '50.00', currency: 'BRL' });
+      expect(rejData.idempotentReplay).toBe(false);
+
+      const beforeReplayRej = await captureDbState(wallet.id, rejData.transactionId);
+
+      // Replay do terminal REJECTED
+      const replayRejRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': idempKeyRejected },
+        body: JSON.stringify(rejPayload),
+      });
+      expect(replayRejRes.status).toBe(422);
+      const replayRejData = (await replayRejRes.json()) as WagerResponseDto;
+      expect(replayRejData.transactionId).toBe(rejData.transactionId);
+      expect(replayRejData.status).toBe('REJECTED');
+      expect(replayRejData.failureCode).toBe('INSUFFICIENT_FUNDS');
+      expect(replayRejData.balance).toEqual({ amount: '50.00', currency: 'BRL' });
+      expect(replayRejData.idempotentReplay).toBe(true);
+      await assertDbStateUnchanged(wallet.id, rejData.transactionId, beforeReplayRej);
     });
   });
 });
+

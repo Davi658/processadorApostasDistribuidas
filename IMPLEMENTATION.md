@@ -200,12 +200,11 @@
   - Mutações posteriores não alteram o resultado histórico gravado no snapshot terminal.
 - **Detecção Estrita de Conflito de Idempotência (409):**
   - Reenvio da mesma chave com payload divergente retorna HTTP 409 Conflict em qualquer estado (pendente ou terminal), sem alterar a transação ou emitir efeitos.
-- **Retry e Compatibilidade com Registros Legados:**
-  - O reprocessamento sem referência aplica backoff exponencial com jitter e atualiza `attempts` e `next_attempt_at`, preservando integralmente o snapshot de aceitação.
-  - Para registros legados onde `response_snapshot` for `NULL`, `ProcessWagerUseCase.buildReplayResponse` recupera defensivamente o saldo histórico com base nos lançamentos contábeis de `wallet_ledger_entries` até o timestamp de criação da transação (`createdAt`), ou `"0.00"`. Nunca fabrica saldo usando o saldo atual da carteira.
-  - Transações terminais não são regravadas e nenhum dado é apagado silenciosamente.
+- **Retry e Tratamento Estrito de Registros Legados:**
+  - O reprocessamento sem referência aplica backoff exponencial determinístico (`Math.min(500 * 2^attempts, 10000)` ms sem jitter) e atualiza `attempts` e `next_attempt_at`, preservando integralmente o snapshot de aceitação original.
+  - Remoção total de fallbacks inseguros: não reconstrói saldo histórico por timestamps do ledger, não usa saldo atual da carteira e não adota `"0.00"` arbitrário. Na ausência de snapshot estruturado íntegro, lança erro tipado `REPLAY_SNAPSHOT_UNAVAILABLE` mapeado para HTTP 500 genérico e estável sem expor dados internos. Registros legados exigem análise e diagnóstico operacional manual, pois repetir a requisição não recupera o histórico. A mesma política fail-closed é aplicada aos processadores `WinProcessor` e `ReversalProcessor`, preservando intactos os registros legados no banco.
 - **Comprovação com PostgreSQL Real Descartável:**
-  - Suíte `tests/integration/wager-pending-replay-m09.test.ts` (15 testes passando, 100% de sucesso) cobre todos os critérios A a I e compatibilidade legada.
+  - Suíte `tests/integration/wager-pending-replay-m09.test.ts` (22 testes passando, 100% de sucesso) cobre todos os critérios A a I e a remoção completa de fallbacks inseguros.
 
 ---
 

@@ -15,6 +15,7 @@ import {
 } from '../../domain/events/events';
 import { WagerResponseDto } from '../dto/wager.dto';
 import { InvalidWagerOperationError } from '../../domain/errors/domain.error';
+import { validateReplaySnapshot } from '../validators/snapshot.validator';
 
 export interface ProcessWinParams {
   transactionId: string;
@@ -52,6 +53,15 @@ export class WinProcessor {
   ): Promise<ProcessWinResult> {
     if (!params.money.isPositive()) {
       throw new InvalidWagerOperationError('WIN amount must be strictly greater than zero');
+    }
+
+    if (params.existingPendingTx) {
+      if (params.existingPendingTx.isTerminal()) {
+        throw new InvalidWagerOperationError(
+          `Cannot transition transaction from terminal status "${params.existingPendingTx.status}"`
+        );
+      }
+      validateReplaySnapshot(params.existingPendingTx.responseSnapshot, params.existingPendingTx);
     }
 
     const refId = params.referenceExternalTransactionId?.trim();
@@ -120,7 +130,12 @@ export class WinProcessor {
       // Reference missing or still pending
       if (!refTx || refTx.status === 'PENDING' || refTx.status === 'PENDING_REFERENCE') {
         if (params.existingPendingTx) {
-          // Reprocessing flow
+          // Reprocessing flow: must have a valid existing snapshot to reschedule; never alter legacy or corrupted records!
+          const validatedSnapshot = validateReplaySnapshot(
+            params.existingPendingTx.responseSnapshot,
+            params.existingPendingTx
+          );
+
           const maxAttempts = params.maxAttempts ?? 5;
           if (params.existingPendingTx.attempts >= maxAttempts) {
             return await rejectWin('REFERENCE_NOT_FOUND');
@@ -131,17 +146,12 @@ export class WinProcessor {
           const updatedTx = params.existingPendingTx.markPendingReference(nextAttemptAt);
           await this.wagerRepo.save(updatedTx);
 
-          const snapshot = params.existingPendingTx.responseSnapshot as WagerResponseDto | null;
           return {
             outcome: 'RESCHEDULED',
-            response: snapshot
-              ? { ...snapshot, idempotentReplay: false }
-              : {
-                  transactionId: params.transactionId,
-                  status: 'PENDING_REFERENCE',
-                  balance: { amount: '0.00', currency: wallet.currency },
-                  idempotentReplay: false,
-                },
+            response: {
+              ...validatedSnapshot,
+              idempotentReplay: false,
+            },
           };
         } else {
           // Immediate flow

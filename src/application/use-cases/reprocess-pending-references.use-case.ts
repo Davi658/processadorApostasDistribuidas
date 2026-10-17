@@ -9,6 +9,8 @@ import { ReversalProcessor } from '../services/reversal-processor.service';
 import { WinProcessor } from '../services/win-processor.service';
 import { WagerResponseDto } from '../dto/wager.dto';
 import { WagerTransactionRejectedEvent } from '../../domain/events/events';
+import { ReplaySnapshotUnavailableError } from '../../domain/errors/domain.error';
+import { validateReplaySnapshot } from '../validators/snapshot.validator';
 
 export interface ReprocessResult {
   processed: number;
@@ -45,15 +47,20 @@ export class ReprocessPendingReferencesUseCase {
     let rescheduled = 0;
 
     for (const pending of pendingList) {
-      await this.uow.runInTransaction(async () => {
-        // Fetch fresh state under transaction
-        const tx = await this.wagerRepo.findById(pending.id);
-        if (!tx || tx.status !== 'PENDING_REFERENCE') {
-          return;
-        }
+      try {
+        await this.uow.runInTransaction(async () => {
+          // Fetch fresh state under transaction
+          const tx = await this.wagerRepo.findById(pending.id);
+          if (!tx || tx.status !== 'PENDING_REFERENCE') {
+            return;
+          }
 
-        const wallet = await this.walletRepo.findById(tx.walletId, true);
-        if (!wallet) return;
+          // Invariant: pending reference must carry a valid responseSnapshot to be reprocessed.
+          // Legacy or corrupted transactions must never be modified silently (fail-closed).
+          validateReplaySnapshot(tx.responseSnapshot, tx);
+
+          const wallet = await this.walletRepo.findById(tx.walletId, true);
+          if (!wallet) return;
 
         const refId = tx.referenceExternalTransactionId;
         if (!refId) {
@@ -145,7 +152,15 @@ export class ReprocessPendingReferencesUseCase {
           }
         }
       });
+    } catch (err) {
+      if (err instanceof ReplaySnapshotUnavailableError) {
+        // Insecure fallbacks are prohibited: corrupted/legacy transactions cannot be safely
+        // reprocessed automatically. Leave them untouched for manual operational analysis.
+        continue;
+      }
+      throw err;
     }
+  }
 
     return { processed, rejected, rescheduled };
   }
