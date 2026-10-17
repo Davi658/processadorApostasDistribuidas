@@ -278,7 +278,7 @@ Evidências finais, comandos, códigos de saída e limitações: [M10 shutdown](
 
 ## M11 — Proteção de Transações Terminais
 
-Base inspecionada: origin/main local a47d1e2039e3e6267a910fd9331e342a8c013cb2 (a main local estava em 6acc7c3). A base informada 7c2cf20 não existe neste clone; nenhum remoto foi acessado. Branch exclusiva codex/m11-terminal-protection, worktree .worktrees/m11-terminal-protection.
+Base da validação histórica de M11: origin/main local a47d1e2039e3e6267a910fd9331e342a8c013cb2 (a main local estava em 6acc7c3). Naquela execução, 7c2cf20 ainda não estava disponível no clone e nenhum remoto foi acessado. Branch codex/m11-terminal-protection, worktree .worktrees/m11-terminal-protection. Essa base antecede a finalização de M17 (52bfa20/7c2cf20); os 327 testes abaixo não comprovam a main combinada 58c124e. A validação integrada está registrada separadamente no adendo ao final desta seção.
 
 Diagnóstico: a função histórica 003 referencia observed_balance, ausente do schema; não há correção posterior até 005. Uma atualização somente de attempts em registro terminal reproduz SQLSTATE 42703 no DOWN. O trigger histórico também não intercepta DELETE e não protege id ou created_at.
 
@@ -286,10 +286,10 @@ A migration 006 substitui a função e registra BEFORE UPDATE OR DELETE. A compa
 
 Provas reproduzíveis: tests/integration/terminal-protection-m11.test.ts usa PostgreSQL real descartável e triggers ativos. Para PROCESSED, REJECTED e FAILED, cada papel (app_user restrito e administrativo) tenta individualmente alterar 17 campos protegidos; cobre também NULL para valor e valor para NULL nas cinco colunas protegidas anuláveis, usando OPENING para permitir NULL em idempotency_key e payload_hash sem violar o contrato externo. Cada recusa verifica SQLSTATE 55000, motivo terminal_transaction_protected_fields e igualdade da linha completa antes/depois. UPDATE sem alteração é aceito.
 
-DELETE pelo app_user verifica 42501 e o identificador da tabela (mensagem localizada pelo PostgreSQL); DELETE administrativo verifica 55000 e terminal_transaction_delete_forbidden, sem depender de FK ou ledger. Os oito campos operacionais são atualizados separadamente; cada um também é combinado com alteração financeira recusada. Há limpeza de lease e seis transições legítimas das duas origens pendentes aos três estados terminais. UP/DOWN/UP preserva linhas completas dos três estados e restaura a proteção. DOWN restaura deliberadamente a função histórica defeituosa; não oferece as garantias M11.
+DELETE pelo app_user verifica 42501 e o identificador da tabela (mensagem localizada pelo PostgreSQL); DELETE administrativo verifica 55000 e terminal_transaction_delete_forbidden, sem depender de FK ou ledger. Os oito campos operacionais são atualizados separadamente; cada um também é combinado com alteração financeira recusada. Há limpeza de lease e seis transições legítimas das duas origens pendentes aos três estados terminais. UP/DOWN/UP preserva linhas completas dos três estados e restaura a proteção. DOWN restaura deliberadamente a implementação anterior, incluindo a referência inválida a observed_balance e o trigger somente de UPDATE. O rollback remove as garantias M11 e não representa uma configuração operacional saudável. A operação normal deve manter a migration 006 aplicada. UP/DOWN/UP foi testado sem perda de dados; esse ensaio demonstra reversibilidade e preservação dos registros, sem demonstrar um procedimento de rollback operacional seguro.
 
 
-Validação final em 17/10/2026, PostgreSQL 16.8 exclusivo e descartável na porta 55411, com fsync=on e synchronous_commit=on:
+Validação histórica de M11 sobre a47d1e2 em 17/10/2026, PostgreSQL 16.8 exclusivo e descartável na porta 55411, com fsync=on e synchronous_commit=on:
 
 | Comando | Exit code | Resultado |
 | --- | --- | --- |
@@ -304,4 +304,17 @@ A matriz M11 verifica 217 recusas com linha intacta: 213 pela proteção termina
 
 Histórico de execução e limitações: a primeira execução de bun run test na porta 5432 retornou 1 (39 unitários aprovados; 185 integrações aprovadas e oito falhas, incluindo timeouts de preparação/limpeza, timeout M04 e teardown após preparação incompleta). PostgreSQL mostrou esperas VersionFileSync e DataFileImmediateSync; a repetição isolada de M04 com --timeout 30000 retornou 1 ainda na preparação. bun run test:concurrency nessa porta retornou 1 por timeout do hook e teardown sem UoW. Não houve afrouxamento da durabilidade ou dos prazos das regressões existentes. No primeiro run do cluster exclusivo, 281 integrações passaram e uma falhou porque o teste M06 ainda supunha 005 como última migration; o ajuste acima eliminou essa falha no run final. As tentativas iniciais do teste novo também corrigiram uma inferência de parâmetro UUID/texto e a expectativa de mensagem de privilégio localizada, sem mudança na lógica do trigger.
 
-Logs locais ignorados pelo Git: m11-test.log (primeiro run), m11-test-isolated.log (diagnóstico do teste M06), m11-test-final.log (327 aprovações), m11-concurrency.log e m11-m04-recheck.log. O cluster exclusivo é encerrado após as provas. A main remota não foi consultada; a base é a referência local mais recente disponível. Nenhum push, merge, publicação ou operação remota foi realizado.
+Logs locais ignorados pelo Git: m11-test.log (primeiro run), m11-test-isolated.log (diagnóstico do teste M06), m11-test-final.log (327 aprovações), m11-concurrency.log e m11-m04-recheck.log. O cluster exclusivo é encerrado após as provas. Na execução histórica, a main remota não foi consultada; a base foi a referência local mais recente então disponível. Nenhum push, merge, publicação ou operação remota fez parte daquela validação.
+
+
+### Adendo — regressão integrada de M11 sobre M10 e M17 final
+
+Em 17/10/2026, git fetch origin main no repositório pessoal confirmou a base exata 58c124e0d97af35244de1cf2db4da826c1aa587c, contendo M10, M17 final e M11. Branch codex/m11-integrated-validation, worktree D:/processadorApostasDistribuidas/.worktrees/m11-integrated-validation. O checkout principal, demais branches e worktrees foram preservados.
+
+O comando oficial bun run test descobriu e executou **333 testes em 21 arquivos: 333 aprovados, zero falhas, exit 0**. Inclui **9/9 M11**, **21/21 M10** e **21/21 M17 final**, além de todas as demais regressões. bun run typecheck retornou **0**. Os 327 testes históricos sobre a47d1e2 continuam separados destes resultados; não validavam a main combinada.
+
+Execução real em Windows x64, Bun 1.4.3 e PostgreSQL 16.8 exclusivo na porta 55412, com fsync, synchronous_commit e full_page_writes ativos, bancos descartáveis e papel de aplicação restrito. O ensaio M11 de UP/DOWN/UP passou novamente sem perda de dados. Docker, Compose, WSL e Linux não foram executados nem declarados validados.
+
+Não houve correção de código, alteração de migrations, refatoração, remoção de testes, redução de assertions ou ampliação de timeouts. Dois runs anteriores falharam e estão registrados separadamente: indisponibilidade do cluster compartilhado e, no primeiro run exclusivo, timeout HTTP e asserção de duração do shutdown M10. O run final completo passou com os mesmos testes e parâmetros. DOWN continua restaurando a implementação histórica defeituosa; a operação normal exige 006 aplicada.
+
+Base, ambiente, comandos, exit codes, resultados de cada arquivo, hashes de logs, falhas intermediárias e limites: [evidências da validação integrada M11](docs/evidence/m11-integrated-validation.md) e [resultados estruturados](docs/evidence/m11-integrated-validation-results.json). Esta entrega contém apenas documentação e evidências, concluída com commit local, sem push, merge ou publicação.
