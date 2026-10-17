@@ -35,7 +35,8 @@ services:
 
   queues:
     image: localstack/localstack:4.0.3
-    entrypoint: [/bin/sh, /infra/bootstrap-sqs.sh]
+    # Normalize Windows checkouts without changing repository-wide Git settings.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /infra/bootstrap-sqs.sh | /bin/sh"]
     environment:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test

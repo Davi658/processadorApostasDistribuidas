@@ -68,6 +68,8 @@ docker compose -f docker-compose.local.yml run --rm queues
 LocalStack fixado em `4.0.3`; AWS access key e secret `test`, região `us-east-1`,
 conta `000000000000`. Nenhum segredo real. O cliente AWS CLI está na imagem
 LocalStack; bootstrap usa `aws --endpoint-url http://localstack:4566`.
+O entrypoint remove CR ao executar o shell montado, suportando checkout Windows
+com CRLF sem alterar configurações Git do projeto.
 
 Endpoint interno `SQS_ENDPOINT=http://localstack:4566`. Estratégia `path` e host
 anunciado `localstack:4566` mantêm as URLs retornadas utilizáveis na rede Compose:
