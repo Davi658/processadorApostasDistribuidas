@@ -1,0 +1,2 @@
+ALTER TABLE wallets DROP CONSTRAINT chk_wallets_balance_finite;
+ALTER TABLE wallet_ledger_entries DROP CONSTRAINT chk_ledger_finite_values;

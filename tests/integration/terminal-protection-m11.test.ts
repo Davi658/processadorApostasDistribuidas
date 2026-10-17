@@ -54,13 +54,14 @@ describe('M11 terminal protection on disposable PostgreSQL with enabled triggers
     try {
       const ids = await Promise.all(states.map(s => seed(s)));
       const before = await Promise.all(ids.map(snapshot));
+      expect(await migrator.down()).toBe('007_ledger_finite_values');
       expect(await migrator.down()).toBe(version);
       const columns = await admin.query(`SELECT column_name FROM information_schema.columns WHERE table_name='wager_transactions'`);
       expect(columns.rows.some(r => r.column_name === 'observed_balance')).toBe(false);
       // An operational-only update evaluates the broken historical expression in full.
       await refusal(admin, ids[0], 'UPDATE wager_transactions SET attempts=attempts+1 WHERE id=$1', [ids[0]],
         '42703', 'observed_balance');
-      expect(await migrator.up()).toEqual([version]);
+      expect(await migrator.up()).toEqual([version, '007_ledger_finite_values']);
       expect(await Promise.all(ids.map(snapshot))).toEqual(before);
     } finally { await migrator.close(); }
   });

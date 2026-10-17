@@ -2379,7 +2379,8 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
         );
         expect(check004.rows.length).toBe(1);
 
-        // 2. Reverter M11 antes de testar down da 004 (sem dados conflitantes)
+        // 2. Reverter M12 e M11 antes de testar down da 004 (sem dados conflitantes)
+        expect(await migrator.down()).toBe('007_ledger_finite_values');
         expect(await migrator.down()).toBe('006_terminal_transaction_protection');
         const check005 = await migPool.query<{ version: string }>(
           "SELECT version FROM schema_migrations WHERE version = '005_pending_reference_worker_lease';"
@@ -2443,6 +2444,7 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
 
         // 5. Tentar executar o DOWN da 004
         // Reverter M11 e depois o lease M10 reaplicados no up
+        expect(await migrator.down()).toBe('007_ledger_finite_values');
         expect(await migrator.down()).toBe('006_terminal_transaction_protection');
         const check005Again = await migPool.query<{ version: string }>(
           "SELECT version FROM schema_migrations WHERE version = '005_pending_reference_worker_lease';"

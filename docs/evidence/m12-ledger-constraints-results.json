@@ -1,0 +1,398 @@
+{
+  "date": "2026-10-17",
+  "timezone": "America/Sao_Paulo",
+  "base": "6a85ab1f7c921b77b4f82cbe2dcd0896394b1ac9",
+  "branch": "codex/m12-ledger-constraints",
+  "worktree": "D:/processadorApostasDistribuidas/.worktrees/m12-ledger-constraints",
+  "environment": {
+    "platform": "Windows x64",
+    "bun": "1.4.3",
+    "postgres": "16.8",
+    "host": "127.0.0.1",
+    "port": 55413,
+    "isolatedCluster": ".data/m12-pg",
+    "fsync": "on",
+    "synchronous_commit": "on",
+    "full_page_writes": "on",
+    "applicationRole": "app_user: NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS",
+    "containers": "not validated",
+    "linux": "not validated"
+  },
+  "typecheck": {
+    "command": "bun run typecheck",
+    "exitCode": 0,
+    "log": "m12-typecheck.log",
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9"
+  },
+  "cleanup": {
+    "remainingDatabases": [
+      "postgres",
+      "template0",
+      "template1"
+    ],
+    "remainingClientConnections": "inspection only",
+    "stop": {
+      "command": "pg_ctl -D .data/m12-pg -m fast -w stop",
+      "exitCode": 0
+    },
+    "removal": {
+      "verifiedAbsolutePath": "D:/processadorApostasDistribuidas/.worktrees/m12-ledger-constraints/.data/m12-pg",
+      "exitCode": 0,
+      "postmasterPidAbsent": true
+    },
+    "postgresLog": {
+      "file": "m12-postgres.log",
+      "sha256": "abba7f74cfd78498bc8b687d1bb29d08de367c9d02f7795682c83ebdf5c14de6"
+    }
+  },
+  "runs": [
+    {
+      "log": "m12-target-before.log",
+      "sha256": "9808767db0ac69c5e75531a83fdeb0f09b584452462bd419c9d47043ebdb6115",
+      "exitCode": 1,
+      "runnerSummary": "[test-runner] 1 files; 1 failed",
+      "passed": 1,
+      "failed": 15,
+      "files": [
+        {
+          "file": "tests/integration/ledger-constraints-m12.test.ts",
+          "passed": 1,
+          "failed": 15,
+          "assertions": 7
+        }
+      ]
+    },
+    {
+      "log": "m12-target-red.log",
+      "sha256": "7e1855e945470f2e4a7e510df28e9fff8db8bb3684b1e6bcee3a35824ad080dc",
+      "exitCode": 1,
+      "runnerSummary": "[test-runner] 1 files; 1 failed",
+      "passed": 15,
+      "failed": 1,
+      "files": [
+        {
+          "file": "tests/integration/ledger-constraints-m12.test.ts",
+          "passed": 15,
+          "failed": 1,
+          "assertions": 99
+        }
+      ]
+    },
+    {
+      "log": "m12-nan-red.log",
+      "sha256": "eaf2c8f711cf2152fffd2d0b0011c79dc6432a190d1eace16ada597e4acf993a",
+      "exitCode": 1,
+      "runnerSummary": "[test-runner] 1 files; 1 failed",
+      "passed": 16,
+      "failed": 4,
+      "files": [
+        {
+          "file": "tests/integration/ledger-constraints-m12.test.ts",
+          "passed": 16,
+          "failed": 4,
+          "assertions": 104
+        }
+      ]
+    },
+    {
+      "log": "m12-target-green.log",
+      "sha256": "7a557aeb73dfb9433f539e13f27ec153ebe26922df5876eb84eea1c8e44e69e3",
+      "exitCode": 0,
+      "runnerSummary": "[test-runner] 1 files; 0 failed",
+      "passed": 20,
+      "failed": 0,
+      "files": [
+        {
+          "file": "tests/integration/ledger-constraints-m12.test.ts",
+          "passed": 20,
+          "failed": 0,
+          "assertions": 127
+        }
+      ]
+    },
+    {
+      "log": "m12-full-test.log",
+      "sha256": "a23c8ae82b5390e1668ed549b9da65c0624522b4553bc6ea59e90ecc50eade0b",
+      "exitCode": 1,
+      "runnerSummary": "[test-runner] 22 files; 1 failed",
+      "passed": 353,
+      "failed": 1,
+      "files": [
+        {
+          "file": "tests/concurrency/concurrency.test.ts",
+          "passed": 6,
+          "failed": 0,
+          "assertions": 218
+        },
+        {
+          "file": "tests/integration/http-endpoints.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 126
+        },
+        {
+          "file": "tests/integration/ledger-constraints-m12.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 145
+        },
+        {
+          "file": "tests/integration/m17-read-endpoints.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 290
+        },
+        {
+          "file": "tests/integration/migrations.test.ts",
+          "passed": 1,
+          "failed": 0,
+          "assertions": 20
+        },
+        {
+          "file": "tests/integration/mikro-orm-uow-m05.test.ts",
+          "passed": 18,
+          "failed": 0,
+          "assertions": 87
+        },
+        {
+          "file": "tests/integration/money-postgres-roundtrip.test.ts",
+          "passed": 9,
+          "failed": 0,
+          "assertions": 108
+        },
+        {
+          "file": "tests/integration/pending-reference-worker-m10.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 348
+        },
+        {
+          "file": "tests/integration/postgres-invariants.test.ts",
+          "passed": 22,
+          "failed": 0,
+          "assertions": 104
+        },
+        {
+          "file": "tests/integration/terminal-protection-m11.test.ts",
+          "passed": 9,
+          "failed": 0,
+          "assertions": 673
+        },
+        {
+          "file": "tests/integration/wager-bet-replay.test.ts",
+          "passed": 16,
+          "failed": 0,
+          "assertions": 332
+        },
+        {
+          "file": "tests/integration/wager-operations.test.ts",
+          "passed": 8,
+          "failed": 0,
+          "assertions": 53
+        },
+        {
+          "file": "tests/integration/wager-pending-replay-m09.test.ts",
+          "passed": 22,
+          "failed": 0,
+          "assertions": 469
+        },
+        {
+          "file": "tests/integration/wager-reversals-m07.test.ts",
+          "passed": 28,
+          "failed": 0,
+          "assertions": 364
+        },
+        {
+          "file": "tests/integration/wager-reversals-m08.test.ts",
+          "passed": 23,
+          "failed": 0,
+          "assertions": 460
+        },
+        {
+          "file": "tests/integration/wager-win-loss-m06.test.ts",
+          "passed": 37,
+          "failed": 1,
+          "assertions": 567
+        },
+        {
+          "file": "tests/integration/wallet-opening.test.ts",
+          "passed": 30,
+          "failed": 0,
+          "assertions": 318
+        },
+        {
+          "file": "tests/unit/money.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 104
+        },
+        {
+          "file": "tests/unit/payload-hash.test.ts",
+          "passed": 6,
+          "failed": 0,
+          "assertions": 10
+        },
+        {
+          "file": "tests/unit/test-runner.test.ts",
+          "passed": 1,
+          "failed": 0,
+          "assertions": 7
+        },
+        {
+          "file": "tests/unit/wallet-ledger-entry.test.ts",
+          "passed": 5,
+          "failed": 0,
+          "assertions": 12
+        },
+        {
+          "file": "tests/unit/wallet.test.ts",
+          "passed": 7,
+          "failed": 0,
+          "assertions": 37
+        }
+      ]
+    },
+    {
+      "log": "m12-full-final.log",
+      "sha256": "c371a98a090d33b9d43703982e10c99ee5e89d45cc692fc5945a3aa157d070a5",
+      "exitCode": 0,
+      "runnerSummary": "[test-runner] 22 files; 0 failed",
+      "passed": 354,
+      "failed": 0,
+      "files": [
+        {
+          "file": "tests/concurrency/concurrency.test.ts",
+          "passed": 6,
+          "failed": 0,
+          "assertions": 218
+        },
+        {
+          "file": "tests/integration/http-endpoints.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 126
+        },
+        {
+          "file": "tests/integration/ledger-constraints-m12.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 145
+        },
+        {
+          "file": "tests/integration/m17-read-endpoints.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 290
+        },
+        {
+          "file": "tests/integration/migrations.test.ts",
+          "passed": 1,
+          "failed": 0,
+          "assertions": 20
+        },
+        {
+          "file": "tests/integration/mikro-orm-uow-m05.test.ts",
+          "passed": 18,
+          "failed": 0,
+          "assertions": 87
+        },
+        {
+          "file": "tests/integration/money-postgres-roundtrip.test.ts",
+          "passed": 9,
+          "failed": 0,
+          "assertions": 108
+        },
+        {
+          "file": "tests/integration/pending-reference-worker-m10.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 348
+        },
+        {
+          "file": "tests/integration/postgres-invariants.test.ts",
+          "passed": 22,
+          "failed": 0,
+          "assertions": 104
+        },
+        {
+          "file": "tests/integration/terminal-protection-m11.test.ts",
+          "passed": 9,
+          "failed": 0,
+          "assertions": 673
+        },
+        {
+          "file": "tests/integration/wager-bet-replay.test.ts",
+          "passed": 16,
+          "failed": 0,
+          "assertions": 332
+        },
+        {
+          "file": "tests/integration/wager-operations.test.ts",
+          "passed": 8,
+          "failed": 0,
+          "assertions": 53
+        },
+        {
+          "file": "tests/integration/wager-pending-replay-m09.test.ts",
+          "passed": 22,
+          "failed": 0,
+          "assertions": 469
+        },
+        {
+          "file": "tests/integration/wager-reversals-m07.test.ts",
+          "passed": 28,
+          "failed": 0,
+          "assertions": 364
+        },
+        {
+          "file": "tests/integration/wager-reversals-m08.test.ts",
+          "passed": 23,
+          "failed": 0,
+          "assertions": 460
+        },
+        {
+          "file": "tests/integration/wager-win-loss-m06.test.ts",
+          "passed": 38,
+          "failed": 0,
+          "assertions": 577
+        },
+        {
+          "file": "tests/integration/wallet-opening.test.ts",
+          "passed": 30,
+          "failed": 0,
+          "assertions": 318
+        },
+        {
+          "file": "tests/unit/money.test.ts",
+          "passed": 21,
+          "failed": 0,
+          "assertions": 104
+        },
+        {
+          "file": "tests/unit/payload-hash.test.ts",
+          "passed": 6,
+          "failed": 0,
+          "assertions": 10
+        },
+        {
+          "file": "tests/unit/test-runner.test.ts",
+          "passed": 1,
+          "failed": 0,
+          "assertions": 7
+        },
+        {
+          "file": "tests/unit/wallet-ledger-entry.test.ts",
+          "passed": 5,
+          "failed": 0,
+          "assertions": 12
+        },
+        {
+          "file": "tests/unit/wallet.test.ts",
+          "passed": 7,
+          "failed": 0,
+          "assertions": 37
+        }
+      ]
+    }
+  ]
+}
