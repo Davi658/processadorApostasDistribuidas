@@ -12,7 +12,7 @@ A verificação do ambiente local identificou:
 |---|---|---|---|
 | **Bun** | Bun 1.x | **Instalado** (v1.4.3) | Utilizado como runtime, gerenciador de pacotes e test runner |
 | **Git** | Git 2.x | **Instalado** (v2.52.0.windows.1) | Controle de versão local estrito |
-| **Docker & Compose** | Docker / Compose | **Não instalado no host** | Arquivo `docker-compose.yml` e scripts nativos fornecidos |
+| **Docker & Compose** | Docker / Compose | **Não operacional nesta validação** | Arquivo `docker-compose.yml` e scripts nativos fornecidos |
 | **PostgreSQL** | PostgreSQL Real | **Instalado e Operacional** (v16.8) | Binários em `~/.pgsql/pgsql`, cluster em `~/.pgsql_data`, porta 5432 |
 
 > [!NOTE]
@@ -25,7 +25,7 @@ A verificação do ambiente local identificou:
 - **Runtime & Test Runner:** [Bun](https://bun.sh/) 1.4.3
 - **Linguagem:** TypeScript 5.8 em modo estrito (`strict: true`)
 - **Framework HTTP:** NestJS 11 (`@nestjs/core`, `@nestjs/common`, `@nestjs/testing` alinhados na versão 11)
-- **ORM & Unidade de Trabalho:** MikroORM 6.4 (PostgreSQL) com `EntityManager.transactional()` e isolamento por `AsyncLocalStorage`
+- **ORM & Unidade de Trabalho:** MikroORM 6.4 (PostgreSQL) com transação explícita e isolamento por `AsyncLocalStorage`
 - **Banco de Dados:** PostgreSQL 16.8
 - **Containerização:** Docker Compose (`docker-compose.yml`)
 
@@ -74,8 +74,8 @@ Todas as suítes utilizam **Bun Test**, executam com isolamento de processos e b
 # Executar verificação de tipos estritos TypeScript (0 erros)
 bun run typecheck
 
-# Executar TODOS os testes unitários e de integração
-bun test
+# Executar TODOS os testes, incluindo concorrência, por arquivo em processos separados
+bun run test
 
 # Executar testes unitários de domínio (Money, Wallet, Ledger)
 bun run test:unit
@@ -87,7 +87,14 @@ bun run test:integration
 bun run test:concurrency
 
 # Executar suíte M10 — Worker de referências pendentes com PostgreSQL real e processos OS reais
-bun test tests/integration/pending-reference-worker-m10.test.ts
+bun run scripts/run-tests.ts tests/integration/pending-reference-worker-m10.test.ts
+```
+
+O comando oficial `bun run test` usa `scripts/run-tests.ts` em Windows e Linux, sem shell específico. Descobre todos os arquivos `.test.ts`, executa cada um sequencialmente em processo Bun novo com prazo padrão de 30 segundos por teste e retorna exit code 1 se qualquer processo falhar, receber sinal ou não iniciar. Continua executando os arquivos restantes para expor todas as falhas. Testes com timeout explícito conservam seu próprio limite. Isso evita vazamento de estado de módulos/variáveis de ambiente entre arquivos; cada integração cria seu banco PostgreSQL descartável. `bun test` diretamente não oferece esse isolamento por arquivo e não é o comando oficial de validação.
+
+```bash
+# Consultas M17 pela aplicação principal
+bun run test:m17
 ```
 
 ---
@@ -143,3 +150,23 @@ Toda transação nasce no estado `PENDING` e transiciona deterministicamente par
 2. **Proteção Rigorosa de Estados Terminais:** Trigger `prevent_terminal_transaction_modification()` utiliza `IS DISTINCT FROM` para proteger todos os campos que definem identidade, payload e resultado original (`wallet_id`, `player_id`, `provider_id`, `external_transaction_id`, `round_id`, `game_id`, `kind`, `amount`, `currency`, `idempotency_key`, `payload_hash`, `response_snapshot`, `status`) quando a transação está em estado terminal (`PROCESSED`, `REJECTED`, `FAILED`).
 3. **Unicidade de Reversão por Tipo e Referência:** Índice parcial `uq_processed_reversal_per_reference` em `(provider_id, reference_external_transaction_id, kind) WHERE status = 'PROCESSED' AND reference_external_transaction_id IS NOT NULL`. Impede no banco que duas reversões do mesmo tipo sejam processadas para a mesma referência.
 4. **Resiliência a Erros Transitórios:** `DomainExceptionFilter` reconhece erros de conexão como `ECONNREFUSED`, `ETIMEDOUT`, `ECONNRESET` e códigos PostgreSQL de shutdown/sobrecarga (`57P01`, `08006`, `08001`, `53300`, `40001`, `40P01`), retornando HTTP 503 `SERVICE_UNAVAILABLE` com mensagem segura sem expor dados internos.
+
+## Consultas e paginação — M17
+
+As três rotas são registradas pelo `AppModule` principal. Escritas, worker M10 e consultas compartilham a mesma `MikroOrmUnitOfWork` e os repositórios exportados pelo `PersistenceModule`; o módulo de consultas não cria outro ORM/pool.
+
+| Método e rota | Resultado |
+|---|---|
+| `GET /wagering/transactions/:transactionId` | Transação por UUID; 400 para UUID inválido; 404 se ausente |
+| `GET /providers/:providerId/wagering/transactions/:externalTransactionId` | Transação pela combinação exata de provedor e identidade externa; 400 para campos vazios ou acima de 128 caracteres; 404 se a combinação não existir |
+| `GET /wallets/:walletId/ledger?limit=50&cursor=...` | Página do ledger; 400 para UUID, limite ou cursor inválidos; 404 para carteira ausente |
+
+Ambas as consultas de transação retornam **o mesmo contrato**, pelo mesmo mapper: `id`, `walletId`, `playerId`, `providerId`, `externalTransactionId`, `roundId`, `gameId`, `kind`, `money: { amount, currency }`, `status`, `rejectionReason`, `referenceExternalTransactionId`, `createdAt`, `updatedAt`. Motivo e referência podem ser `null`. Valores monetários são strings decimais exatas com duas casas, inclusive `"9999999999999999.99"`; não passam por `number`. O mesmo externalId pode existir em provedores distintos sem misturar as respostas.
+
+O ledger retorna `{ items, nextCursor, hasMore, limit }`. Cada item contém `id`, `walletId`, `transactionId`, `entryType`, `amount`, `balanceBefore`, `balanceAfter` e `createdAt`; os três campos monetários usam `{ amount: string, currency: string }`. Carteira sem lançamentos retorna `items: []`, `nextCursor: null`, `hasMore: false`. Limite padrão 50, permitido de 1 a 100. A última página tem cursor nulo.
+
+A ordenação é ascendente por `(created_at, id)` e a consulta parametrizada busca `limit + 1`. O cursor contém `{ walletId, createdAt, id }` codificado em Base64URL canônico, sem padding. **Base64URL é codificação, não assinatura nem criptografia**: o cursor pode ser reconstruído pelo cliente e não é uma credencial de acesso. A aplicação valida o vínculo com a carteira solicitada.
+
+O timestamp do ledger/cursor é exatamente `YYYY-MM-DDTHH:mm:ss.ffffffZ`: UTC, ano de 0001 a 9999, seis dígitos fracionários. O codec independente de HTTP valida calendário gregoriano, dias por mês, anos bissextos e hora de 00:00:00 a 23:59:59; rejeita formatos alternativos, offsets e datas impossíveis com HTTP 400 antes de qualquer acesso aos repositórios. Datas não são normalizadas com `Date.parse`. PostgreSQL formata os seis microssegundos e recebe de volta o mesmo texto no cursor.
+
+As consultas não alteram saldo, versão, transações, ledger ou outbox. A suíte M17 usa HTTP real com `NestFactory.create(AppModule)` e PostgreSQL descartável, verifica snapshots completos das quatro tabelas e confirma que `app.close()` fecha o único ORM e não deixa sessões da aplicação. O shutdown financeiro do M10 mantém suas barreiras de drenagem e cancelamento.

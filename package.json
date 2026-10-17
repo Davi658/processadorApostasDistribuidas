@@ -7,11 +7,12 @@
   "scripts": {
     "start": "bun run src/main.ts",
     "start:dev": "bun --watch src/main.ts",
-    "test": "bun test:unit && bun test:integration && bun test:concurrency",
-    "test:unit": "bun test tests/unit",
-    "test:integration": "bun test tests/integration",
-    "test:concurrency": "bun test tests/concurrency/concurrency.test.ts",
-    "typecheck": "tsc --noEmit"
+    "test": "bun run scripts/run-tests.ts",
+    "test:unit": "bun run scripts/run-tests.ts tests/unit",
+    "test:integration": "bun run scripts/run-tests.ts tests/integration",
+    "test:concurrency": "bun run scripts/run-tests.ts tests/concurrency",
+    "typecheck": "tsc --noEmit",
+    "test:m17": "bun run scripts/run-tests.ts tests/integration/m17-read-endpoints.test.ts"
   },
   "dependencies": {
     "@mikro-orm/cli": "^6.4.9",

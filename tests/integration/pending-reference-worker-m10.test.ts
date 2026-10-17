@@ -654,11 +654,11 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       [txId, wallet.id, playerId, `win-e-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
     );
 
-    // Inicia processo filho real que adquire claim com lease curto (600ms) e pausa antes do processamento
+    // Lease longo mantém o claim ativo durante o handshake e o crash, independente da velocidade do host.
     const childWorker = spawnWorkerWithMilestone(
       { CRASH_POINT: 'AFTER_CLAIM_BEFORE_PROCESS' },
       '1',
-      '600'
+      '30000'
     );
 
     try {
@@ -673,14 +673,24 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       expect(claimedState.transaction.leaseOwner).toContain('runner-');
 
       // O coordenador mata o filho real abruptamente (SIGKILL)
+      const terminated = new Promise<void>(resolve => childWorker.proc.once('exit', () => resolve()));
       childWorker.proc.kill('SIGKILL');
+      await terminated;
 
       // Imediatamente tenta reservar com Worker 2: não deve conseguir pois o lease ainda está ativo no PostgreSQL
       const initialClaim = await wagerRepo.claimPendingReferences(10, 30000, 'worker-2');
       expect(initialClaim.some((c) => c.id === txId)).toBe(false);
 
-      // Aguarda a expiração natural do lease no PostgreSQL (700ms)
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      // Depois da asserção de exclusão mútua, reduz a duração pela operação
+      // real de lease e aguarda o relógio PostgreSQL confirmar a expiração.
+      expect(await wagerRepo.renewLease(txId, claimedState.transaction.leaseToken!, 200)).toBe(true);
+      const expirationDeadline = Date.now() + 5000;
+      while (true) {
+        const lease = await adminPool.query('SELECT lease_expires_at < clock_timestamp() AS expired FROM wager_transactions WHERE id = $1', [txId]);
+        if (lease.rows[0].expired) break;
+        if (Date.now() > expirationDeadline) throw new Error('PostgreSQL lease expiration barrier timed out');
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
 
       // Agora Worker 2 deve conseguir reivindicar e processar
       const result = await reprocessUseCase.execute(10, 30000, 'worker-2');
