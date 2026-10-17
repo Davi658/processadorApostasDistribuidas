@@ -592,12 +592,12 @@ Para coordenar múltiplos processos e nós de aplicação independentes disputan
 
 ### 13.5 Delimitação Estrita de Escopo (M10 vs M14 / M15 / M16)
 > [!IMPORTANT]
-> O marco M10 estabiliza exclusivamente o **worker de referências pendentes baseado em lease persistente no PostgreSQL e ciclo de vida NestJS**.
-> Os seguintes componentes pertencem a marcos posteriores e permanecem explicitamente como **NÃO VALIDADOS / FORA DE ESCOPO**:
-> 1. **Filas SQS / LocalStack e Mensageria Assíncrona Externa (M14):** **NÃO VALIDADO / FORA DE ESCOPO**
-> 2. **Tabela Inbox e Deduplicação Inbox / SQS (M15):** **NÃO VALIDADO / FORA DE ESCOPO**
-> 3. **Publisher Concorrente da Outbox para Broker Externo (M16):** **NÃO VALIDADO / FORA DE ESCOPO**
-> 4. **Dead Letter Queue (DLQ) Externa de Mensageria:** **NÃO VALIDADO / FORA DE ESCOPO**
+> O marco M10 estabiliza e conclui exclusivamente o **worker de referências pendentes baseado em lease persistente no PostgreSQL, crash recovery real e ciclo de vida NestJS com drenagem comprovada**.
+> Os seguintes componentes pertencem aos marcos posteriores M14, M15 e M16 e permanecem explicitamente como **NÃO VALIDADOS / FORA DE ESCOPO**:
+> 1. **Publisher Concorrente da Outbox para Broker Externo (M14):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 2. **Inbox e Mensageria Assíncrona SQS (M15):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 3. **Retry, Dead Letter Queue (DLQ) e Shutdown do Consumidor (M16):** **NÃO VALIDADO / FORA DE ESCOPO**
+
 
 
 

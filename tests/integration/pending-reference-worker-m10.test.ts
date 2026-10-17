@@ -98,6 +98,45 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     );
   }
 
+  function spawnWorkerWithMilestone(
+    envOverrides: Record<string, string>,
+    batchSize = '10',
+    leaseDurationMs = '30000'
+  ) {
+    const runnerScript = join(import.meta.dir, '..', 'concurrency', 'pending-worker-runner.ts');
+    const proc = spawn('bun', ['run', runnerScript, '', batchSize, leaseDurationMs], {
+      env: {
+        ...process.env,
+        DB_NAME: isolatedDb.dbName,
+        APP_DB_NAME: isolatedDb.dbName,
+        ...envOverrides,
+      },
+    });
+
+    let stdout = '';
+    let milestoneResolve: (value: string) => void;
+    const milestonePromise = new Promise<string>((resolve) => {
+      milestoneResolve = resolve;
+    });
+
+    proc.stdout.on('data', (d) => {
+      const str = d.toString();
+      stdout += str;
+      if (str.includes('MILESTONE:')) {
+        const match = str.match(/MILESTONE:([^\r\n]+)/);
+        if (match && milestoneResolve) {
+          milestoneResolve(match[1]);
+        }
+      }
+    });
+
+    return {
+      proc,
+      milestonePromise,
+      getStdout: () => stdout,
+    };
+  }
+
   beforeAll(async () => {
     isolatedDb = await createIsolatedTestDatabase('m10_worker_');
 
@@ -573,7 +612,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     expect(sRollback.transaction.status).toBe('PROCESSED');
   });
 
-  it('E. Processo morre após claim e antes do processamento: outro retoma após expiração', async () => {
+  it('E. Processo morre após claim e antes do processamento: outro retoma após expiração (Processo Real)', async () => {
     const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
@@ -600,21 +639,40 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       idempotentReplay: false,
     };
 
-    // Cria a transação já com lease ativo que simula crash do Worker 1
-    const worker1Token = crypto.randomUUID();
+    // Insere pendência elegível sem lease no PostgreSQL
     await adminPool.query(
       `INSERT INTO wager_transactions 
-       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, created_at, updated_at)
-       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-e', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-e', $6, $7, 1, NOW() - INTERVAL '1s', $8, 'worker-crashed', NOW() + INTERVAL '100 milliseconds', NOW(), NOW());`,
-      [txId, wallet.id, playerId, `win-e-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId, worker1Token]
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-e', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-e', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-e-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
     );
 
-    // Imediatamente tenta reservar com Worker 2: não deve conseguir pois o lease ainda não expirou
+    // Inicia processo filho real que adquire claim com lease curto (600ms) e pausa antes do processamento
+    const childWorker = spawnWorkerWithMilestone(
+      { CRASH_POINT: 'AFTER_CLAIM_BEFORE_PROCESS' },
+      '1',
+      '600'
+    );
+
+    // Aguarda handshake por marco confirmando que o filho adquiriu o claim no PostgreSQL
+    const milestone = await childWorker.milestonePromise;
+    expect(milestone).toContain('CLAIM_CONFIRMED');
+
+    // Confirma que a transação está reservada pelo processo filho real no PostgreSQL
+    const claimedState = await captureDbState(wallet.id, txId);
+    expect(claimedState.transaction.status).toBe('PENDING_REFERENCE');
+    expect(claimedState.transaction.leaseToken).not.toBeNull();
+    expect(claimedState.transaction.leaseOwner).toContain('runner-');
+
+    // O coordenador mata o filho real abruptamente (SIGKILL)
+    childWorker.proc.kill('SIGKILL');
+
+    // Imediatamente tenta reservar com Worker 2: não deve conseguir pois o lease ainda está ativo no PostgreSQL
     const initialClaim = await wagerRepo.claimPendingReferences(10, 30000, 'worker-2');
     expect(initialClaim.some((c) => c.id === txId)).toBe(false);
 
-    // Aguarda expiração do lease (150ms)
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Aguarda a expiração natural do lease no PostgreSQL (700ms)
+    await new Promise((resolve) => setTimeout(resolve, 700));
 
     // Agora Worker 2 deve conseguir reivindicar e processar
     const result = await reprocessUseCase.execute(10, 30000, 'worker-2');
@@ -700,7 +758,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     expect(stateAfterWorker1.ledgerCount).toBe(stateAfterWorker2.ledgerCount);
   });
 
-  it('G. Processo morre após commit financeiro e antes de finalizar o ciclo: reinício não reaplica efeitos', async () => {
+  it('G. Processo morre após commit financeiro e antes de finalizar o ciclo: reinício não reaplica efeitos (Processo Real)', async () => {
     const playerId = crypto.randomUUID();
     const wallet = await createWalletUseCase.execute({
       playerId,
@@ -734,23 +792,38 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       [txId, wallet.id, playerId, `win-g-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
     );
 
-    // Processa com sucesso
-    const r1 = await reprocessUseCase.execute(10);
-    expect(r1.processed).toBe(1);
+    // Inicia processo filho real configurado para pausar logo após o commit financeiro e antes de finalizar o ciclo
+    const childWorker = spawnWorkerWithMilestone(
+      { CRASH_POINT: 'AFTER_COMMIT_BEFORE_CYCLE_END' },
+      '1',
+      '30000'
+    );
 
-    const state1 = await captureDbState(wallet.id, txId);
-    expect(state1.transaction.status).toBe('PROCESSED');
-    expect(state1.wallet.balance).toBe('115.00'); // 90 + 25
+    // Aguarda o anúncio do marco COMMIT_CONFIRMED emitido pelo processo filho após o commit na base
+    const milestone = await childWorker.milestonePromise;
+    expect(milestone).toContain('COMMIT_CONFIRMED');
 
-    // Reinicia o ciclo (simulando nova tentativa de execução do worker)
+    // Confirma que a transação foi commitada no banco pelo filho
+    const stateCommitted = await captureDbState(wallet.id, txId);
+    expect(stateCommitted.transaction.status).toBe('PROCESSED');
+    expect(stateCommitted.wallet.balance).toBe('115.00'); // 90 + 25
+
+    // Coordenador mata o processo filho abruptamente antes de ele reportar conclusão ou fechar recursos
+    childWorker.proc.kill('SIGKILL');
+
+    // Reinicia um novo worker para processar o lote: nenhum efeito se repete
     const r2 = await reprocessUseCase.execute(10);
     expect(r2.processed).toBe(0);
 
-    const state2 = await captureDbState(wallet.id, txId);
-    expect(state2.wallet.balance).toBe('115.00');
-    expect(state2.wallet.version).toBe(state1.wallet.version);
-    expect(state2.ledgerCount).toBe(state1.ledgerCount);
-    expect(state2.outboxCount).toBe(state1.outboxCount);
+    const stateAfterRestart = await captureDbState(wallet.id, txId);
+    expect(stateAfterRestart.wallet.balance).toBe('115.00');
+    expect(stateAfterRestart.wallet.version).toBe(stateCommitted.wallet.version);
+    expect(stateAfterRestart.ledgerCount).toBe(stateCommitted.ledgerCount);
+    expect(stateAfterRestart.outboxCount).toBe(stateCommitted.outboxCount);
+
+    const recon = await reconcileWalletUseCase.execute(wallet.id);
+    expect(recon.consistent).toBe(true);
+    expect(recon.storedBalance.amount).toBe('115.00');
   });
 
   it('H. Falha transitória permite recuperação sem rejeição financeira', async () => {
@@ -886,29 +959,125 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     expect(nextResult.processed).toBe(0);
   });
 
-  it('J. Shutdown para novas reservas e encerra recursos corretamente', async () => {
-    const testWorker = new PendingReferenceWorkerService(reprocessUseCase, {
-      enabled: true,
-      intervalMs: 100,
-      batchSize: 5,
-      leaseDurationMs: 5000,
-      drainTimeoutMs: 1000,
-      workerId: 'shutdown-test-worker',
-    });
+  it('J. Shutdown coordena ordem comprovada: impede novos claims, conclui drenagem antes do encerramento do ORM (Aplicação Nest Real e Barreira)', async () => {
+    // Cria aplicação Nest real dedicada para teste de shutdown com barreira
+    const shutdownApp = await NestFactory.create(AppModule, { logger: false });
+    await shutdownApp.listen(0);
 
-    testWorker.start();
-    expect(testWorker.isWorkerRunning()).toBe(true);
+    let releaseBarrier: () => void = () => {};
 
-    // Dispara shutdown
-    await testWorker.beforeApplicationShutdown();
+    try {
+      const testUow = shutdownApp.get(MikroOrmUnitOfWork);
+      const testCreateWallet = shutdownApp.get(CreateWalletUseCase);
+      const testProcessWager = shutdownApp.get(ProcessWagerUseCase);
+      const testWorkerService = shutdownApp.get(PendingReferenceWorkerService);
 
-    expect(testWorker.isWorkerRunning()).toBe(false);
+      const playerId = crypto.randomUUID();
+      const wallet = await testCreateWallet.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
 
-    // Novas tentativas de execução em shutdown retornam imediatamente vazio
-    const res = await testWorker.executeBatch();
-    expect(res.processed).toBe(0);
-    expect(res.rejected).toBe(0);
-  });
+      const playerId2 = crypto.randomUUID();
+      const wallet2 = await testCreateWallet.execute({
+        playerId: playerId2,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const betId = `bet-j-${crypto.randomUUID()}`;
+      await testProcessWager.execute(crypto.randomUUID(), {
+        providerId: 'EVOLUTION',
+        externalTransactionId: betId,
+        playerId,
+        walletId: wallet.id,
+        roundId: 'round-j',
+        gameId: 'slots',
+        kind: 'BET',
+        money: { amount: '20.00', currency: 'BRL' },
+      });
+
+      const txId1 = crypto.randomUUID();
+      const snap1 = {
+        transactionId: txId1,
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '80.00', currency: 'BRL' },
+        idempotentReplay: false,
+      };
+
+      await adminPool.query(
+        `INSERT INTO wager_transactions 
+         (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+         VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-j', 'slots', 'WIN', '50.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-j-1', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+        [txId1, wallet.id, playerId, `win-j-1-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap1), betId]
+      );
+
+      // Barreira de sincronização: operação em andamento pausa no hook after_wallet_save
+      const barrierReachedPromise = new Promise<void>((resolve) => {
+        testUow.setTestHook('after_wallet_save', () => {
+          resolve();
+          return new Promise<void>((res) => {
+            releaseBarrier = res;
+          });
+        });
+      });
+
+      // Inicia a execução do worker em segundo plano
+      const executionPromise = testWorkerService.executeBatch(5, 30000);
+
+      // Aguarda a transação entrar e pausar na barreira
+      await barrierReachedPromise;
+
+      // Enquanto a transação financeira está pausada em andamento, dispara app.close()
+      const closePromise = shutdownApp.close();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Comprova que o shutdown impede novos claims imediatamente
+      expect(testWorkerService['isShuttingDown']).toBe(true);
+
+      // Insere uma segunda transação pendente durante o shutdown usando wallet2 (sem conflito de lock com a tx1)
+      const txId2 = crypto.randomUUID();
+      const snap2 = {
+        transactionId: txId2,
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '100.00', currency: 'BRL' },
+        idempotentReplay: false,
+      };
+      await adminPool.query(
+        `INSERT INTO wager_transactions 
+         (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+         VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-j-2', 'slots', 'WIN', '10.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-j-2', $6, 'ref-any', 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+        [txId2, wallet2.id, playerId2, `win-j-2-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap2)]
+      );
+
+      // Tentativa de novo claim durante o shutdown retorna vazio (bloqueio total de novos claims)
+      const newBatchResult = await testWorkerService.executeBatch(5, 30000);
+      expect(newBatchResult.processed).toBe(0);
+
+      // Libera a barreira para a operação em andamento concluir seu commit
+      releaseBarrier();
+
+      // Aguarda conclusão da execução in-flight e do fechamento da aplicação
+      const batchResult = await executionPromise;
+      await closePromise;
+
+      expect(batchResult.processed).toBe(1);
+
+      // Verifica que o primeiro item foi commitado com sucesso antes do fechamento do ORM
+      const finalState1 = await captureDbState(wallet.id, txId1);
+      expect(finalState1.transaction.status).toBe('PROCESSED');
+      expect(finalState1.wallet.balance).toBe('130.00'); // 80 + 50
+
+      // O segundo item permaneceu intacto como PENDING_REFERENCE sem claim nem mutação
+      const finalState2 = await captureDbState(wallet2.id, txId2);
+      expect(finalState2.transaction.status).toBe('PENDING_REFERENCE');
+      expect(finalState2.transaction.leaseToken).toBeNull();
+    } finally {
+      releaseBarrier();
+      try {
+        await shutdownApp.close();
+      } catch {}
+    }
+  }, 30000);
 
   it('K. Esgotamento de referência gera uma rejeição e um evento', async () => {
     const playerId = crypto.randomUUID();
@@ -956,5 +1125,349 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     expect(outboxAfter.rows[0].event_type).toBe('WagerTransactionRejected');
     expect(outboxAfter.rows[0].payload.failureCode).toBe('REFERENCE_NOT_FOUND');
     expect(state.outboxCount).toBe(outboxCountBefore + 1);
+  });
+
+  it('L. Operações atômicas de lease: releaseLease, renewLease e markOperationallyBlocked informam sucesso inequívoco e protegem concorrência', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const tokenA = crypto.randomUUID();
+    const tokenB = crypto.randomUUID();
+
+    // Insere transação com lease ativo pertencente a tokenA (válido por 10 segundos)
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, reference_external_transaction_id, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-l', 'slots', 'WIN', '10.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-l', 'ref-l', 1, NOW() - INTERVAL '1s', $6, 'worker-a', NOW() + INTERVAL '10 seconds', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-l-${crypto.randomUUID()}`, crypto.randomUUID(), tokenA]
+    );
+
+    // 1. renewLease com token incorreto deve retornar false sem modificar nada
+    const renewWrong = await wagerRepo.renewLease(txId, tokenB, 20000);
+    expect(renewWrong).toBe(false);
+
+    // 2. renewLease com token correto e lease ativo deve retornar true
+    const renewOk = await wagerRepo.renewLease(txId, tokenA, 25000);
+    expect(renewOk).toBe(true);
+
+    // 3. Simula expiração do lease no PostgreSQL
+    await adminPool.query(
+      "UPDATE wager_transactions SET lease_expires_at = NOW() - INTERVAL '2 seconds' WHERE id = $1;",
+      [txId]
+    );
+
+    // 4. renewLease com lease já expirado no PostgreSQL não pode ressuscitar o lease e deve retornar false
+    const renewExpired = await wagerRepo.renewLease(txId, tokenA, 30000);
+    expect(renewExpired).toBe(false);
+
+    // 5. Novo worker assume a posse da pendência expirada
+    await adminPool.query(
+      "UPDATE wager_transactions SET lease_token = $1, lease_owner = 'worker-b', lease_expires_at = NOW() + INTERVAL '10 seconds' WHERE id = $2;",
+      [tokenB, txId]
+    );
+
+    // 6. Worker antigo (tokenA) tenta renovar ou bloquear o item reservado pelo novo worker (tokenB): deve retornar false
+    const renewOld = await wagerRepo.renewLease(txId, tokenA, 30000);
+    expect(renewOld).toBe(false);
+
+    const blockOld = await wagerRepo.markOperationallyBlocked(txId, tokenA, 'Old worker attempt');
+    expect(blockOld).toBe(false);
+
+    // Comprova que o registro permanece reservado para o worker B e não foi bloqueado
+    const stateAfterOldAttempts = await captureDbState(wallet.id, txId);
+    expect(stateAfterOldAttempts.transaction.isOperationallyBlocked).toBe(false);
+    expect(stateAfterOldAttempts.transaction.leaseToken).toBe(tokenB);
+
+    // 7. releaseLease com token incorreto retorna false e não modifica nada
+    const releaseWrong = await wagerRepo.releaseLease(txId, tokenA);
+    expect(releaseWrong).toBe(false);
+
+    // 8. releaseLease com token correto retorna true e limpa os campos
+    const releaseOk = await wagerRepo.releaseLease(txId, tokenB);
+    expect(releaseOk).toBe(true);
+
+    const stateAfterRelease = await captureDbState(wallet.id, txId);
+    expect(stateAfterRelease.transaction.leaseToken).toBeNull();
+    expect(stateAfterRelease.transaction.leaseOwner).toBeNull();
+    expect(stateAfterRelease.transaction.leaseExpiresAt).toBeNull();
+
+    // 9. releaseLease em registro sem lease retorna false
+    const releaseEmpty = await wagerRepo.releaseLease(txId, tokenB);
+    expect(releaseEmpty).toBe(false);
+  });
+
+  it('M. Validação de elegibilidade e expiração usando exclusivamente relógio do PostgreSQL, imune a Date.now() divergente', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-m-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-m',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '90.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-m', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-m', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-m-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
+    );
+
+    // Artificialmente distorce o relógio do Node/Bun em +2 horas no futuro
+    const originalDateNow = Date.now;
+    try {
+      Date.now = () => originalDateNow() + 7200000;
+
+      // Executa o reprocessamento: deve validar elegibilidade e expiração no PostgreSQL NOW(), sem StaleLeaseError espúrio
+      const resultFuture = await reprocessUseCase.execute(10, 30000, 'worker-clock-test');
+      expect(resultFuture.processed).toBe(1);
+
+      const stateFuture = await captureDbState(wallet.id, txId);
+      expect(stateFuture.transaction.status).toBe('PROCESSED');
+      expect(stateFuture.wallet.balance).toBe('110.00');
+    } finally {
+      Date.now = originalDateNow;
+    }
+  });
+
+  it('N. Falha injetada antes do commit confirma que o lote não contabiliza como concluída uma operação revertida', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-n-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-n',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '90.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-n', 'slots', 'WIN', '25.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-n', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-n-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
+    );
+
+    // Injeta falha estritamente no ponto imediatamente anterior ao commit (before_commit)
+    uow.setTestHook('before_commit', () => {
+      throw new Error('Simulated failure immediately prior to transaction commit');
+    });
+
+    try {
+      const result = await reprocessUseCase.execute(10);
+
+      // Comprova que o lote NÃO contabilizou a operação revertida como concluída
+      expect(result.processed).toBe(0);
+      expect(result.rejected).toBe(0);
+      expect(result.failed).toBe(1);
+
+      // Comprova que a transação no banco permaneceu PENDING_REFERENCE e o saldo permaneceu inalterado
+      const state = await captureDbState(wallet.id, txId);
+      expect(state.transaction.status).toBe('PENDING_REFERENCE');
+      expect(state.wallet.balance).toBe('90.00');
+      expect(state.ledgerCount).toBe(2); // 1 OPENING + 1 BET
+    } finally {
+      uow.clearTestHooks();
+      await adminPool.query('DELETE FROM wager_transactions WHERE id = $1;', [txId]);
+    }
+  });
+
+  it('O. Classificação de erros: defeito permanente/inesperado (TypeError) não gera rejeição financeira falsa e não bloqueia o restante do lote', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-o-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-o',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '20.00', currency: 'BRL' },
+    }); // Saldo: 80.00
+
+    const txDefectId = crypto.randomUUID();
+    const txValidId = crypto.randomUUID();
+
+    const snapDefect = {
+      transactionId: txDefectId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '80.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+    const snapValid = {
+      transactionId: txValidId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '80.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES 
+       ($1, $3, $4, 'EVOLUTION', $5, 'round-o', 'slots', 'WIN', '30.00', 'BRL', 'PENDING_REFERENCE', $6, 'h-def', $7, $9, 1, NOW() - INTERVAL '2s', NOW() - INTERVAL '2s', NOW()),
+       ($2, $3, $4, 'EVOLUTION', $8, 'round-o', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $10, 'h-val', $11, $9, 1, NOW() - INTERVAL '1s', NOW() - INTERVAL '1s', NOW());`,
+      [
+        txDefectId,
+        txValidId,
+        wallet.id,
+        playerId,
+        `win-def-${crypto.randomUUID()}`,
+        crypto.randomUUID(),
+        JSON.stringify(snapDefect),
+        `win-val-${crypto.randomUUID()}`,
+        betId,
+        crypto.randomUUID(),
+        JSON.stringify(snapValid),
+      ]
+    );
+
+    // Injeta TypeError inesperado apenas para a primeira transação
+    let defectInjected = false;
+    uow.setTestHook('after_wallet_save', () => {
+      if (!defectInjected) {
+        defectInjected = true;
+        throw new TypeError('Unexpected runtime memory type violation in domain handler');
+      }
+    });
+
+    try {
+      const result = await reprocessUseCase.execute(10);
+      expect(result.failed).toBe(1);
+      expect(result.processed).toBe(1); // O segundo item do lote prosseguiu e concluiu com sucesso!
+
+      // Comprova que o defeito técnico NÃO gerou uma rejeição financeira falsa para o item 1
+      const stateDefect = await captureDbState(wallet.id, txDefectId);
+      expect(stateDefect.transaction.status).toBe('PENDING_REFERENCE');
+      expect(stateDefect.transaction.status).not.toBe('REJECTED');
+      expect(stateDefect.transaction.attempts).toBe(1); // Attempts de negócio não foram consumidas
+
+      // Comprova que o item 2 foi processado com sucesso
+      const stateValid = await captureDbState(wallet.id, txValidId);
+      expect(stateValid.transaction.status).toBe('PROCESSED');
+      expect(stateValid.wallet.balance).toBe('100.00'); // 80 + 20
+    } finally {
+      uow.clearTestHooks();
+    }
+  });
+
+  it('P. Timeout de drenagem no shutdown cancela trabalho em andamento com rollback e preserva recuperação das reservas', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-p-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-p',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '15.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '85.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-p', 'slots', 'WIN', '30.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-p', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-p-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
+    );
+
+    // Worker configurado com timeout de drenagem agressivo de 100ms e lease de 500ms
+    const shortDrainWorker = new PendingReferenceWorkerService(reprocessUseCase, {
+      enabled: false,
+      batchSize: 5,
+      leaseDurationMs: 500,
+      drainTimeoutMs: 100,
+      workerId: 'timeout-worker',
+    });
+
+    // Injeta retardo de 400ms na transação (excede o limite de drenagem de 100ms)
+    uow.setTestHook('after_wallet_save', async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+
+    try {
+      // Inicia a execução do batch
+      const batchPromise = shortDrainWorker.executeBatch();
+
+      // Dispara o shutdown via onModuleDestroy logo após o início
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const shutdownPromise = shortDrainWorker.onModuleDestroy();
+
+      await Promise.all([batchPromise, shutdownPromise]);
+
+      // Comprova que nenhuma mutação financeira parcial ocorreu (rollback preservado)
+      const stateDuringTimeout = await captureDbState(wallet.id, txId);
+      expect(stateDuringTimeout.wallet.balance).toBe('85.00'); // Saldo permaneceu inalterado
+
+      // Aguarda expiração do lease no PostgreSQL (600ms)
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // Outro worker retoma a reserva preservada com recuperação 100% íntegra
+      const recoveryResult = await reprocessUseCase.execute(5, 30000, 'recovery-worker');
+      expect(recoveryResult.processed).toBe(1);
+
+      const finalState = await captureDbState(wallet.id, txId);
+      expect(finalState.transaction.status).toBe('PROCESSED');
+      expect(finalState.wallet.balance).toBe('115.00'); // 85 + 30
+    } finally {
+      uow.clearTestHooks();
+    }
   });
 });

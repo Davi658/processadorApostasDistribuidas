@@ -20,12 +20,12 @@
 | **Frente M03** | 14. Estabilização da Abertura de Carteira (Contrato, atomicidade SQL, 20 concorrentes, rollback em falhas injetadas, reconciliação, limite Money) | **CONCLUÍDO** | `tests/integration/wallet-opening.test.ts` |
 | **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
 | **Frente M06** | 17. Estabilização e Finalização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado, Migration 004 permitindo múltiplas WINs na mesma BET sequencial e concorrentemente com down seguro, WIN fora de ordem via PENDING_REFERENCE e 202, WinProcessor dedicado, resolução determinística e replays) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (38 testes passando) |
-| **Frente M10** | 18. Worker de Referências Pendentes e Concorrência Distribuída (Ciclo NestJS, claim transacional curto com FOR UPDATE SKIP LOCKED, lease persistente com PostgreSQL NOW(), proteção contra finalização por lease expirado/stale, ordenação canônica de locks wallet antes de tx, refresh no Identity Map, isolamento de falhas transitórias sem queima de retries de domínio, bloqueio operacional fail-closed para snapshots corrompidos sem contaminação do lote, crash recovery após expiração, shutdown gracioso com drenagem, esgotamento gerando 1 rejeição e 1 evento na outbox, disputa entre 3 processos OS reais com barreira READY) | **CONCLUÍDO** | `tests/integration/pending-reference-worker-m10.test.ts` (11 testes passando) |
-
+| **Frente M10** | 18. Worker de Referências Pendentes e Concorrência Distribuída (Reserva com relógio PostgreSQL NOW(), lease persistente imune a drift de Date.now(), operações atômicas com RETURNING id sem ressuscitar lease expirado nem permitir bloqueio por worker antigo, shutdown coordenado NestJS impedindo novos claims e drenando antes de fechar o ORM, timeout de drenagem cancelando com rollback, contadores e logs estritamente pós-commit, classificação de erros transitório / stale lease / snapshot inválido / defeito inesperado sem rejeição falsa, crash recovery com processos OS reais via SIGKILL e handshakes, 3 processos concorrentes com barreira) | **CONCLUÍDO** | `tests/integration/pending-reference-worker-m10.test.ts` (16 testes passando) |
 
 ---
 
 ## 2. Detalhamento das Implementações Realizadas
+
 
 ### 2.1 Bloco A — Correções Prioritárias
 - **Migration 003 (`003_protect_terminals_and_composite_fk.sql` & `.down.sql`):**
@@ -212,27 +212,37 @@
   - Adição de colunas `lease_token VARCHAR(64)`, `lease_owner VARCHAR(255)`, `lease_expires_at TIMESTAMPTZ`, `is_operationally_blocked BOOLEAN DEFAULT FALSE` e `operational_block_reason VARCHAR(255)` na tabela `wager_transactions`.
   - Índices dedicados para seleção eficiente: `idx_wager_tx_pending_claim` em `(status, is_operationally_blocked, next_attempt_at, lease_expires_at, created_at)` e `idx_wager_tx_lease_expires` em `(lease_expires_at)`.
   - Reversibilidade total comprovada (`migrator.down()` e `migrator.up()`).
-- **Reserva Persistente Curta com `FOR UPDATE SKIP LOCKED`:**
+- **Reserva Persistente Curta com `FOR UPDATE SKIP LOCKED` e Horário do PostgreSQL:**
   - Consulta atômica isolada de seleção e marcação do lease (`claimPendingReferences`) sem nenhuma movimentação financeira.
-  - O relógio do PostgreSQL (`NOW()`) determina a elegibilidade e expiração dos leases, neutralizando qualquer clock drift entre nós.
-- **Proteção Contra Lease Estrita (Stale Lease Guard):**
-  - O processamento valida a posse do lease sob lock pessimista. Se outro worker assumir a pendência após expiração do lease, o worker antigo detecta a divergência do token (`tx.leaseToken !== claimedToken`), abortando com `StaleLeaseError` sem cometer efeitos no banco.
-- **Ordenação Canônica de Locks e Isolamento de Memória:**
-  - Locks adquiridos rigorosamente em `wallets` antes de `wager_transactions`.
-  - Uso de transações com `em.fork()` e `{ refresh: true, lockMode: LockMode.PESSIMISTIC_WRITE }` impedindo o uso de entidades desatualizadas do Identity Map do MikroORM.
-- **Isolamento Fail-Closed de Registros com Snapshot Inválido:**
-  - Quando um snapshot é inválido ou corrompido, o worker persiste `is_operationally_blocked = TRUE` e `operational_block_reason`, liberando o lease sem alterar transação financeira nem gerar lançamentos no ledger.
-  - A query de claim exclui automaticamente registros bloqueados (`is_operationally_blocked = FALSE`), permitindo que os demais itens do lote avancem normalmente sem contaminação.
-- **Tratamento de Falhas Transitórias e Crash Recovery:**
-  - Falhas de infraestrutura transitórias liberam o lease sem queimar tentativas de domínio (`attempts`).
-  - Morte de processo antes do processamento permite retomada automática por outro worker após o vencimento do lease.
-  - Morte de processo após commit financeiro não reaplica efeitos contábeis ao ser reprocessado.
-- **Ciclo de Vida NestJS e Graceful Shutdown:**
+  - O relógio do PostgreSQL (`NOW()`) determina a elegibilidade e expiração dos leases; validação de posse (`isLeaseValid`) consulta diretamente `WHERE lease_expires_at > NOW() AND lease_token = ?`, sem depender de `Date.now()` da aplicação, imune a desvios artificiais ou relógios descalibrados.
+- **Operações Atômicas de Lease com Sucesso Inequívoco:**
+  - `releaseLease(id, token)`, `renewLease(id, token, durationMs)` e `markOperationallyBlocked(id, token, reason)` utilizam `UPDATE ... RETURNING id`, informando sucesso inequívoco (`true` somente se 1 linha afetada).
+  - Token incorreto, reserva já expirada no PostgreSQL ou substituída por outro worker retornam `false` sem modificar absolutamente nada.
+  - Renovação nunca ressuscita lease já expirado no PostgreSQL.
+  - Não é permitido que um worker antigo bloqueie operacionalmente um item já reservado por outro worker.
+- **Ciclo de Vida NestJS e Shutdown Coordenado com Ordem Comprovada:**
   - Inicialização automática via `OnApplicationBootstrap` (`start()`).
-  - Prevenção de overlap de ticks na mesma instância via flag `isTickRunning`.
-  - Drenagem graciosa no shutdown via `BeforeApplicationShutdown`: bloqueia novas reservas e aguarda tarefas in-flight concluírem antes de encerrar o ORM.
+  - Prevenção de sobreposição de ticks via `isTickRunning`.
+  - Drenagem coordenada implementando `OnModuleDestroy` e `BeforeApplicationShutdown`:
+    - Bloqueia novos claims imediatamente (`isShuttingDown = true; stop()`).
+    - Drena tarefas in-flight com timeout configurável (`drainTimeoutMs`).
+    - Caso o timeout de drenagem seja excedido, cancela o trabalho em andamento via `AbortController`, marcando `ctx.rollbackOnly = true` para forçar rollback seguro no PostgreSQL.
+    - O fechamento do ORM (`MikroOrmUnitOfWork.onApplicationShutdown`) é executado estritamente por último, após a conclusão ou cancelamento com rollback das operações em andamento, impedindo que transações financeiras continuem operando em conexões encerradas.
+    - Comprovado com aplicação Nest real e operação pausada por barreira: `app.close()` impede novos claims, a barreira é liberada e o commit/rollback é verificado com fechamento limpo das conexões.
+- **Resultados Pós-Commit e Classificação Rigorosa de Erros:**
+  - Contadores (`processed`, `rejected`, `rescheduled`, `blocked`) e logs de sucesso só são atualizados após a confirmação inequívoca do commit da transação (`runInTransaction` concluído).
+  - Injeção de falha no `before_commit` atesta que operações revertidas nunca são contabilizadas como concluídas.
+  - Classificação estrita de erros:
+    - *Transitórios conhecidos:* retry seguro sem queimar `attempts` de domínio, liberando o lease;
+    - *Stale lease:* descarta posse antiga silenciosamente;
+    - *Snapshot inválido:* bloqueio operacional fail-closed (`is_operationally_blocked = TRUE`), sem contaminação do lote;
+    - *Defeito permanente/inesperado (ex: TypeError):* sinalização auditável explícita (`PENDING_REFERENCE_UNEXPECTED_ERROR`), sem transformar erro técnico em rejeição financeira falsa (`status` não vira `REJECTED`), permitindo o avanço do restante do lote.
+- **Crash Recovery Real com Processos OS:**
+  - Testes com processos OS reais via `spawn` + `SIGKILL` + handshake de marcos via stdout:
+    - *Cenário A:* Filho anuncia marco `CLAIM_CONFIRMED` e pausa; coordenador mata o filho com `SIGKILL`; outro worker retoma o item após a expiração natural do lease no PostgreSQL.
+    - *Cenário B:* Filho confirma commit financeiro na base emitindo marco `COMMIT_CONFIRMED` e pausa antes de finalizar o ciclo; coordenador mata o filho com `SIGKILL` e reinicia o worker; nenhum efeito financeiro, contábil ou evento se repete.
 - **Comprovação com PostgreSQL Real Descartável:**
-  - Suíte `tests/integration/pending-reference-worker-m10.test.ts` (11 testes passando, 100% de sucesso) cobrindo todos os cenários de A a K com múltiplos processos OS reais coordenados via barreira `READY`.
+  - Suíte `tests/integration/pending-reference-worker-m10.test.ts` (16 testes passando, 100% de sucesso) cobrindo todos os cenários de A a P, incluindo 3 processos concorrentes com barreira de arquivos, concorrência distribuída, duas reversões da mesma referência, falhas injetadas e reconciliação contábil integral.
 
 ---
 
@@ -240,10 +250,10 @@
 
 > [!IMPORTANT]
 > **Delimitação de Escopo (M02 a M10 vs M14/M15/M16):**
-> A presente base comprova integralmente os fluxos síncronos e assíncronos de apostas, reversões imediatas e pendentes, créditos de ganhos, snapshots históricos (M09) e o worker distribuído com lease persistente e ciclo de vida NestJS (M10).
+> A presente base conclui e comprova integralmente os fluxos de apostas, reversões imediatas e pendentes, créditos de ganhos, snapshots históricos (M09) e o worker distribuído com lease persistente seguro no PostgreSQL, crash recovery real e ciclo de vida NestJS (M10).
 > Os seguintes componentes pertencem aos marcos M14, M15 e M16 e permanecem explicitamente como **NÃO VALIDADOS / FORA DE ESCOPO**:
-> 1. **Filas SQS / LocalStack e Mensageria Assíncrona Externa (M14):** **NÃO VALIDADO / FORA DE ESCOPO**
-> 2. **Tabela Inbox e Deduplicação Inbox / SQS (M15):** **NÃO VALIDADO / FORA DE ESCOPO**
-> 3. **Publisher Concorrente da Outbox para Broker Externo (M16):** **NÃO VALIDADO / FORA DE ESCOPO**
-> 4. **Dead Letter Queue (DLQ) Externa de Mensageria:** **NÃO VALIDADO / FORA DE ESCOPO**
+> 1. **Publisher Concorrente da Outbox para Broker Externo (M14):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 2. **Inbox e Mensageria Assíncrona SQS (M15):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 3. **Retry, Dead Letter Queue (DLQ) e Shutdown do Consumidor (M16):** **NÃO VALIDADO / FORA DE ESCOPO**
+
 

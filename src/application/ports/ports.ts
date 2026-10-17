@@ -27,6 +27,7 @@ export interface WagerTransactionRepositoryPort {
   releaseLease(id: string, token: string): Promise<boolean>;
   renewLease(id: string, token: string, leaseDurationMs: number): Promise<boolean>;
   markOperationallyBlocked(id: string, token: string, reason: string): Promise<boolean>;
+  isLeaseValid(id: string, token: string): Promise<boolean>;
   save(transaction: WagerTransaction): Promise<void>;
 }
 

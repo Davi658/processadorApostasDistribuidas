@@ -1,6 +1,7 @@
 import {
   Injectable,
   OnApplicationBootstrap,
+  OnModuleDestroy,
   BeforeApplicationShutdown,
   Logger,
   Optional,
@@ -21,7 +22,7 @@ export interface PendingReferenceWorkerOptions {
 
 @Injectable()
 export class PendingReferenceWorkerService
-  implements OnApplicationBootstrap, BeforeApplicationShutdown
+  implements OnApplicationBootstrap, OnModuleDestroy, BeforeApplicationShutdown
 {
   private readonly logger = new Logger(PendingReferenceWorkerService.name);
   private isRunning = false;
@@ -29,6 +30,8 @@ export class PendingReferenceWorkerService
   private isShuttingDown = false;
   private timer: NodeJS.Timeout | null = null;
   private activeExecutionPromise: Promise<ReprocessResult | null> | null = null;
+  private shutdownPromise: Promise<void> | null = null;
+  private abortController: AbortController | null = null;
 
   public readonly enabled: boolean;
   public readonly intervalMs: number;
@@ -67,20 +70,50 @@ export class PendingReferenceWorkerService
     }
   }
 
-  public async beforeApplicationShutdown(signal?: string): Promise<void> {
-    this.isShuttingDown = true;
-    this.stop();
+  public async onModuleDestroy(): Promise<void> {
+    await this.handleShutdown('onModuleDestroy');
+  }
 
-    if (this.activeExecutionPromise) {
-      try {
-        const timeoutPromise = new Promise((resolve) =>
-          setTimeout(resolve, this.drainTimeoutMs)
-        );
-        await Promise.race([this.activeExecutionPromise, timeoutPromise]);
-      } catch (err) {
-        this.logger.error('Error draining in-flight worker batch during shutdown', err);
-      }
+  public async beforeApplicationShutdown(signal?: string): Promise<void> {
+    await this.handleShutdown('beforeApplicationShutdown');
+  }
+
+  private async handleShutdown(phase: string): Promise<void> {
+    if (this.shutdownPromise) {
+      return await this.shutdownPromise;
     }
+
+    this.shutdownPromise = (async () => {
+      this.isShuttingDown = true;
+      this.stop();
+
+      if (this.activeExecutionPromise) {
+        let timeoutHandle: NodeJS.Timeout | null = null;
+        const timeoutPromise = new Promise<'timeout'>((resolve) => {
+          timeoutHandle = setTimeout(() => resolve('timeout'), this.drainTimeoutMs);
+        });
+
+        try {
+          const res = await Promise.race([this.activeExecutionPromise, timeoutPromise]);
+          if (res === 'timeout') {
+            this.logger.warn(
+              `Worker drainage timed out after ${this.drainTimeoutMs}ms during ${phase}. Aborting active operations.`
+            );
+            if (this.abortController) {
+              this.abortController.abort(new Error('DRAIN_TIMEOUT_EXCEEDED'));
+            }
+          }
+        } catch (err) {
+          this.logger.error('Error draining in-flight worker batch during shutdown', err);
+        } finally {
+          if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+          }
+        }
+      }
+    })();
+
+    return await this.shutdownPromise;
   }
 
   public start(): void {
@@ -122,12 +155,10 @@ export class PendingReferenceWorkerService
 
     this.isTickRunning = true;
     try {
-      this.activeExecutionPromise = this.executeBatch(this.batchSize, this.leaseDurationMs);
-      await this.activeExecutionPromise;
+      await this.executeBatch(this.batchSize, this.leaseDurationMs);
     } catch (err) {
       this.logger.error('Worker tick execution error', err);
     } finally {
-      this.activeExecutionPromise = null;
       this.isTickRunning = false;
     }
   }
@@ -139,6 +170,21 @@ export class PendingReferenceWorkerService
     if (this.isShuttingDown) {
       return { processed: 0, rejected: 0, rescheduled: 0, blocked: 0, failed: 0 };
     }
-    return await this.reprocessUseCase.execute(batchSize, leaseDurationMs, this.workerId);
+    this.abortController = new AbortController();
+    const execPromise = this.reprocessUseCase.execute(
+      batchSize,
+      leaseDurationMs,
+      this.workerId,
+      this.abortController.signal
+    );
+    this.activeExecutionPromise = execPromise;
+    try {
+      return await execPromise;
+    } finally {
+      if (this.activeExecutionPromise === execPromise) {
+        this.activeExecutionPromise = null;
+      }
+      this.abortController = null;
+    }
   }
 }

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { LockMode, type Options } from '@mikro-orm/core';
 import { EntityManager, MikroORM } from '@mikro-orm/postgresql';
-import { Injectable, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, OnApplicationShutdown, OnModuleInit, Optional } from '@nestjs/common';
 import { Wallet } from '../../../domain/entities/wallet.entity';
 import { WagerTransaction } from '../../../domain/entities/wager-transaction.entity';
 import { WalletLedgerEntry } from '../../../domain/entities/wallet-ledger-entry.entity';
@@ -30,7 +30,9 @@ export type FailureHookPoint =
   | 'after_wallet_save'
   | 'after_tx_save'
   | 'after_ledger_save'
-  | 'after_outbox_save';
+  | 'after_outbox_save'
+  | 'before_commit'
+  | 'after_commit';
 
 export interface TransactionContext {
   em: EntityManager;
@@ -40,10 +42,10 @@ export interface TransactionContext {
 }
 
 @Injectable()
-export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModuleDestroy {
+export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnApplicationShutdown {
   private orm?: MikroORM;
   private readonly asyncLocalStorage = new AsyncLocalStorage<TransactionContext>();
-  private readonly testHooks = new Map<FailureHookPoint, (entity?: any) => void>();
+  private readonly testHooks = new Map<FailureHookPoint, (entity?: any) => void | Promise<void>>();
 
   constructor(@Optional() private readonly customConfig?: Options) {}
 
@@ -53,7 +55,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     }
   }
 
-  public async onModuleDestroy(): Promise<void> {
+  public async onApplicationShutdown(): Promise<void> {
     await this.close();
   }
 
@@ -95,7 +97,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     return this.getOrm().em.fork();
   }
 
-  public setTestFailurePoint(point: FailureHookPoint, callback?: (entity?: any) => void): void {
+  public setTestFailurePoint(point: FailureHookPoint, callback?: (entity?: any) => void | Promise<void>): void {
     this.testHooks.set(
       point,
       callback ??
@@ -105,7 +107,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     );
   }
 
-  public setTestHook(point: FailureHookPoint, callback?: (entity?: any) => void): void {
+  public setTestHook(point: FailureHookPoint, callback?: (entity?: any) => void | Promise<void>): void {
     this.setTestFailurePoint(point, callback);
   }
 
@@ -117,10 +119,10 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     this.clearTestFailurePoints();
   }
 
-  public triggerTestHook(point: FailureHookPoint, entity?: any): void {
+  public async triggerTestHook(point: FailureHookPoint, entity?: any): Promise<void> {
     const hook = this.testHooks.get(point);
     if (hook) {
-      hook(entity);
+      await hook(entity);
     }
   }
 
@@ -155,7 +157,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
     }
 
     // Outermost transaction (depth 0)
-    return await orm.em.transactional(async (forkedEm) => {
+    const committedResult = await orm.em.transactional(async (forkedEm) => {
       const context: TransactionContext = {
         em: forkedEm,
         depth: 0,
@@ -171,6 +173,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
               context.rollbackReason
             );
           }
+          await this.triggerTestHook('before_commit');
           await forkedEm.flush();
           return result;
 
@@ -180,6 +183,9 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
         }
       });
     });
+
+    await this.triggerTestHook('after_commit', committedResult);
+    return committedResult;
   }
 }
 
@@ -261,7 +267,7 @@ export class MikroOrmWalletRepository implements WalletRepositoryPort {
     ormEntity.updatedAt = new Date(wallet.updatedAt);
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_wallet_save', ormEntity);
+    await this.uow.triggerTestHook('after_wallet_save', ormEntity);
   }
 }
 
@@ -333,16 +339,18 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
 
   public async listPendingReferences(limit = 100): Promise<WagerTransaction[]> {
     const em = this.em;
-    const entities = await em.find(
-      WagerTransactionOrmEntity,
-      {
-        status: 'PENDING_REFERENCE',
-        isOperationallyBlocked: false,
-        nextAttemptAt: { $lte: new Date() },
-      },
-      { limit, orderBy: { nextAttemptAt: 'ASC' } }
-    );
-    return entities.map((e) => this.toDomain(e));
+    const query = `
+      SELECT *
+      FROM wager_transactions
+      WHERE status = 'PENDING_REFERENCE'
+        AND is_operationally_blocked = FALSE
+        AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+      ORDER BY next_attempt_at ASC NULLS FIRST, created_at ASC
+      LIMIT ?;
+    `;
+    const rows = await em.execute<any[]>(query, [limit]);
+    const ormEntities = rows.map((r) => em.map(WagerTransactionOrmEntity, r));
+    return ormEntities.map((e) => this.toDomain(e));
   }
 
   public async claimPendingReferences(
@@ -403,10 +411,11 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
           lease_owner = NULL,
           lease_expires_at = NULL,
           updated_at = NOW()
-      WHERE id = ? AND lease_token = ?;
+      WHERE id = ? AND lease_token = ?
+      RETURNING id;
     `;
-    const res = await em.execute<any>(query, [id, token]);
-    return (res?.rowCount ?? (Array.isArray(res) ? res.length : 1)) > 0;
+    const res = await em.execute<Array<{ id: string }>>(query, [id, token]);
+    return Array.isArray(res) && res.length > 0;
   }
 
   public async renewLease(id: string, token: string, leaseDurationMs: number): Promise<boolean> {
@@ -415,10 +424,15 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
       UPDATE wager_transactions
       SET lease_expires_at = NOW() + (? * INTERVAL '1 millisecond'),
           updated_at = NOW()
-      WHERE id = ? AND lease_token = ?;
+      WHERE id = ?
+        AND lease_token = ?
+        AND lease_expires_at > NOW()
+        AND status = 'PENDING_REFERENCE'
+        AND is_operationally_blocked = FALSE
+      RETURNING id;
     `;
-    const res = await em.execute<any>(query, [leaseDurationMs, id, token]);
-    return (res?.rowCount ?? (Array.isArray(res) ? res.length : 1)) > 0;
+    const res = await em.execute<Array<{ id: string }>>(query, [leaseDurationMs, id, token]);
+    return Array.isArray(res) && res.length > 0;
   }
 
   public async markOperationallyBlocked(id: string, token: string, reason: string): Promise<boolean> {
@@ -431,10 +445,29 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
           lease_owner = NULL,
           lease_expires_at = NULL,
           updated_at = NOW()
-      WHERE id = ? AND (lease_token = ? OR lease_token IS NULL);
+      WHERE id = ?
+        AND lease_token = ?
+        AND lease_expires_at > NOW()
+        AND is_operationally_blocked = FALSE
+      RETURNING id;
     `;
-    await em.execute<any>(query, [reason, id, token]);
-    return true;
+    const res = await em.execute<Array<{ id: string }>>(query, [reason, id, token]);
+    return Array.isArray(res) && res.length > 0;
+  }
+
+  public async isLeaseValid(id: string, token: string): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      SELECT id
+      FROM wager_transactions
+      WHERE id = ?
+        AND lease_token = ?
+        AND lease_expires_at > NOW()
+        AND status = 'PENDING_REFERENCE'
+        AND is_operationally_blocked = FALSE;
+    `;
+    const res = await em.execute<Array<{ id: string }>>(query, [id, token]);
+    return Array.isArray(res) && res.length > 0;
   }
 
   public async save(transaction: WagerTransaction): Promise<void> {
@@ -477,7 +510,7 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
     ormEntity.updatedAt = new Date(transaction.updatedAt);
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_tx_save', ormEntity);
+    await this.uow.triggerTestHook('after_tx_save', ormEntity);
   }
 
   private toDomain(orm: WagerTransactionOrmEntity): WagerTransaction {
@@ -537,7 +570,7 @@ export class MikroOrmWalletLedgerRepository implements WalletLedgerRepositoryPor
     ormEntity.createdAt = new Date(entry.createdAt);
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_ledger_save', ormEntity);
+    await this.uow.triggerTestHook('after_ledger_save', ormEntity);
   }
 
   public async listByWalletId(walletId: string): Promise<WalletLedgerEntry[]> {
@@ -593,7 +626,7 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
 
 
     await em.persistAndFlush(ormEntity);
-    this.uow.triggerTestHook('after_outbox_save', ormEntity);
+    await this.uow.triggerTestHook('after_outbox_save', ormEntity);
   }
 
   public async listUnpublished(limit = 100): Promise<IntegrationEventEnvelope[]> {

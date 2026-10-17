@@ -20,6 +20,51 @@ export interface ReprocessResult {
   failed?: number;
 }
 
+export function isTransientError(err: unknown): boolean {
+  if (!err) return false;
+  const errorObj = err as any;
+  const message = (errorObj.message || String(err)).toLowerCase();
+  const code = String(errorObj.code || errorObj.sqlState || '');
+
+  const transientCodes = [
+    '40P01',
+    '55P03',
+    '40001',
+    '57P01',
+    '08006',
+    '08001',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'ECONNREFUSED',
+  ];
+  if (transientCodes.includes(code)) {
+    return true;
+  }
+
+  const transientPatterns = [
+    'deadlock',
+    'lock timeout',
+    'could not obtain lock',
+    'serialization failure',
+    'connection timeout',
+    'connection terminated',
+    'transient',
+    'socket hang up',
+    'econnreset',
+    'etimedout',
+    'econnrefused',
+  ];
+
+  return transientPatterns.some((pattern) => message.includes(pattern));
+}
+
+type ReprocessItemOutcome =
+  | { outcome: 'PROCESSED'; transactionId: string; attempts: number }
+  | { outcome: 'REJECTED'; transactionId: string; attempts: number; failureCode?: string }
+  | { outcome: 'RESCHEDULED' | 'PENDING_REFERENCE'; transactionId: string; attempts: number }
+  | { outcome: 'BLOCKED'; transactionId: string; reason: string }
+  | { outcome: 'SKIPPED' };
+
 export class ReprocessPendingReferencesUseCase {
   private readonly reversalProcessor: ReversalProcessor;
   private readonly winProcessor: WinProcessor;
@@ -51,8 +96,13 @@ export class ReprocessPendingReferencesUseCase {
   public async execute(
     limit = 20,
     leaseDurationMs = 30000,
-    workerId = 'worker'
+    workerId = 'worker',
+    abortSignal?: AbortSignal
   ): Promise<ReprocessResult> {
+    if (abortSignal?.aborted) {
+      return { processed: 0, rejected: 0, rescheduled: 0, blocked: 0, failed: 0 };
+    }
+
     const claimedList = await this.wagerRepo.claimPendingReferences(limit, leaseDurationMs, workerId);
 
     if (claimedList.length === 0) {
@@ -74,24 +124,52 @@ export class ReprocessPendingReferencesUseCase {
     let failed = 0;
 
     for (const claimed of claimedList) {
+      if (abortSignal?.aborted) {
+        break;
+      }
+
       try {
-        await this.uow.runInTransaction(async () => {
-          // Canonical lock order: lock wallet first, then transaction
-          const wallet = await this.walletRepo.findById(claimed.walletId, true);
-          if (!wallet) {
-            await this.wagerRepo.releaseLease(claimed.id, claimed.leaseToken);
-            return;
+        const itemResult = await this.uow.runInTransaction<ReprocessItemOutcome>(async () => {
+          if (abortSignal?.aborted) {
+            throw new Error('ABORTED_BY_SHUTDOWN');
           }
+
+          let cleanupAbortListener: (() => void) | null = null;
+          if (abortSignal) {
+            const abortHandler = () => {
+              const ctx = (this.uow as any).getTransactionContext?.();
+              if (ctx) {
+                ctx.rollbackOnly = true;
+                ctx.rollbackReason = abortSignal.reason ?? new Error('ABORTED_BY_SHUTDOWN');
+              }
+            };
+            if (abortSignal.aborted) {
+              abortHandler();
+              throw new Error('ABORTED_BY_SHUTDOWN');
+            }
+            abortSignal.addEventListener('abort', abortHandler, { once: true });
+            cleanupAbortListener = () => {
+              abortSignal.removeEventListener('abort', abortHandler);
+            };
+          }
+
+          try {
+            // Canonical lock order: lock wallet first, then transaction
+            const wallet = await this.walletRepo.findById(claimed.walletId, true);
+            if (!wallet) {
+              await this.wagerRepo.releaseLease(claimed.id, claimed.leaseToken);
+              return { outcome: 'SKIPPED' };
+            }
 
           // Fetch fresh transaction state under pessimistic write lock
           const tx = await this.wagerRepo.findById(claimed.id, true);
           if (!tx) {
-            return;
+            return { outcome: 'SKIPPED' };
           }
 
           // If already terminal, do not repeat movements or events (idempotency)
           if (tx.isTerminal()) {
-            return;
+            return { outcome: 'SKIPPED' };
           }
 
           // Verify lease token matches what this worker claimed
@@ -101,40 +179,45 @@ export class ReprocessPendingReferencesUseCase {
             );
           }
 
-          // Verify lease expiration
-          if (tx.leaseExpiresAt && new Date(tx.leaseExpiresAt).getTime() < Date.now()) {
+          // Validate lease validity and expiration strictly using PostgreSQL clock
+          const isLeaseActive = await this.wagerRepo.isLeaseValid(claimed.id, claimed.leaseToken);
+          if (!isLeaseActive) {
             throw new StaleLeaseError(
-              `Lease expired for transaction ${claimed.id} at ${tx.leaseExpiresAt}`
+              `Lease is no longer active in PostgreSQL for transaction ${claimed.id} with token ${claimed.leaseToken}`
             );
           }
 
           // If already operationally blocked, skip
           if (tx.isOperationallyBlocked) {
-            blocked++;
-            return;
+            return {
+              outcome: 'BLOCKED',
+              transactionId: tx.id,
+              reason: tx.operationalBlockReason ?? 'ALREADY_BLOCKED',
+            };
           }
 
           // Validate snapshot strictly before processing
           try {
             validateReplaySnapshot(tx.responseSnapshot, tx);
           } catch (snapErr) {
-            // Insecure fallbacks are prohibited. Register separate auditable operational block
             const reason = snapErr instanceof Error ? snapErr.message : 'INVALID_SNAPSHOT';
-            const blockedTx = tx.markOperationallyBlocked(reason);
-            await this.wagerRepo.save(blockedTx);
+            const blockedOk = await this.wagerRepo.markOperationallyBlocked(
+              claimed.id,
+              claimed.leaseToken,
+              reason
+            );
 
-            this.logStructured({
-              level: 'error',
-              event: 'PENDING_REFERENCE_OPERATIONALLY_BLOCKED',
-              workerId,
+            if (!blockedOk) {
+              throw new StaleLeaseError(
+                `Failed to apply operational block: lease is stale for transaction ${claimed.id}`
+              );
+            }
+
+            return {
+              outcome: 'BLOCKED',
               transactionId: tx.id,
-              providerId: tx.providerId,
-              externalTransactionId: tx.externalTransactionId,
               reason,
-            });
-
-            blocked++;
-            return;
+            };
           }
 
           const refId = tx.referenceExternalTransactionId;
@@ -170,18 +253,12 @@ export class ReprocessPendingReferencesUseCase {
             });
             await this.outboxRepo.save(rejectedEvent);
 
-            this.logStructured({
-              level: 'info',
-              event: 'PENDING_REFERENCE_RESOLVED',
-              workerId,
-              transactionId: tx.id,
+            return {
               outcome: 'REJECTED',
-              failureCode: 'REFERENCE_NOT_FOUND',
+              transactionId: tx.id,
               attempts: tx.attempts,
-            });
-
-            rejected++;
-            return;
+              failureCode: 'REFERENCE_NOT_FOUND',
+            };
           }
 
           if (tx.kind === 'WIN') {
@@ -202,22 +279,11 @@ export class ReprocessPendingReferencesUseCase {
               maxAttempts: this.maxAttempts,
             });
 
-            this.logStructured({
-              level: 'info',
-              event: 'PENDING_REFERENCE_RESOLVED',
-              workerId,
-              transactionId: tx.id,
+            return {
               outcome: result.outcome,
+              transactionId: tx.id,
               attempts: tx.attempts,
-            });
-
-            if (result.outcome === 'PROCESSED') {
-              processed++;
-            } else if (result.outcome === 'REJECTED') {
-              rejected++;
-            } else if (result.outcome === 'RESCHEDULED') {
-              rescheduled++;
-            }
+            };
           } else if (tx.kind === 'REFUND' || tx.kind === 'ROLLBACK') {
             const result = await this.reversalProcessor.processReversal(wallet, {
               transactionId: tx.id,
@@ -237,24 +303,60 @@ export class ReprocessPendingReferencesUseCase {
               maxAttempts: this.maxAttempts,
             });
 
-            this.logStructured({
-              level: 'info',
-              event: 'PENDING_REFERENCE_RESOLVED',
-              workerId,
-              transactionId: tx.id,
+            return {
               outcome: result.outcome,
+              transactionId: tx.id,
               attempts: tx.attempts,
-            });
+            };
+          }
 
-            if (result.outcome === 'PROCESSED') {
-              processed++;
-            } else if (result.outcome === 'REJECTED') {
-              rejected++;
-            } else if (result.outcome === 'RESCHEDULED') {
-              rescheduled++;
-            }
+            return { outcome: 'SKIPPED' };
+          } finally {
+            cleanupAbortListener?.();
           }
         });
+
+        // ONLY update counters and emit success logs AFTER transaction commit confirmation
+        if (itemResult.outcome === 'PROCESSED') {
+          processed++;
+          this.logStructured({
+            level: 'info',
+            event: 'PENDING_REFERENCE_RESOLVED',
+            workerId,
+            transactionId: itemResult.transactionId,
+            outcome: 'PROCESSED',
+            attempts: itemResult.attempts,
+          });
+        } else if (itemResult.outcome === 'REJECTED') {
+          rejected++;
+          this.logStructured({
+            level: 'info',
+            event: 'PENDING_REFERENCE_RESOLVED',
+            workerId,
+            transactionId: itemResult.transactionId,
+            outcome: 'REJECTED',
+            failureCode: itemResult.failureCode,
+            attempts: itemResult.attempts,
+          });
+        } else if (itemResult.outcome === 'RESCHEDULED' || itemResult.outcome === 'PENDING_REFERENCE') {
+          rescheduled++;
+          this.logStructured({
+            level: 'info',
+            event: 'PENDING_REFERENCE_RESCHEDULED',
+            workerId,
+            transactionId: itemResult.transactionId,
+            attempts: itemResult.attempts,
+          });
+        } else if (itemResult.outcome === 'BLOCKED') {
+          blocked++;
+          this.logStructured({
+            level: 'error',
+            event: 'PENDING_REFERENCE_OPERATIONALLY_BLOCKED',
+            workerId,
+            transactionId: itemResult.transactionId,
+            reason: itemResult.reason,
+          });
+        }
       } catch (err) {
         if (err instanceof StaleLeaseError) {
           this.logStructured({
@@ -267,25 +369,45 @@ export class ReprocessPendingReferencesUseCase {
           continue;
         }
 
-        // Transient infrastructure failure:
-        // Do not consume business retry attempts or falsely reject.
-        // Release lease immediately for retry.
+        if (isTransientError(err)) {
+          // Known transient error: safe retry without consuming attempts or falsely rejecting
+          try {
+            await this.wagerRepo.releaseLease(claimed.id, claimed.leaseToken);
+          } catch {
+            // Lease will expire naturally in DB
+          }
+
+          this.logStructured({
+            level: 'warn',
+            event: 'PENDING_REFERENCE_TRANSIENT_FAILURE',
+            workerId,
+            transactionId: claimed.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+
+          failed++;
+          continue;
+        }
+
+        // Permanent / unexpected defect: explicit auditable signaling without calling everything transient
         try {
           await this.wagerRepo.releaseLease(claimed.id, claimed.leaseToken);
         } catch {
-          // If DB is unreachable, lease will expire naturally
+          // Lease will expire naturally in DB
         }
 
         this.logStructured({
-          level: 'warn',
-          event: 'PENDING_REFERENCE_TRANSIENT_FAILURE',
+          level: 'error',
+          event: 'PENDING_REFERENCE_UNEXPECTED_ERROR',
           workerId,
           transactionId: claimed.id,
-          error: err instanceof Error ? err.message : String(err),
+          errorName: err instanceof Error ? err.name : 'UnknownError',
+          errorMessage: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
         });
 
         failed++;
-        // Continue to the next claimed item in the batch
+        // Continue to the next claimed item in the batch: one failure cannot block the rest of the batch
       }
     }
 
