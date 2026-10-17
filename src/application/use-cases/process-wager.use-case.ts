@@ -23,9 +23,11 @@ import {
   WalletBalanceChangedEvent,
 } from '../../domain/events/events';
 import { ReversalProcessor } from '../services/reversal-processor.service';
+import { WinProcessor } from '../services/win-processor.service';
 
 export class ProcessWagerUseCase {
   protected readonly reversalProcessor: ReversalProcessor;
+  protected readonly winProcessor: WinProcessor;
 
   constructor(
     protected readonly walletRepo: WalletRepositoryPort,
@@ -33,11 +35,15 @@ export class ProcessWagerUseCase {
     protected readonly ledgerRepo: WalletLedgerRepositoryPort,
     protected readonly outboxRepo: OutboxRepositoryPort,
     protected readonly uow: UnitOfWorkPort,
-    reversalProcessor?: ReversalProcessor
+    reversalProcessor?: ReversalProcessor,
+    winProcessor?: WinProcessor
   ) {
     this.reversalProcessor =
       reversalProcessor ??
       new ReversalProcessor(this.walletRepo, this.wagerRepo, this.ledgerRepo, this.outboxRepo);
+    this.winProcessor =
+      winProcessor ??
+      new WinProcessor(this.walletRepo, this.wagerRepo, this.ledgerRepo, this.outboxRepo);
   }
 
   public async execute(idempotencyKey: string, dto: ProcessWagerDto): Promise<WagerResponseDto> {
@@ -316,202 +322,24 @@ export class ProcessWagerUseCase {
     dto: ProcessWagerDto,
     winMoney: Money
   ): Promise<WagerResponseDto> {
-    if (!winMoney.isPositive()) {
-      throw new InvalidWagerOperationError('WIN amount must be strictly greater than zero');
-    }
-
-    if (dto.referenceExternalTransactionId) {
-      const refTx = await this.wagerRepo.findByProviderAndExternalId(
-        dto.providerId,
-        dto.referenceExternalTransactionId
-      );
-
-      if (!refTx) {
-        return this.rejectWin(
-          transactionId,
-          idempotencyKey,
-          correlationId,
-          payloadHash,
-          wallet,
-          dto,
-          winMoney,
-          'REFERENCE_NOT_FOUND'
-        );
-      }
-
-      if (refTx.status !== 'PROCESSED') {
-        return this.rejectWin(
-          transactionId,
-          idempotencyKey,
-          correlationId,
-          payloadHash,
-          wallet,
-          dto,
-          winMoney,
-          'REFERENCE_NOT_PROCESSED'
-        );
-      }
-
-      const isCompatible =
-        refTx.kind === 'BET' &&
-        refTx.playerId.toLowerCase() === wallet.playerId.toLowerCase() &&
-        refTx.walletId.toLowerCase() === wallet.id.toLowerCase() &&
-        refTx.currency === wallet.currency &&
-        refTx.roundId === dto.roundId;
-
-      if (!isCompatible) {
-        return this.rejectWin(
-          transactionId,
-          idempotencyKey,
-          correlationId,
-          payloadHash,
-          wallet,
-          dto,
-          winMoney,
-          'REFERENCE_INCOMPATIBLE'
-        );
-      }
-    }
-
-    const previousBalanceAmount = wallet.balance.getAmount();
-    const ledgerEntryId = crypto.randomUUID();
-    const ledgerEntry = wallet.credit({
+    const result = await this.winProcessor.processWin(wallet, {
       transactionId,
-      amount: winMoney,
-      ledgerEntryId,
-    });
-    await this.walletRepo.save(wallet);
-
-    const response: WagerResponseDto = {
-      transactionId,
-      status: 'PROCESSED',
-      balance: {
-        amount: wallet.balance.getAmount(),
-        currency: wallet.currency,
-      },
-      idempotentReplay: false,
-    };
-
-    const pendingTx = WagerTransaction.createPending({
-      id: transactionId,
-      walletId: wallet.id,
-      playerId: wallet.playerId,
       providerId: dto.providerId,
       externalTransactionId: dto.externalTransactionId,
-      roundId: dto.roundId,
-      gameId: dto.gameId,
-      kind: 'WIN',
-      money: winMoney,
-      idempotencyKey,
-      payloadHash,
-      referenceExternalTransactionId: dto.referenceExternalTransactionId,
-    });
-
-    const processedTx = pendingTx.markProcessed(response);
-    await this.wagerRepo.save(processedTx);
-    await this.ledgerRepo.save(ledgerEntry);
-
-    const processedEvent = new WagerTransactionProcessedEvent({
-      aggregateId: wallet.id,
-      correlationId,
-      causationId: idempotencyKey,
-      data: {
-        transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'WIN',
-        amount: { amount: winMoney.getAmount(), currency: wallet.currency },
-        balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        referenceExternalTransactionId: dto.referenceExternalTransactionId ?? null,
-      },
-    });
-    await this.outboxRepo.save(processedEvent);
-
-    const balanceChangedEvent = new WalletBalanceChangedEvent({
-      aggregateId: wallet.id,
-      correlationId,
-      causationId: idempotencyKey,
-      data: {
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        currency: wallet.currency,
-        previousBalance: { amount: previousBalanceAmount, currency: wallet.currency },
-        currentBalance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        version: wallet.version,
-        triggerTransactionId: transactionId,
-      },
-    });
-    await this.outboxRepo.save(balanceChangedEvent);
-
-    return response;
-  }
-
-  private async rejectWin(
-    transactionId: string,
-    idempotencyKey: string,
-    correlationId: string,
-    payloadHash: string,
-    wallet: any,
-    dto: ProcessWagerDto,
-    winMoney: Money,
-    failureCode: string
-  ): Promise<WagerResponseDto> {
-    const response: WagerResponseDto = {
-      transactionId,
-      status: 'REJECTED',
-      failureCode,
-      balance: {
-        amount: wallet.balance.getAmount(),
-        currency: wallet.currency,
-      },
-      idempotentReplay: false,
-    };
-
-    const pendingTx = WagerTransaction.createPending({
-      id: transactionId,
-      walletId: wallet.id,
       playerId: wallet.playerId,
-      providerId: dto.providerId,
-      externalTransactionId: dto.externalTransactionId,
+      walletId: wallet.id,
       roundId: dto.roundId,
       gameId: dto.gameId,
-      kind: 'WIN',
       money: winMoney,
+      referenceExternalTransactionId: dto.referenceExternalTransactionId,
       idempotencyKey,
       payloadHash,
-      referenceExternalTransactionId: dto.referenceExternalTransactionId,
-    });
-
-    const rejectedTx = pendingTx.markRejected(failureCode, response);
-    await this.wagerRepo.save(rejectedTx);
-
-    const rejectedEvent = new WagerTransactionRejectedEvent({
-      aggregateId: wallet.id,
       correlationId,
-      causationId: idempotencyKey,
-      data: {
-        transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'WIN',
-        amount: { amount: winMoney.getAmount(), currency: wallet.currency },
-        balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        failureCode,
-        referenceExternalTransactionId: dto.referenceExternalTransactionId ?? null,
-      },
     });
-    await this.outboxRepo.save(rejectedEvent);
 
-    return response;
+    return result.response;
   }
+
 
   private async handleLoss(
     transactionId: string,

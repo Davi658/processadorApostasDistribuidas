@@ -15,6 +15,8 @@ import { CreateWalletUseCase } from '../../src/application/use-cases/create-wall
 import { GetWalletUseCase } from '../../src/application/use-cases/get-wallet.use-case';
 import { ProcessWagerUseCase } from '../../src/application/use-cases/process-wager.use-case';
 import { ReconcileWalletUseCase } from '../../src/application/use-cases/reconcile-wallet.use-case';
+import { ReprocessPendingReferencesUseCase } from '../../src/application/use-cases/reprocess-pending-references.use-case';
+import { DatabaseMigrator } from '../../src/infrastructure/persistence/migrator';
 import { ProcessWagerDto } from '../../src/application/dto/wager.dto';
 import { Money } from '../../src/domain/value-objects/money.vo';
 import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
@@ -35,6 +37,14 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
   let getWalletUseCase: GetWalletUseCase;
   let processWagerUseCase: ProcessWagerUseCase;
   let reconcileWalletUseCase: ReconcileWalletUseCase;
+  let reprocessWorker: ReprocessPendingReferencesUseCase;
+
+  async function makePendingEligible(transactionId: string): Promise<void> {
+    await adminPool.query(
+      "UPDATE wager_transactions SET next_attempt_at = NOW() - INTERVAL '1 second' WHERE id = $1;",
+      [transactionId]
+    );
+  }
 
   beforeAll(async () => {
     // 1. Criar banco de dados isolado e descartável com migrações aplicadas
@@ -66,6 +76,7 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
     getWalletUseCase = app.get(GetWalletUseCase);
     processWagerUseCase = app.get(ProcessWagerUseCase);
     reconcileWalletUseCase = app.get(ReconcileWalletUseCase);
+    reprocessWorker = app.get(ReprocessPendingReferencesUseCase);
   }, 30000);
 
   afterAll(async () => {
@@ -1578,7 +1589,7 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
       expect(recon.storedBalance.amount).toBe('160.00');
     });
 
-    it('9.2: WIN com referência a BET inexistente é rejeitada com 422 e REFERENCE_NOT_FOUND', async () => {
+    it('9.2: WIN com referência a BET ausente ou ainda não processada gera PENDING_REFERENCE (202 Accepted) e outbox de pendência', async () => {
       const playerId = crypto.randomUUID();
       const wallet = await createWalletUseCase.execute({
         playerId,
@@ -1602,33 +1613,35 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
         }),
       });
 
-      expect(winRes.status).toBe(422);
+      expect(winRes.status).toBe(202);
       const winData = (await winRes.json()) as any;
-      expect(winData.status).toBe('REJECTED');
-      expect(winData.failureCode).toBe('REFERENCE_NOT_FOUND');
+      expect(winData.status).toBe('PENDING_REFERENCE');
       expect(winData.balance.amount).toBe('100.00');
 
       uow.getEntityManager().clear();
 
-      // Saldo da carteira não foi alterado
+      // Saldo da carteira não foi alterado e versão permanece 1
       const walletRow = (await adminPool.query('SELECT * FROM wallets WHERE id = $1', [wallet.id])).rows[0];
       expect(walletRow.balance).toBe('100.00');
       expect(Number(walletRow.version)).toBe(1);
 
-      // Transação persistida em status REJECTED
-      const rejectedTx = (await adminPool.query('SELECT * FROM wager_transactions WHERE id = $1', [winData.transactionId])).rows[0];
-      expect(rejectedTx.status).toBe('REJECTED');
-      expect(rejectedTx.rejection_reason).toBe('REFERENCE_NOT_FOUND');
+      // Transação persistida em status PENDING_REFERENCE com snapshot
+      const pendingTx = (await adminPool.query('SELECT * FROM wager_transactions WHERE id = $1', [winData.transactionId])).rows[0];
+      expect(pendingTx.status).toBe('PENDING_REFERENCE');
+      expect(pendingTx.reference_external_transaction_id).toBe(missingBetExtId);
+      expect(pendingTx.attempts).toBe(1);
+      expect(pendingTx.next_attempt_at).toBeDefined();
 
-      // Zero ledger entries para a rejeição
+      // Zero ledger entries para a pendência
       const ledgerCount = await adminPool.query('SELECT count(*) FROM wallet_ledger_entries WHERE transaction_id = $1', [winData.transactionId]);
       expect(Number(ledgerCount.rows[0].count)).toBe(0);
 
-      // Outbox emite WagerTransactionRejected
+      // Outbox emite WagerTransactionPendingReference
       const outboxEvents = await findOutboxEventsForTransaction(winData.transactionId);
       expect(outboxEvents.length).toBe(1);
-      expect(outboxEvents[0].event_type).toBe('WagerTransactionRejected');
-      expect(outboxEvents[0].payload.failureCode).toBe('REFERENCE_NOT_FOUND');
+      expect(outboxEvents[0].event_type).toBe('WagerTransactionPendingReference');
+      expect(outboxEvents[0].payload.referenceExternalTransactionId).toBe(missingBetExtId);
+      expect(outboxEvents[0].payload.kind).toBe('WIN');
     });
 
     it('9.3: WIN com referência a BET de outra rodada ou outra carteira é rejeitada com 422 e REFERENCE_INCOMPATIBLE', async () => {
@@ -1775,6 +1788,679 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
       const winData = (await winRes.json()) as any;
       expect(winData.status).toBe('REJECTED');
       expect(winData.failureCode).toBe('REFERENCE_NOT_PROCESSED');
+    });
+  });
+
+  // =========================================================================
+  // 10. WIN COM REFERÊNCIA FORA DE ORDEM, MÚLTIPLAS WINS NA MESMA BET E RESOLUÇÃO
+  // =========================================================================
+  describe('10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução', () => {
+    it('10.1: WIN chega antes da BET → PENDING_REFERENCE (202); BET chega; execução manual resolve com um crédito', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const betExtId = `bet-ooo-10-1-${crypto.randomUUID()}`;
+      const winExtId = `win-ooo-10-1-${crypto.randomUUID()}`;
+      const winKey = `key-win-ooo-10-1-${crypto.randomUUID()}`;
+
+      // 1. WIN chega antes da BET existir -> PENDING_REFERENCE (HTTP 202)
+      const winRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': winKey },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: winExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_ooo_10_1',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '45.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(winRes.status).toBe(202);
+      const winData = (await winRes.json()) as any;
+      expect(winData.status).toBe('PENDING_REFERENCE');
+      expect(winData.balance.amount).toBe('100.00');
+
+      // Carteira intacta
+      const midWallet = await getWalletUseCase.execute(wallet.id);
+      expect(midWallet.balance.amount).toBe('100.00');
+      expect(midWallet.version).toBe(1);
+
+      // 2. BET chega e é processada com sucesso
+      const betRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-bet-ooo-10-1-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: betExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_ooo_10_1',
+          gameId: 'slot_ref',
+          kind: 'BET',
+          money: { amount: '20.00', currency: 'BRL' },
+        }),
+      });
+      expect(betRes.status).toBe(200);
+
+      // Saldo após BET: 100 - 20 = 80.00, version = 2
+      const walletAfterBet = await getWalletUseCase.execute(wallet.id);
+      expect(walletAfterBet.balance.amount).toBe('80.00');
+      expect(walletAfterBet.version).toBe(2);
+
+      // 3. Execução manual do reprocessador
+      await makePendingEligible(winData.transactionId);
+      const reprocessResult = await reprocessWorker.execute(10);
+      expect(reprocessResult.processed).toBe(1);
+
+      uow.getEntityManager().clear();
+
+      // Transação agora é PROCESSED
+      const updatedWinTx = (await adminPool.query('SELECT * FROM wager_transactions WHERE id = $1', [winData.transactionId])).rows[0];
+      expect(updatedWinTx.status).toBe('PROCESSED');
+
+      // Carteira creditada exatamente uma vez: 80.00 + 45.00 = 125.00, version = 3
+      const finalWallet = await getWalletUseCase.execute(wallet.id);
+      expect(finalWallet.balance.amount).toBe('125.00');
+      expect(finalWallet.version).toBe(3);
+
+      // Reconciliação perfeita
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('125.00');
+
+      // Replay terminal após resolução preserva resultado histórico
+      const replayRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': winKey },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: winExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_ooo_10_1',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '45.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(replayRes.status).toBe(200);
+      const replayData = (await replayRes.json()) as any;
+      expect(replayData.status).toBe('PROCESSED');
+      expect(replayData.idempotentReplay).toBe(true);
+      expect(replayData.balance.amount).toBe('125.00');
+    });
+
+    it('10.2: Referência incompatível (BET em outra carteira/player) → reprocessador rejeita sem crédito', async () => {
+      const player1 = crypto.randomUUID();
+      const player2 = crypto.randomUUID();
+      const wallet1 = await createWalletUseCase.execute({ playerId: player1, initialBalance: { amount: '100.00', currency: 'BRL' } });
+      const wallet2 = await createWalletUseCase.execute({ playerId: player2, initialBalance: { amount: '100.00', currency: 'BRL' } });
+
+      const betExtId = `bet-cross-10-2-${crypto.randomUUID()}`;
+      const winExtId = `win-cross-10-2-${crypto.randomUUID()}`;
+
+      // WIN chega na Wallet 2 apontando para betExtId ainda inexistente -> 202 PENDING_REFERENCE
+      const winRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-win-cross-10-2-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: winExtId,
+          playerId: player2,
+          walletId: wallet2.id,
+          roundId: 'round_cross_10_2',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '30.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(winRes.status).toBe(202);
+      const winData = (await winRes.json()) as any;
+      expect(winData.status).toBe('PENDING_REFERENCE');
+
+      // A BET chega na Wallet 1 (player 1) e é processada
+      await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-bet-cross-10-2-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: betExtId,
+          playerId: player1,
+          walletId: wallet1.id,
+          roundId: 'round_cross_10_2',
+          gameId: 'slot_ref',
+          kind: 'BET',
+          money: { amount: '20.00', currency: 'BRL' },
+        }),
+      });
+
+      // Execução manual do reprocessador
+      await makePendingEligible(winData.transactionId);
+      const reprocessResult = await reprocessWorker.execute(10);
+      expect(reprocessResult.rejected).toBe(1);
+
+      uow.getEntityManager().clear();
+
+      // Transação na Wallet 2 rejeitada por incompatibilidade
+      const rejectedTx = (await adminPool.query('SELECT * FROM wager_transactions WHERE id = $1', [winData.transactionId])).rows[0];
+      expect(rejectedTx.status).toBe('REJECTED');
+      expect(rejectedTx.rejection_reason).toBe('REFERENCE_INCOMPATIBLE');
+
+      // Saldo da Wallet 2 intacto
+      const finalWallet2 = await getWalletUseCase.execute(wallet2.id);
+      expect(finalWallet2.balance.amount).toBe('100.00');
+      expect(finalWallet2.version).toBe(1);
+
+      // Zero lançamentos no ledger para a WIN rejeitada
+      const ledgerRows = (await adminPool.query('SELECT * FROM wallet_ledger_entries WHERE transaction_id = $1', [winData.transactionId])).rows;
+      expect(ledgerRows.length).toBe(0);
+
+      // Reconciliação perfeita
+      const recon = await reconcileWalletUseCase.execute(wallet2.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('100.00');
+    });
+
+    it('10.3: Referência rejeitada (BET REJECTED por saldo insuficiente) → reprocessador rejeita sem crédito', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '10.00', currency: 'BRL' },
+      });
+
+      const betExtId = `bet-rej-10-3-${crypto.randomUUID()}`;
+      const winExtId = `win-rej-10-3-${crypto.randomUUID()}`;
+
+      // WIN chega pendente referenciando a BET futura
+      const winRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-win-rej-10-3-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: winExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_rej_10_3',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '30.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(winRes.status).toBe(202);
+      const winData = (await winRes.json()) as any;
+
+      // BET chega depois e é rejeitada por saldo insuficiente (10.00 disponível vs 50.00 solicitados)
+      const betRes = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-bet-rej-10-3-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: betExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_rej_10_3',
+          gameId: 'slot_ref',
+          kind: 'BET',
+          money: { amount: '50.00', currency: 'BRL' },
+        }),
+      });
+      expect(betRes.status).toBe(422);
+
+      // Execução manual do reprocessador
+      await makePendingEligible(winData.transactionId);
+      const reprocessResult = await reprocessWorker.execute(10);
+      expect(reprocessResult.rejected).toBe(1);
+
+      uow.getEntityManager().clear();
+
+      // Transação WIN rejeitada com REFERENCE_NOT_PROCESSED
+      const rejectedTx = (await adminPool.query('SELECT * FROM wager_transactions WHERE id = $1', [winData.transactionId])).rows[0];
+      expect(rejectedTx.status).toBe('REJECTED');
+      expect(rejectedTx.rejection_reason).toBe('REFERENCE_NOT_PROCESSED');
+
+      // Saldo inalterado
+      const finalWallet = await getWalletUseCase.execute(wallet.id);
+      expect(finalWallet.balance.amount).toBe('10.00');
+      expect(finalWallet.version).toBe(1);
+    });
+
+    it('10.4: Duas WIN distintas vinculadas à mesma BET sequencialmente → ambas processam, créditos exatos, version, ledger, outbox e replay', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // 1. Processar BET de 20.00 (saldo 80.00, version = 2)
+      const betExtId = `bet-multi-seq-${crypto.randomUUID()}`;
+      await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-bet-seq-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: betExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_multi_seq',
+          gameId: 'slot_ref',
+          kind: 'BET',
+          money: { amount: '20.00', currency: 'BRL' },
+        }),
+      });
+
+      // 2. Primeira WIN vinculada à BET: ganho de 30.00
+      const win1ExtId = `win1-multi-seq-${crypto.randomUUID()}`;
+      const win1Key = `key-win1-seq-${crypto.randomUUID()}`;
+      const win1Res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': win1Key },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: win1ExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_multi_seq',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '30.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(win1Res.status).toBe(200);
+      const win1Data = (await win1Res.json()) as any;
+      expect(win1Data.status).toBe('PROCESSED');
+      expect(win1Data.balance.amount).toBe('110.00'); // 80 + 30 = 110.00
+
+      // 3. Segunda WIN distinta vinculada à mesma BET: ganho de 40.00 (permitido pela Migration 004!)
+      const win2ExtId = `win2-multi-seq-${crypto.randomUUID()}`;
+      const win2Key = `key-win2-seq-${crypto.randomUUID()}`;
+      const win2Res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': win2Key },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: win2ExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_multi_seq',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '40.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(win2Res.status).toBe(200);
+      const win2Data = (await win2Res.json()) as any;
+      expect(win2Data.status).toBe('PROCESSED');
+      expect(win2Data.balance.amount).toBe('150.00'); // 110 + 40 = 150.00
+
+      uow.getEntityManager().clear();
+
+      // Prova PostgreSQL: Saldo 150.00, Versão 4 (1 opening + 1 bet + 1 win1 + 1 win2)
+      const walletRow = (await adminPool.query('SELECT * FROM wallets WHERE id = $1', [wallet.id])).rows[0];
+      expect(walletRow.balance).toBe('150.00');
+      expect(Number(walletRow.version)).toBe(4);
+
+      // Ambas as transações persistidas como PROCESSED apontando para a mesma BET
+      const winRows = (await adminPool.query("SELECT * FROM wager_transactions WHERE reference_external_transaction_id = $1 AND kind = 'WIN'", [betExtId])).rows;
+      expect(winRows.length).toBe(2);
+      expect(winRows.every((r: any) => r.status === 'PROCESSED')).toBe(true);
+
+      // Ledger: 4 lançamentos (1 opening CREDIT, 1 bet DEBIT, 2 win CREDIT)
+      const ledgerRows = (await adminPool.query('SELECT * FROM wallet_ledger_entries WHERE wallet_id = $1', [wallet.id])).rows;
+      expect(ledgerRows.length).toBe(4);
+
+      // Outbox: eventos emitidos para ambas as WINs
+      const outbox1 = await findOutboxEventsForTransaction(win1Data.transactionId);
+      expect(outbox1.some((e) => e.event_type === 'WagerTransactionProcessed')).toBe(true);
+      expect(outbox1.some((e) => e.event_type === 'WalletBalanceChanged')).toBe(true);
+
+      const outbox2 = await findOutboxEventsForTransaction(win2Data.transactionId);
+      expect(outbox2.some((e) => e.event_type === 'WagerTransactionProcessed')).toBe(true);
+      expect(outbox2.some((e) => e.event_type === 'WalletBalanceChanged')).toBe(true);
+
+      // Reconciliação perfeita
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('150.00');
+
+      // Replays individuais continuam idempotentes
+      const replayWin1 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': win1Key },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: win1ExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_multi_seq',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '30.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(replayWin1.status).toBe(200);
+      const replayWin1Data = (await replayWin1.json()) as any;
+      expect(replayWin1Data.idempotentReplay).toBe(true);
+      expect(replayWin1Data.balance.amount).toBe('110.00'); // Snapshot histórico preservado!
+
+      const replayWin2 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': win2Key },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: win2ExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_multi_seq',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '40.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(replayWin2.status).toBe(200);
+      const replayWin2Data = (await replayWin2.json()) as any;
+      expect(replayWin2Data.idempotentReplay).toBe(true);
+      expect(replayWin2Data.balance.amount).toBe('150.00');
+    });
+
+    it('10.5: Duas WIN distintas vinculadas à mesma BET concorrentemente → ambas processam, créditos exatos sem lost update', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      // BET de 10.00 (saldo 90.00, version = 2)
+      const betExtId = `bet-multi-con-${crypto.randomUUID()}`;
+      await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-bet-con-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: betExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_multi_con',
+          gameId: 'slot_ref',
+          kind: 'BET',
+          money: { amount: '10.00', currency: 'BRL' },
+        }),
+      });
+
+      // Disparo concorrente de duas WINs distintas apontando para a mesma BET
+      const win1ExtId = `win1-con-${crypto.randomUUID()}`;
+      const win2ExtId = `win2-con-${crypto.randomUUID()}`;
+
+      const [res1, res2] = await Promise.all([
+        fetch(`${serverUrl}/wagering/transactions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-win1-con-${crypto.randomUUID()}` },
+          body: JSON.stringify({
+            providerId: 'provider_m06',
+            externalTransactionId: win1ExtId,
+            playerId,
+            walletId: wallet.id,
+            roundId: 'round_multi_con',
+            gameId: 'slot_ref',
+            kind: 'WIN',
+            money: { amount: '25.00', currency: 'BRL' },
+            referenceExternalTransactionId: betExtId,
+          }),
+        }),
+        fetch(`${serverUrl}/wagering/transactions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-win2-con-${crypto.randomUUID()}` },
+          body: JSON.stringify({
+            providerId: 'provider_m06',
+            externalTransactionId: win2ExtId,
+            playerId,
+            walletId: wallet.id,
+            roundId: 'round_multi_con',
+            gameId: 'slot_ref',
+            kind: 'WIN',
+            money: { amount: '35.00', currency: 'BRL' },
+            referenceExternalTransactionId: betExtId,
+          }),
+        }),
+      ]);
+
+      expect(res1.status).toBe(200);
+      expect(res2.status).toBe(200);
+
+      uow.getEntityManager().clear();
+
+      // Saldo final: 90.00 + 25.00 + 35.00 = 150.00, version = 4
+      const walletRow = (await adminPool.query('SELECT * FROM wallets WHERE id = $1', [wallet.id])).rows[0];
+      expect(walletRow.balance).toBe('150.00');
+      expect(Number(walletRow.version)).toBe(4);
+
+      // Reconciliação
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('150.00');
+    });
+
+    it('10.6: Duas WINs pendentes para a mesma BET → ambas chegam antes da BET e ambas resolvem uma única vez', async () => {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const betExtId = `bet-2ooo-${crypto.randomUUID()}`;
+      const win1ExtId = `win1-2ooo-${crypto.randomUUID()}`;
+      const win2ExtId = `win2-2ooo-${crypto.randomUUID()}`;
+      const win1Key = `key-win1-2ooo-${crypto.randomUUID()}`;
+      const win2Key = `key-win2-2ooo-${crypto.randomUUID()}`;
+
+      // 1. Submeter WIN 1 antes da BET -> 202 PENDING_REFERENCE
+      const win1Res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': win1Key },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: win1ExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_2ooo',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '30.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(win1Res.status).toBe(202);
+      const win1Data = (await win1Res.json()) as any;
+
+      // 2. Submeter WIN 2 antes da BET -> 202 PENDING_REFERENCE
+      const win2Res = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': win2Key },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: win2ExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_2ooo',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '20.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(win2Res.status).toBe(202);
+      const win2Data = (await win2Res.json()) as any;
+
+      // 3. Submeter BET de 15.00
+      await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': `key-bet-2ooo-${crypto.randomUUID()}` },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: betExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_2ooo',
+          gameId: 'slot_ref',
+          kind: 'BET',
+          money: { amount: '15.00', currency: 'BRL' },
+        }),
+      });
+
+      // 4. Executar reprocessador para ambas as pendências
+      await makePendingEligible(win1Data.transactionId);
+      await makePendingEligible(win2Data.transactionId);
+
+      const reprocessResult = await reprocessWorker.execute(10);
+      expect(reprocessResult.processed).toBe(2);
+
+      uow.getEntityManager().clear();
+
+      // Saldo final: 100 - 15 + 30 + 20 = 135.00, version = 4
+      const finalWallet = await getWalletUseCase.execute(wallet.id);
+      expect(finalWallet.balance.amount).toBe('135.00');
+      expect(finalWallet.version).toBe(4);
+
+      // Reconciliação
+      const recon = await reconcileWalletUseCase.execute(wallet.id);
+      expect(recon.consistent).toBe(true);
+      expect(recon.storedBalance.amount).toBe('135.00');
+
+      // Replays de ambas preservam resultados históricos
+      const rep1 = await fetch(`${serverUrl}/wagering/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': win1Key },
+        body: JSON.stringify({
+          providerId: 'provider_m06',
+          externalTransactionId: win1ExtId,
+          playerId,
+          walletId: wallet.id,
+          roundId: 'round_2ooo',
+          gameId: 'slot_ref',
+          kind: 'WIN',
+          money: { amount: '30.00', currency: 'BRL' },
+          referenceExternalTransactionId: betExtId,
+        }),
+      });
+      expect(rep1.status).toBe(200);
+      const rep1Data = (await rep1.json()) as any;
+      expect(rep1Data.idempotentReplay).toBe(true);
+      expect(rep1Data.status).toBe('PROCESSED');
+    });
+  });
+
+  // =========================================================================
+  // 11. VALIDAÇÃO DA MIGRATION 004 UP/DOWN/UP E RECUSA SEGURA EM BANCO DESCARTÁVEL
+  // =========================================================================
+  describe('11. Validação da Migration 004 Up/Down/Up e Recusa Segura em Banco Descartável', () => {
+    it('deve executar up/down/up com sucesso e recusar down com segurança quando existem dados incompatíveis', async () => {
+      // 1. Criar banco isolado dedicado exclusivamente para testes de migration
+      const migDb = await createIsolatedTestDatabase('mig004_test_');
+      const migPool = new pg.Pool(migDb.adminConfig);
+      const migrator = new DatabaseMigrator(migDb.adminConfig);
+
+      try {
+        // O banco recém-criado já aplicou as migrações up (001, 002, 003, 004)
+        const check004 = await migPool.query<{ version: string }>(
+          "SELECT version FROM schema_migrations WHERE version = '004_restrict_reversal_unique_index';"
+        );
+        expect(check004.rows.length).toBe(1);
+
+        // 2. Testar down da 004 (reverte para 003 sem dados conflitantes)
+        const revertedVersion = await migrator.down();
+        expect(revertedVersion).toBe('004_restrict_reversal_unique_index');
+
+        const checkAfterDown = await migPool.query<{ version: string }>(
+          "SELECT version FROM schema_migrations WHERE version = '004_restrict_reversal_unique_index';"
+        );
+        expect(checkAfterDown.rows.length).toBe(0);
+
+        // 3. Testar up novamente (reaplica 004 com sucesso)
+        const reapplied = await migrator.up();
+        expect(reapplied).toContain('004_restrict_reversal_unique_index');
+
+        // 4. Inserir duas transações WIN PROCESSED com o mesmo provider_id e reference_external_transaction_id
+        // Primeiro cria uma wallet fictícia
+        const dummyWalletId = crypto.randomUUID();
+        const dummyPlayerId = crypto.randomUUID();
+        await migPool.query(
+          `INSERT INTO wallets (id, player_id, currency, balance, version, created_at, updated_at)
+           VALUES ($1, $2, 'BRL', '100.00', 1, NOW(), NOW());`,
+          [dummyWalletId, dummyPlayerId]
+        );
+
+        const refExtId = `bet-for-mig-test-${crypto.randomUUID()}`;
+        const tx1Id = crypto.randomUUID();
+        const tx2Id = crypto.randomUUID();
+
+        // Primeira WIN
+        await migPool.query(
+          `INSERT INTO wager_transactions (
+             id, wallet_id, player_id, provider_id, external_transaction_id,
+             round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash,
+             reference_external_transaction_id, response_snapshot, created_at, updated_at
+           ) VALUES (
+             $1, $2, $3, 'prv-mig', 'ext-mig-win-1',
+             'rnd-mig', 'gm-mig', 'WIN', '10.00', 'BRL', 'PROCESSED', 'key-mig-1', 'hash-1',
+             $4, '{}'::jsonb, NOW(), NOW()
+           );`,
+          [tx1Id, dummyWalletId, dummyPlayerId, refExtId]
+        );
+
+        // Segunda WIN com o MESMO reference_external_transaction_id (válido na 004)
+        await migPool.query(
+          `INSERT INTO wager_transactions (
+             id, wallet_id, player_id, provider_id, external_transaction_id,
+             round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash,
+             reference_external_transaction_id, response_snapshot, created_at, updated_at
+           ) VALUES (
+             $1, $2, $3, 'prv-mig', 'ext-mig-win-2',
+             'rnd-mig', 'gm-mig', 'WIN', '20.00', 'BRL', 'PROCESSED', 'key-mig-2', 'hash-2',
+             $4, '{}'::jsonb, NOW(), NOW()
+           );`,
+          [tx2Id, dummyWalletId, dummyPlayerId, refExtId]
+        );
+
+        // 5. Tentar executar o DOWN da 004
+        // A recusa segura deve disparar a exceção customizada (ERRCODE 23505)
+        let downFailed = false;
+        try {
+          await migrator.down();
+        } catch (err: any) {
+          downFailed = true;
+          expect(err.message).toContain('Cannot revert migration 004');
+        }
+        expect(downFailed).toBe(true);
+
+        // 6. Confirmar que a migração 004 permaneceu intacta e nenhum registro foi apagado
+        const remainingTxs = await migPool.query(
+          'SELECT id FROM wager_transactions WHERE id IN ($1, $2);',
+          [tx1Id, tx2Id]
+        );
+        expect(remainingTxs.rows.length).toBe(2);
+
+        const checkStill004 = await migPool.query<{ version: string }>(
+          "SELECT version FROM schema_migrations WHERE version = '004_restrict_reversal_unique_index';"
+        );
+        expect(checkStill004.rows.length).toBe(1);
+      } finally {
+        await migrator.close();
+        await migPool.end();
+        await migDb.closeAndDrop();
+      }
     });
   });
 });

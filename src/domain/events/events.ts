@@ -118,7 +118,7 @@ export interface WagerTransactionPendingReferenceData {
   externalTransactionId: string;
   roundId: string;
   gameId: string;
-  kind: 'REFUND' | 'ROLLBACK';
+  kind: 'REFUND' | 'ROLLBACK' | 'WIN';
   amount: { amount: string; currency: string };
   referenceExternalTransactionId: string;
   attempts: number;

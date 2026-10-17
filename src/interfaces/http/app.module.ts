@@ -11,6 +11,7 @@ import { GetWalletUseCase } from '../../application/use-cases/get-wallet.use-cas
 import { ProcessWagerUseCase } from '../../application/use-cases/process-wager.use-case';
 import { ProcessBetUseCase } from '../../application/use-cases/process-bet.use-case';
 import { ReconcileWalletUseCase } from '../../application/use-cases/reconcile-wallet.use-case';
+import { ReprocessPendingReferencesUseCase } from '../../application/use-cases/reprocess-pending-references.use-case';
 import { WalletController } from './controllers/wallet.controller';
 import { WageringController } from './controllers/wagering.controller';
 
@@ -105,6 +106,23 @@ import { WageringController } from './controllers/wagering.controller';
         uow: MikroOrmUnitOfWork
       ) => new ReconcileWalletUseCase(walletRepo, ledgerRepo, uow),
       inject: [MikroOrmWalletRepository, MikroOrmWalletLedgerRepository, MikroOrmUnitOfWork],
+    },
+    {
+      provide: ReprocessPendingReferencesUseCase,
+      useFactory: (
+        walletRepo: MikroOrmWalletRepository,
+        wagerRepo: MikroOrmWagerTransactionRepository,
+        ledgerRepo: MikroOrmWalletLedgerRepository,
+        outboxRepo: MikroOrmOutboxRepository,
+        uow: MikroOrmUnitOfWork
+      ) => new ReprocessPendingReferencesUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow, 5),
+      inject: [
+        MikroOrmWalletRepository,
+        MikroOrmWagerTransactionRepository,
+        MikroOrmWalletLedgerRepository,
+        MikroOrmOutboxRepository,
+        MikroOrmUnitOfWork,
+      ],
     },
   ],
 })

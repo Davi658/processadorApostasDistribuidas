@@ -6,6 +6,7 @@ import {
   WalletRepositoryPort,
 } from '../ports/ports';
 import { ReversalProcessor } from '../services/reversal-processor.service';
+import { WinProcessor } from '../services/win-processor.service';
 
 export interface ReprocessResult {
   processed: number;
@@ -15,6 +16,7 @@ export interface ReprocessResult {
 
 export class ReprocessPendingReferencesUseCase {
   private readonly reversalProcessor: ReversalProcessor;
+  private readonly winProcessor: WinProcessor;
 
   constructor(
     private readonly walletRepo: WalletRepositoryPort,
@@ -23,11 +25,15 @@ export class ReprocessPendingReferencesUseCase {
     private readonly outboxRepo: OutboxRepositoryPort,
     private readonly uow: UnitOfWorkPort,
     private readonly maxAttempts = 5,
-    reversalProcessor?: ReversalProcessor
+    reversalProcessor?: ReversalProcessor,
+    winProcessor?: WinProcessor
   ) {
     this.reversalProcessor =
       reversalProcessor ??
       new ReversalProcessor(this.walletRepo, this.wagerRepo, this.ledgerRepo, this.outboxRepo);
+    this.winProcessor =
+      winProcessor ??
+      new WinProcessor(this.walletRepo, this.wagerRepo, this.ledgerRepo, this.outboxRepo);
   }
 
   public async execute(limit = 20): Promise<ReprocessResult> {
@@ -55,30 +61,57 @@ export class ReprocessPendingReferencesUseCase {
         const wallet = await this.walletRepo.findById(tx.walletId, true);
         if (!wallet) return;
 
-        const result = await this.reversalProcessor.processReversal(wallet, {
-          transactionId: tx.id,
-          providerId: tx.providerId,
-          externalTransactionId: tx.externalTransactionId,
-          playerId: tx.playerId,
-          walletId: tx.walletId,
-          roundId: tx.roundId,
-          gameId: tx.gameId,
-          kind: tx.kind as 'REFUND' | 'ROLLBACK',
-          money: tx.money,
-          referenceExternalTransactionId: refId,
-          idempotencyKey: tx.idempotencyKey,
-          payloadHash: tx.payloadHash,
-          correlationId: crypto.randomUUID(),
-          existingPendingTx: tx,
-          maxAttempts: this.maxAttempts,
-        });
+        if (tx.kind === 'WIN') {
+          const result = await this.winProcessor.processWin(wallet, {
+            transactionId: tx.id,
+            providerId: tx.providerId,
+            externalTransactionId: tx.externalTransactionId,
+            playerId: tx.playerId,
+            walletId: tx.walletId,
+            roundId: tx.roundId,
+            gameId: tx.gameId,
+            money: tx.money,
+            referenceExternalTransactionId: refId,
+            idempotencyKey: tx.idempotencyKey,
+            payloadHash: tx.payloadHash,
+            correlationId: crypto.randomUUID(),
+            existingPendingTx: tx,
+            maxAttempts: this.maxAttempts,
+          });
 
-        if (result.outcome === 'PROCESSED') {
-          processed++;
-        } else if (result.outcome === 'REJECTED') {
-          rejected++;
-        } else if (result.outcome === 'RESCHEDULED') {
-          rescheduled++;
+          if (result.outcome === 'PROCESSED') {
+            processed++;
+          } else if (result.outcome === 'REJECTED') {
+            rejected++;
+          } else if (result.outcome === 'RESCHEDULED') {
+            rescheduled++;
+          }
+        } else if (tx.kind === 'REFUND' || tx.kind === 'ROLLBACK') {
+          const result = await this.reversalProcessor.processReversal(wallet, {
+            transactionId: tx.id,
+            providerId: tx.providerId,
+            externalTransactionId: tx.externalTransactionId,
+            playerId: tx.playerId,
+            walletId: tx.walletId,
+            roundId: tx.roundId,
+            gameId: tx.gameId,
+            kind: tx.kind as 'REFUND' | 'ROLLBACK',
+            money: tx.money,
+            referenceExternalTransactionId: refId,
+            idempotencyKey: tx.idempotencyKey,
+            payloadHash: tx.payloadHash,
+            correlationId: crypto.randomUUID(),
+            existingPendingTx: tx,
+            maxAttempts: this.maxAttempts,
+          });
+
+          if (result.outcome === 'PROCESSED') {
+            processed++;
+          } else if (result.outcome === 'REJECTED') {
+            rejected++;
+          } else if (result.outcome === 'RESCHEDULED') {
+            rescheduled++;
+          }
         }
       });
     }

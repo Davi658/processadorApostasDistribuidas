@@ -19,8 +19,7 @@
 | **Frente M02** | 13. Estabilização da Frente Money (NUMERIC 18,2, overflow no domínio, round-trip real) | **CONCLUÍDO** | `tests/unit/money.test.ts`, `tests/integration/money-postgres-roundtrip.test.ts` |
 | **Frente M03** | 14. Estabilização da Abertura de Carteira (Contrato, atomicidade SQL, 20 concorrentes, rollback em falhas injetadas, reconciliação, limite Money) | **CONCLUÍDO** | `tests/integration/wallet-opening.test.ts` |
 | **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
-| **Frente M05** | 16. Estabilização MikroORM e Unidade de Trabalho (Isolamento de EntityManager por execução via AsyncLocalStorage, zero Identity Map compartilhado, conexão e tx compartilhadas pelos 4 repositórios, locks pessimistas na tx, rollback integral, chamadas aninhadas com Rollback-Only, escrita sem UoW rejeitada com TransactionRequiredError, ciclo de vida NestJS sem conexões penduradas) | **CONCLUÍDO** | `tests/integration/mikro-orm-uow-m05.test.ts` (18 testes passando) |
-| **Frente M06** | 17. Estabilização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado e referência opcional validando BET) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (31 testes passando) |
+| **Frente M06** | 17. Estabilização e Finalização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado, Migration 004 permitindo múltiplas WINs na mesma BET sequencial e concorrentemente com down seguro, WIN fora de ordem via PENDING_REFERENCE e 202, WinProcessor dedicado, resolução determinística e replays) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (38 testes passando) |
 
 
 ---
@@ -169,8 +168,17 @@
   - 50 LOSS idênticas simultâneas geram exatamente 1 transação, 1 evento e zero movimentos na carteira.
   - 10 WIN distintas simultâneas na mesma carteira executam soma exata sem lost update e com version correta (ex: +100.00 e version+10).
   - Falhas injetadas em `wallet_save`, `tx_save`, `ledger_save` e primeira `outbox_save` para WIN e `tx_save`, `outbox_save` para LOSS executam rollback integral auditado por IDs, com reenvio bem-sucedido e efeito único.
-- **Referência Opcional de WIN:**
-  - Se `referenceExternalTransactionId` for informada em WIN, valida existência e compatibilidade da BET (PROCESSED, mesma carteira/jogador/moeda/rodada). Se incompatível, não encontrada ou não processada, rejeita auditavelmente com 422 (`REFERENCE_INCOMPATIBLE`, `REFERENCE_NOT_FOUND` ou `REFERENCE_NOT_PROCESSED`). Se omitida, opera como ganho independente.
+- **Referência Opcional de WIN e Resolução Fora de Ordem (`WinProcessor`):**
+  - Se `referenceExternalTransactionId` for informada em WIN e a referência estiver ausente ou ainda não processada, a operação transiciona para `PENDING_REFERENCE` (HTTP 202 Accepted), com persistência do snapshot de resposta e evento `WagerTransactionPendingReferenceEvent` na outbox.
+  - A resolução de referências pendentes foi encapsulada no serviço dedicado `WinProcessor` (reutilizando a exata mesma regra de domínio de WIN do fluxo imediato, sem direcionar para o `ReversalProcessor` exclusivo de reversões).
+  - Quando a BET de referência é processada, o reprocessamento manual resolve a pendência aplicando um crédito exato, version+1, ledger `CREDIT`, eventos na outbox e status `PROCESSED`.
+  - Referências com falha ou rejeitadas (`REJECTED` ou `FAILED`) são rejeitadas auditavelmente com o código estável `REFERENCE_NOT_PROCESSED`.
+  - Referências incompatíveis (divergência de carteira, jogador, moeda, rodada ou tipo diferente de `BET`) são rejeitadas com `REFERENCE_INCOMPATIBLE`. Não se exige igualdade de valores entre WIN e BET (ganho não é reversão).
+  - Replays terminais de transações resolvidas após período pendente preservam imutáveis os dados e saldos históricos originais.
+- **Múltiplas WINs Vinculadas à Mesma BET (Migration 004):**
+  - A migration incremental `004_restrict_reversal_unique_index.sql` restringe a unicidade parcial de `uq_processed_reversal_per_reference` exclusivamente a `kind IN ('REFUND', 'ROLLBACK')`.
+  - Múltiplas operações WIN apontando para uma mesma BET são aceitas sequencial e concorrentemente, mantendo a consistência do saldo e do versionamento.
+  - O script de reversão `004_restrict_reversal_unique_index.down.sql` implementa recusa segura com código 23505 caso encontre registros incompatíveis com a constraint 003, impedindo qualquer exclusão acidental de dados.
 
 ---
 
