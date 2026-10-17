@@ -31,11 +31,12 @@ describe('Reversible Migrations on Disposable Database', () => {
 
       // 2. Run UP migrations
       const applied = await migrator.up();
-      expect(applied.length).toBe(4);
+      expect(applied.length).toBe(5);
       expect(applied).toContain('001_initial_schema');
       expect(applied).toContain('002_reinforce_schema_and_outbox');
       expect(applied).toContain('003_protect_terminals_and_composite_fk');
       expect(applied).toContain('004_restrict_reversal_unique_index');
+      expect(applied).toContain('005_pending_reference_worker_lease');
 
       // Verify tables and constraints exist
       const client = new pg.Client(disposableConfig);
@@ -57,6 +58,13 @@ describe('Reversible Migrations on Disposable Database', () => {
           AND trigger_name = 'trg_protect_wallet_ledger_entries';
       `);
       expect(triggerRes.rows.length).toBe(1);
+
+      // M10 lease migration must reverse before the older schema migrations.
+      const leaseColumns = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'wager_transactions' AND column_name = 'lease_token'`);
+      expect(leaseColumns.rows.length).toBe(1);
+      expect(await migrator.down()).toBe('005_pending_reference_worker_lease');
+      const removedLeaseColumns = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'wager_transactions' AND column_name = 'lease_token'`);
+      expect(removedLeaseColumns.rows.length).toBe(0);
 
       // 3. Run DOWN migration 004
       const reverted004 = await migrator.down();

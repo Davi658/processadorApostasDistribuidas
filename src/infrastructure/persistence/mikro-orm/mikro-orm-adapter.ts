@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Knex } from 'knex';
 import { LockMode, type Options } from '@mikro-orm/core';
 import { EntityManager, MikroORM } from '@mikro-orm/postgresql';
 import { Injectable, OnApplicationShutdown, OnModuleInit, Optional } from '@nestjs/common';
@@ -31,6 +32,7 @@ export type FailureHookPoint =
   | 'after_tx_save'
   | 'after_ledger_save'
   | 'after_outbox_save'
+  | 'after_begin'
   | 'before_commit'
   | 'after_commit';
 
@@ -40,7 +42,7 @@ export interface TransactionContext {
   depth: number;
   rollbackOnly: boolean;
   rollbackReason?: unknown;
-  cleanup?: () => void;
+  phase?: 'working' | 'committing' | 'committed' | 'rolled_back';
 }
 
 @Injectable()
@@ -88,6 +90,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
 
   public markAllRollbackOnly(reason?: unknown): void {
     for (const ctx of this.activeTransactions) {
+      if (ctx.phase && ctx.phase !== 'working') continue;
       ctx.rollbackOnly = true;
       if (!ctx.rollbackReason) {
         ctx.rollbackReason = reason;
@@ -152,7 +155,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
     }
   }
 
-  public async runInTransaction<T>(work: () => Promise<T>): Promise<T> {
+  public async runInTransaction<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     if (!this.orm) {
       await this.init();
     }
@@ -182,65 +185,73 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
       }
     }
 
-    // Outermost transaction (depth 0)
-    const committedResult = await orm.em.transactional(async (forkedEm) => {
-      const context: TransactionContext = {
-        id: crypto.randomUUID(),
-        em: forkedEm,
-        depth: 0,
-        rollbackOnly: false,
-      };
-      this.activeTransactions.add(context);
-
-      try {
-        await forkedEm.execute(
-          `SET LOCAL lock_timeout = '${this.lockTimeoutMs}ms'; SET LOCAL statement_timeout = '${this.statementTimeoutMs}ms';`
+    // Own the complete lifecycle: cancellation stays attached through flush and
+    // commit preparation. The captured context never depends on the abort caller's ALS.
+    const em = orm.em.fork();
+    const context: TransactionContext = {
+      id: crypto.randomUUID(), em, depth: 0, rollbackOnly: false, phase: 'working',
+    };
+    const onAbort = () => {
+      // Once COMMIT has been dispatched, await its actual outcome. Never report
+      // rollback merely because shutdown arrived while its acknowledgement was pending.
+      if (context.phase !== 'working') return;
+      context.rollbackOnly = true;
+      context.rollbackReason = signal?.reason ?? new Error('ABORTED_BY_SHUTDOWN');
+    };
+    const assertCommittable = () => {
+      if (context.rollbackOnly) {
+        throw new TransactionRollbackOnlyError(
+          'Transaction is rollback-only', context.rollbackReason
         );
-      } catch {
-        // Fallback for mocks or drivers without SET LOCAL support
       }
-
-      return await this.asyncLocalStorage.run(context, async () => {
-        try {
-          const result = await work();
-          if (context.rollbackOnly) {
-            throw new TransactionRollbackOnlyError(
-              'Transaction cannot be committed because it has been marked as rollback-only',
-              context.rollbackReason
-            );
-          }
-          await this.triggerTestHook('before_commit');
-          if (context.rollbackOnly) {
-            throw new TransactionRollbackOnlyError(
-              'Transaction cannot be committed because it has been marked as rollback-only before commit',
-              context.rollbackReason
-            );
-          }
-          await forkedEm.flush();
-          if (context.rollbackOnly) {
-            throw new TransactionRollbackOnlyError(
-              'Transaction cannot be committed because it has been marked as rollback-only during flush',
-              context.rollbackReason
-            );
-          }
-          return result;
-
-        } catch (error) {
-          // Re-throwing causes MikroORM transactional() to execute ROLLBACK on the DB connection
-          throw error;
-        } finally {
-          try {
-            context.cleanup?.();
-          } catch {
-            // Ignore cleanup errors
-          }
-          this.activeTransactions.delete(context);
-        }
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+    this.activeTransactions.add(context);
+    let begun = false;
+    try {
+      assertCommittable();
+      await em.begin();
+      begun = true;
+      // PostgreSQL, rather than AbortController, bounds SQL and lock waits.
+      // Fail closed if these limits cannot be installed.
+      await em.execute(`SET LOCAL lock_timeout = '${this.lockTimeoutMs}ms'; SET LOCAL statement_timeout = '${this.statementTimeoutMs}ms';`);
+      const result = await this.asyncLocalStorage.run(context, async () => {
+        assertCommittable();
+        await this.triggerTestHook('after_begin');
+        assertCommittable();
+        const value = await work();
+        assertCommittable();
+        await this.triggerTestHook('before_commit');
+        assertCommittable();
+        await em.flush();
+        assertCommittable();
+        return value;
       });
-    });
-
-    await this.triggerTestHook('after_commit', committedResult);
-    return committedResult;
+      // No async boundary between final cancellation check and COMMIT dispatch.
+      assertCommittable();
+      const transaction = em.getTransactionContext<Knex.Transaction>()!;
+      // Knex's public transaction API dispatches COMMIT directly. The ORM
+      // connection wrapper awaits transaction event hooks before dispatch, which
+      // would introduce a cancellation gap after our final check.
+      context.phase = 'committing';
+      transaction.commit();
+      await transaction.executionPromise;
+      context.phase = 'committed';
+      em.resetTransactionContext();
+      await this.triggerTestHook('after_commit', result);
+      return result;
+    } catch (error) {
+      if (begun && context.phase !== 'committed') {
+        await em.rollback();
+        context.phase = 'rolled_back';
+      }
+      throw error;
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+      this.activeTransactions.delete(context);
+      em.clear();
+    }
   }
 }
 

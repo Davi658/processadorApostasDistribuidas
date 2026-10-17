@@ -137,27 +137,6 @@ export class ReprocessPendingReferencesUseCase {
             throw new Error('ABORTED_BY_SHUTDOWN');
           }
 
-          // Capture transactional context explicitly inside the active transaction where AsyncLocalStorage is active
-          const txContext = (this.uow as any).getTransactionContext?.();
-
-          let abortHandler: (() => void) | null = null;
-          if (abortSignal && txContext) {
-            abortHandler = () => {
-              txContext.rollbackOnly = true;
-              txContext.rollbackReason = abortSignal.reason ?? new Error('ABORTED_BY_SHUTDOWN');
-            };
-            if (abortSignal.aborted) {
-              abortHandler();
-              throw new Error('ABORTED_BY_SHUTDOWN');
-            }
-            abortSignal.addEventListener('abort', abortHandler, { once: true });
-            txContext.cleanup = () => {
-              if (abortHandler) {
-                abortSignal.removeEventListener('abort', abortHandler);
-              }
-            };
-          }
-
           // Canonical lock order: lock wallet first, then transaction
           const wallet = await this.walletRepo.findById(claimed.walletId, true);
           if (!wallet) {
@@ -315,7 +294,7 @@ export class ReprocessPendingReferencesUseCase {
           }
 
           return { outcome: 'SKIPPED' };
-        });
+        }, abortSignal);
 
         // ONLY update counters and emit success logs AFTER transaction commit confirmation
         if (itemResult.outcome === 'PROCESSED') {

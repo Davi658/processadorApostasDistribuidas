@@ -499,20 +499,26 @@ O marco M10 consolida o processamento automático, assíncrono e concorrente de 
 1. **Inicialização Automatizada (`OnApplicationBootstrap`):**
    - O worker `PendingReferenceWorkerService` é inicializado no ciclo de vida do NestJS através do hook `onApplicationBootstrap()`.
    - Permite ativação/desativação dinâmica e parametrização via variáveis de ambiente:
-     - `PENDING_WORKER_ENABLED` (padrão: `true`): liga/desliga o agendamento em background.
-     - `PENDING_WORKER_INTERVAL_MS` (padrão: `1000` ms): intervalo entre varreduras periódicas.
+     - `PENDING_WORKER_ENABLED` (padrão: `false`): liga/desliga o agendamento em background.
+     - `PENDING_WORKER_INTERVAL_MS` (padrão: `5000` ms): intervalo entre varreduras periódicas.
      - `PENDING_WORKER_BATCH_SIZE` (padrão: `20` itens): limite máximo de pendências por lote.
      - `PENDING_WORKER_LEASE_MS` (padrão: `30000` ms): duração de expiração do lease de reserva.
-     - `PENDING_WORKER_DRAIN_TIMEOUT_MS` (padrão: `10000` ms): tempo limite de drenagem no shutdown.
+     - `PENDING_WORKER_DRAIN_TIMEOUT_MS` (padrão: `5000` ms): tempo limite de drenagem no shutdown.
 2. **Prevenção de Sobreposição de Ciclos (Overlap Guard):**
    - Na mesma instância de aplicação, um ciclo de tick em execução ativa a flag booleana interna `isTickRunning`. Se o intervalo periódico disparar enquanto o lote anterior ainda estiver em processamento, a nova execução é ignorada de imediato sem sobreposição ou concorrência interna.
-3. **Graceful Shutdown com Drenagem de Recursos (`BeforeApplicationShutdown`):**
+3. **Graceful Shutdown com Drenagem de Recursos (`OnModuleDestroy` e `BeforeApplicationShutdown`):**
    - Implementa a interface `BeforeApplicationShutdown` do NestJS, disparada antes do encerramento dos módulos de persistência e do ORM (`MikroORM`).
-   - Ao receber o sinal de parada (`SIGTERM`, `SIGINT`, etc.), o worker ativa `isDraining = true` e cancela os timers ativos, impedindo qualquer nova reserva (`claim`).
+   - Ao receber o sinal de parada (`SIGTERM`, `SIGINT`, etc.), o worker ativa `isShuttingDown = true` e cancela os timers ativos, impedindo qualquer nova reserva (`claim`).
    - O encerramento aguarda ativamente a conclusão de todas as operações e transações financeiras in-flight até o prazo de tolerância configurado (`drainTimeoutMs`).
-   - O fechamento das conexões do banco de dados e do MikroORM só é permitido após o término seguro de todas as operações pendentes em andamento.
+   - Ao exceder a drenagem, `abort()` marca o contexto capturado explicitamente pela Unit of Work como rollback-only. O listener não consulta o AsyncLocalStorage do chamador do abort.
+   - `PENDING_WORKER_CANCELLATION_TIMEOUT_MS` (padrão: `5000` ms) emite diagnóstico se a execução ainda não terminou; não libera o shutdown. A execução precisa encerrar antes do fechamento do ORM em `OnApplicationShutdown`.
+   - O listener permanece instalado durante `before_commit`, flush e resolução da transação, sendo removido em `finally`, junto da remoção do contexto do conjunto de transações ativas.
+   - A Unit of Work faz begin explícito, trabalho, preparação, flush, última verificação síncrona e envio de COMMIT sem await intermediário. Após o envio, aguarda o resultado real: cancelamento tardio não transforma commit confirmado em rollback. Contadores e logs de sucesso continuam posteriores à confirmação.
+   - `DB_LOCK_TIMEOUT_MS` (padrão: `5000`) e `DB_STATEMENT_TIMEOUT_MS` (padrão: `10000`) são aplicados pelo PostgreSQL às conexões e por `SET LOCAL` em cada transação. Abrangem também consultas fora da transação, incluindo claim. Falha ao instalar os limites locais aborta a transação; não há fallback silencioso. AbortController sozinho não interrompe SQL.
+   - Os limites são por instrução SQL, não um prazo global de shutdown. Trabalho JavaScript pausado exige cooperação para terminar; o ORM permanece aberto enquanto isso. Os testes mantêm a barreira fechada além do prazo diagnóstico para provar essa propriedade.
+   - Ordem comprovada: bloquear claims → drenar → solicitar cancelamento se necessário → PostgreSQL encerrar espera SQL / liberar barreira → rollback ou commit confirmado → execução terminar → fechar ORM → zero novas sessões da aplicação em `pg_stat_activity`.
 4. **Preservação de Ponto de Entrada para Testes Manuais:**
-   - O método `reprocessBatch({ batchSize, leaseDurationMs, workerOwner })` permanece exposto para acionamento determinístico e manual pelas suítes de testes, executando rigorosamente o mesmo caso de uso e a mesma lógica do agendador automático.
+   - O método `executeBatch(batchSize, leaseDurationMs)` permanece exposto para acionamento determinístico e manual pelas suítes de testes, executando rigorosamente o mesmo caso de uso e a mesma lógica do agendador automático.
 
 ### 13.2 Reserva Concorrente com Lease Persistente e `FOR UPDATE SKIP LOCKED`
 Para coordenar múltiplos processos e nós de aplicação independentes disputando a mesma base de dados sem duplicações ou deadlocks, foi adotada a estratégia de lease persistente com transação curta de reserva:
@@ -563,7 +569,7 @@ Para coordenar múltiplos processos e nós de aplicação independentes disputan
      2. `wager_transactions` (`SELECT ... FOR UPDATE` com releitura direta).
    - Essa ordem espelha fielmente a ordem adotada no endpoint HTTP imediato (`ProcessWagerUseCase`), prevenindo deadlocks cruzados no PostgreSQL (`40P01 dead lock detected`).
 2. **Releitura Limpa do Identity Map (MikroORM):**
-   - Para evitar inconsistências causadas por entidades em cache de memória (Identity Map do ORM), o processamento utiliza transações isoladas (`em.fork().transactional(...)`) e releitura explícita com `{ refresh: true, lockMode: LockMode.PESSIMISTIC_WRITE }`.
+   - Para evitar inconsistências causadas por entidades em cache de memória (Identity Map do ORM), o processamento utiliza transações isoladas (`em.fork()`, begin explícito, flush e commit pela API transacional pública do Knex) e releitura explícita com `{ refresh: true, lockMode: LockMode.PESSIMISTIC_WRITE }`.
 3. **Idempotência e Estado Terminal Reavaliado sob Lock:**
    - O status da transação é inspecionado imediatamente após a obtenção dos locks. Se a transação já tiver atingido um estado terminal (`PROCESSED` ou `REJECTED`), a execução retorna sem aplicar novas mutações de saldo, sem criar lançamentos adicionais no ledger e sem emitir eventos repetidos na outbox.
 4. **Reutilização Integral de Motores de Negócio:**
@@ -602,3 +608,7 @@ Para coordenar múltiplos processos e nós de aplicação independentes disputan
 
 
 
+
+### 13.5 Evidências finais do shutdown M10
+
+`tests/integration/pending-reference-worker-m10.test.ts` executa 21 testes contra PostgreSQL real descartável. Seis variantes com aplicação Nest real pausam após escrita, em `before_commit`, durante flush, após commit confirmado, em lock de carteira e em `pg_sleep(30)`. Barreiras explícitas e `pg_stat_activity` confirmam o ponto atingido antes de iniciar `app.close()`. Nos testes SQL, limites de 1000 ms para lock e 1200 ms para instrução encerram as esperas mantendo o lock externo até o worker terminar. Cada variante verifica ordem de encerramento, saldo, versão, snapshot, tentativas, ledger, outbox, recuperação e ausência de repetição. Os testes de múltiplos processos, crash após claim, crash após commit e fencing de leases continuam presentes. Comandos e resultados finais estão em `docs/evidence/m10-shutdown.md`.

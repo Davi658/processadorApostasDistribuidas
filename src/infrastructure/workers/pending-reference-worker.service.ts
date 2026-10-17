@@ -30,7 +30,7 @@ export class PendingReferenceWorkerService
   private isTickRunning = false;
   private isShuttingDown = false;
   private timer: NodeJS.Timeout | null = null;
-  private activeExecutionPromise: Promise<ReprocessResult | null> | null = null;
+  private activeExecutionPromise: Promise<ReprocessResult> | null = null;
   private shutdownPromise: Promise<void> | null = null;
   private abortController: AbortController | null = null;
 
@@ -108,27 +108,15 @@ export class PendingReferenceWorkerService
               this.abortController.abort(new Error('DRAIN_TIMEOUT_EXCEEDED'));
             }
 
-            // Await confirmation of rollback and execution completion before allowing ORM closure
-            let cancellationHandle: NodeJS.Timeout | null = null;
-            const cancellationTimeoutPromise = new Promise<'timeout'>((resolve) => {
-              cancellationHandle = setTimeout(() => resolve('timeout'), this.cancellationTimeoutMs);
-            });
-
+            // This is a diagnostic deadline, never permission to close an ORM
+            // still owned by an execution. SQL waits are bounded by PostgreSQL.
+            const warning = setTimeout(() => {
+              this.logger.error(`Cancellation still pending after ${this.cancellationTimeoutMs}ms during ${phase}; waiting for execution termination.`);
+            }, this.cancellationTimeoutMs);
             try {
-              const cancelRes = await Promise.race([this.activeExecutionPromise, cancellationTimeoutPromise]);
-              if (cancelRes === 'timeout') {
-                this.logger.error(
-                  `Active execution did not terminate within cancellation timeout of ${this.cancellationTimeoutMs}ms during ${phase}.`
-                );
-              } else {
-                this.logger.log(
-                  `Active execution successfully cancelled and terminated during ${phase}.`
-                );
-              }
+              await this.activeExecutionPromise;
             } finally {
-              if (cancellationHandle) {
-                clearTimeout(cancellationHandle);
-              }
+              clearTimeout(warning);
             }
           }
         } catch (err) {
@@ -153,7 +141,7 @@ export class PendingReferenceWorkerService
   }
 
   public start(): void {
-    if (this.isRunning) return;
+    if (this.isRunning || this.isShuttingDown) return;
     this.isRunning = true;
     this.scheduleNextTick(0);
   }
@@ -206,12 +194,15 @@ export class PendingReferenceWorkerService
     if (this.isShuttingDown) {
       return { processed: 0, rejected: 0, rescheduled: 0, blocked: 0, failed: 0 };
     }
-    this.abortController = new AbortController();
+    // A worker owns at most one execution, including manual executeBatch calls.
+    if (this.activeExecutionPromise) return await this.activeExecutionPromise;
+    const controller = new AbortController();
+    this.abortController = controller;
     const execPromise = this.reprocessUseCase.execute(
       batchSize,
       leaseDurationMs,
       this.workerId,
-      this.abortController.signal
+      controller.signal
     );
     this.activeExecutionPromise = execPromise;
     try {
@@ -220,7 +211,7 @@ export class PendingReferenceWorkerService
       if (this.activeExecutionPromise === execPromise) {
         this.activeExecutionPromise = null;
       }
-      this.abortController = null;
+      if (this.abortController === controller) this.abortController = null;
     }
   }
 }

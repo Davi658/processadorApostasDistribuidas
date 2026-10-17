@@ -1,7 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { NestFactory } from '@nestjs/core';
 import type { INestApplication } from '@nestjs/common';
 import pg from 'pg';
+import { getEventListeners } from 'node:events';
 import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -62,8 +63,8 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
   async function captureDbState(walletId: string, txId: string): Promise<DbStateSnapshot> {
     const walletRes = await adminPool.query('SELECT balance, version FROM wallets WHERE id = $1;', [walletId]);
     const txRes = await adminPool.query(
-      `SELECT status, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, 
-              is_operationally_blocked, operational_block_reason, response_snapshot 
+      `SELECT status, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at,
+              is_operationally_blocked, operational_block_reason, response_snapshot
        FROM wager_transactions WHERE id = $1;`,
       [txId]
     );
@@ -167,6 +168,12 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     reprocessUseCase = app.get(ReprocessPendingReferencesUseCase);
     workerService = app.get(PendingReferenceWorkerService);
   }, 60000);
+
+  beforeEach(async () => {
+    // Every scenario owns its pending items. A prior scenario's backoff must
+    // never become eligible merely because this machine runs the suite slowly.
+    await adminPool.query("DELETE FROM wager_transactions WHERE status = 'PENDING_REFERENCE'");
+  });
 
   afterAll(async () => {
     if (app) {
@@ -322,7 +329,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
         };
 
         await adminPool.query(
-          `INSERT INTO wager_transactions 
+          `INSERT INTO wager_transactions
            (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW() - INTERVAL '1 second', NOW(), NOW());`,
           [
@@ -457,9 +464,9 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     };
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
-       VALUES 
+       VALUES
        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 1, NOW() - INTERVAL '1 second', NOW(), NOW()),
        ($16, $2, $3, $4, $17, $6, $7, $8, $9, $10, $11, $18, $19, $20, $15, 1, NOW() - INTERVAL '1 second', NOW(), NOW());`,
       [
@@ -568,9 +575,9 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     const pendingRollbackId = crypto.randomUUID();
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
-       VALUES 
+       VALUES
        ($1, $4, $5, 'EVOLUTION', $6, 'round-d-1', 'game1', 'WIN', '15.00', 'BRL', 'PENDING_REFERENCE', $7, 'h1', $8, $9, 1, NOW() - INTERVAL '1s', NOW(), NOW()),
        ($2, $4, $5, 'EVOLUTION', $10, 'round-d-2', 'game2', 'REFUND', '20.00', 'BRL', 'PENDING_REFERENCE', $11, 'h2', $12, $13, 1, NOW() - INTERVAL '1s', NOW(), NOW()),
        ($3, $4, $5, 'EVOLUTION', $14, 'round-d-1', 'game1', 'ROLLBACK', '40.00', 'BRL', 'PENDING_REFERENCE', $15, 'h3', $16, $17, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
@@ -641,7 +648,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
 
     // Insere pendência elegível sem lease no PostgreSQL
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-e', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-e', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-e-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
@@ -720,7 +727,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     // Worker 1 reserva com token T1
     const token1 = crypto.randomUUID();
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-f', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-f', $6, $7, 1, NOW() - INTERVAL '1s', $8, 'worker-1', NOW() - INTERVAL '1s', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-f-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId, token1]
@@ -792,7 +799,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     };
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-g', 'slots', 'WIN', '25.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-g', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-g-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
@@ -860,7 +867,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     };
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-h', 'slots', 'WIN', '30.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-h', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-h-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
@@ -924,9 +931,9 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     };
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
-       VALUES 
+       VALUES
        ($1, $3, $4, 'EVOLUTION', $5, 'round-i', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $6, 'h-corrupt', NULL, $7, 1, NOW() - INTERVAL '2s', NOW() - INTERVAL '2s', NOW()),
        ($2, $3, $4, 'EVOLUTION', $8, 'round-i', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $9, 'h-valid', $10, $7, 1, NOW() - INTERVAL '1s', NOW() - INTERVAL '1s', NOW());`,
       [
@@ -1011,7 +1018,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
       };
 
       await adminPool.query(
-        `INSERT INTO wager_transactions 
+        `INSERT INTO wager_transactions
          (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
          VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-j', 'slots', 'WIN', '50.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-j-1', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
         [txId1, wallet.id, playerId, `win-j-1-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap1), betId]
@@ -1049,7 +1056,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
         idempotentReplay: false,
       };
       await adminPool.query(
-        `INSERT INTO wager_transactions 
+        `INSERT INTO wager_transactions
          (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
          VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-j-2', 'slots', 'WIN', '10.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-j-2', $6, 'ref-any', 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
         [txId2, wallet2.id, playerId2, `win-j-2-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap2)]
@@ -1102,7 +1109,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
 
     // Criar com attempts = 5 (limite maxAttempts = 5) e referência inexistente
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-k', 'slots', 'WIN', '50.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-k', $6, 'non-existent-ref-id', 5, NOW() - INTERVAL '1s', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-k-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap)]
@@ -1146,7 +1153,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
 
     // Insere transação com lease ativo pertencente a tokenA (válido por 10 segundos)
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, reference_external_transaction_id, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-l', 'slots', 'WIN', '10.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-l', 'ref-l', 1, NOW() - INTERVAL '1s', $6, 'worker-a', NOW() + INTERVAL '10 seconds', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-l-${crypto.randomUUID()}`, crypto.randomUUID(), tokenA]
@@ -1234,7 +1241,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     };
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-m', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-m', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-m-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
@@ -1285,7 +1292,7 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     };
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
        VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-n', 'slots', 'WIN', '25.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-n', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
       [txId, wallet.id, playerId, `win-n-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
@@ -1351,9 +1358,9 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     };
 
     await adminPool.query(
-      `INSERT INTO wager_transactions 
+      `INSERT INTO wager_transactions
        (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
-       VALUES 
+       VALUES
        ($1, $3, $4, 'EVOLUTION', $5, 'round-o', 'slots', 'WIN', '30.00', 'BRL', 'PENDING_REFERENCE', $6, 'h-def', $7, $9, 1, NOW() - INTERVAL '2s', NOW() - INTERVAL '2s', NOW()),
        ($2, $3, $4, 'EVOLUTION', $8, 'round-o', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $10, 'h-val', $11, $9, 1, NOW() - INTERVAL '1s', NOW() - INTERVAL '1s', NOW());`,
       [
@@ -1401,155 +1408,249 @@ describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (Po
     }
   });
 
-  it('P. Timeout de drenagem no shutdown cancela trabalho em andamento com rollback e comprova fechamento do ORM (Aplicação Nest Real e Handshake)', async () => {
-    // Limpa quaisquer pendências residuais de testes anteriores para garantir isolamento estrito
-    await adminPool.query("DELETE FROM wager_transactions WHERE status = 'PENDING_REFERENCE';");
+  for (const pausePoint of ['after_wallet_save', 'before_commit', 'during_flush', 'after_commit', 'lock_wait', 'query_wait'] as const) {
+    it(`${pausePoint}: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake)`, async () => {
+      // Limpa quaisquer pendências residuais de testes anteriores para garantir isolamento estrito
+      await adminPool.query("DELETE FROM wager_transactions WHERE status = 'PENDING_REFERENCE';");
 
-    // 1. Prepara dados no banco através de uma operação inicial
-    const playerId = crypto.randomUUID();
-    const wallet = await createWalletUseCase.execute({
-      playerId,
-      initialBalance: { amount: '100.00', currency: 'BRL' },
-    });
-
-    const betId = `bet-p-${crypto.randomUUID()}`;
-    await processWagerUseCase.execute(crypto.randomUUID(), {
-      providerId: 'EVOLUTION',
-      externalTransactionId: betId,
-      playerId,
-      walletId: wallet.id,
-      roundId: 'round-p',
-      gameId: 'slots',
-      kind: 'BET',
-      money: { amount: '15.00', currency: 'BRL' },
-    }); // Saldo atual: 85.00
-
-    const txId = crypto.randomUUID();
-    const snap = {
-      transactionId: txId,
-      status: 'PENDING_REFERENCE',
-      balance: { amount: '85.00', currency: 'BRL' },
-      idempotentReplay: false,
-    };
-
-    // Insere pendência elegível com lease curto de 800ms
-    await adminPool.query(
-      `INSERT INTO wager_transactions 
-       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
-       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-p', 'slots', 'WIN', '30.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-p', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
-      [txId, wallet.id, playerId, `win-p-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
-    );
-
-    // 2. Inicializa aplicação Nest real dedicada para o teste de timeout de drenagem
-    // Configura timeout de drenagem agressivo (150ms) via variável de ambiente
-    const prevDrainTimeout = process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS;
-    process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS = '150';
-
-    let timeoutApp: INestApplication | null = null;
-    let releaseBarrierFn: (() => void) | null = null;
-
-    try {
-      timeoutApp = await NestFactory.create(AppModule, { logger: false });
-      await timeoutApp.init();
-
-      const testUow = timeoutApp.get(MikroOrmUnitOfWork);
-      const testWorkerService = timeoutApp.get(PendingReferenceWorkerService);
-
-      // A. Iniciar uma pendência e pausar após escrita, com handshake (sem sleep fixo!)
-      let signalWriteReached!: () => void;
-      const writeReachedPromise = new Promise<void>((resolve) => {
-        signalWriteReached = resolve;
+      // 1. Prepara dados no banco através de uma operação inicial
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
       });
 
-      const barrierPromise = new Promise<void>((resolve) => {
-        releaseBarrierFn = resolve;
-      });
+      const betId = `bet-p-${crypto.randomUUID()}`;
+      await processWagerUseCase.execute(crypto.randomUUID(), {
+        providerId: 'EVOLUTION',
+        externalTransactionId: betId,
+        playerId,
+        walletId: wallet.id,
+        roundId: 'round-p',
+        gameId: 'slots',
+        kind: 'BET',
+        money: { amount: '15.00', currency: 'BRL' },
+      }); // Saldo atual: 85.00
 
-      // Hook no ponto após a escrita do saldo da carteira na transação (after_wallet_save)
-      testUow.setTestHook('after_wallet_save', async () => {
-        signalWriteReached();
-        await barrierPromise;
-      });
+      const txId = crypto.randomUUID();
+      const snap = {
+        transactionId: txId,
+        status: 'PENDING_REFERENCE',
+        balance: { amount: '85.00', currency: 'BRL' },
+        idempotentReplay: false,
+      };
 
-      // Inicia a execução do batch na aplicação real (lease de 800ms)
-      const executionPromise = testWorkerService.executeBatch(5, 800);
+      // Insere pendência elegível; a recuperação força expiração pelo relógio PostgreSQL.
+      await adminPool.query(
+        `INSERT INTO wager_transactions
+         (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+         VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-p', 'slots', 'WIN', '30.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-p', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+        [txId, wallet.id, playerId, `win-p-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
+      );
 
-      // Aguarda handshake comprovar que a escrita foi realizada no banco
-      await writeReachedPromise;
+      const baseline = await captureDbState(wallet.id, txId);
+      const existingSessions = await adminPool.query('SELECT pid FROM pg_stat_activity WHERE datname = current_database() AND usename = $1', [isolatedDb.appConfig.user]);
+      const existingPids = existingSessions.rows.map(row => row.pid);
 
-      // B. Disparar app.close() e forçar timeout de drenagem
-      let isAppClosed = false;
-      const closePromise = timeoutApp.close().then(() => {
-        isAppClosed = true;
-      });
+      // 2. Inicializa aplicação Nest real dedicada para o teste de timeout de drenagem
+      // Configura timeout de drenagem agressivo (150ms) via variável de ambiente
+      const prevDrainTimeout = process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS;
+      const prevCancelTimeout = process.env.PENDING_WORKER_CANCELLATION_TIMEOUT_MS;
+      process.env.PENDING_WORKER_CANCELLATION_TIMEOUT_MS = '20';
+      const prevLockTimeout = process.env.DB_LOCK_TIMEOUT_MS;
+      const prevStatementTimeout = process.env.DB_STATEMENT_TIMEOUT_MS;
+      process.env.DB_LOCK_TIMEOUT_MS = '1000';
+      process.env.DB_STATEMENT_TIMEOUT_MS = '1200';
+      process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS = '150';
 
-      // Aguarda o timeout de drenagem (150ms) expirar e o cancelamento ser solicitado
-      const cancelTriggeredPromise = new Promise<void>((resolve) => {
-        const check = () => {
-          if (testWorkerService.isAbortRequested()) {
-            resolve();
-          } else {
-            setTimeout(check, 10);
+      let lockClient: pg.PoolClient | undefined;
+      let timeoutApp: INestApplication | null = null;
+      let releaseBarrierFn: (() => void) | null = null;
+
+      try {
+        timeoutApp = await NestFactory.create(AppModule, { logger: false });
+        await timeoutApp.init();
+
+        const testUow = timeoutApp.get(MikroOrmUnitOfWork);
+        const testWorkerService = timeoutApp.get(PendingReferenceWorkerService);
+
+        // A. Iniciar uma pendência e pausar após escrita, com handshake (sem sleep fixo!)
+        let signalWriteReached!: () => void;
+        const writeReachedPromise = new Promise<void>((resolve) => {
+          signalWriteReached = resolve;
+        });
+
+        const barrierPromise = new Promise<void>((resolve) => {
+          releaseBarrierFn = resolve;
+        });
+
+        // Hook no ponto após a escrita do saldo da carteira na transação (after_wallet_save)
+        let capturedContext: ReturnType<MikroOrmUnitOfWork['getTransactionContext']>;
+        testUow.setTestHook('after_begin', () => { capturedContext = testUow.getTransactionContext(); });
+        let backendPid: number | undefined;
+        const sqlWait = pausePoint === 'lock_wait' || pausePoint === 'query_wait';
+        if (pausePoint === 'lock_wait') {
+          lockClient = await adminPool.connect();
+          await lockClient.query('BEGIN');
+          await lockClient.query('SELECT id FROM wallets WHERE id = $1 FOR UPDATE', [wallet.id]);
+        }
+        testUow.setTestHook(sqlWait || pausePoint === 'during_flush' ? 'after_begin' : pausePoint, async () => {
+          capturedContext = testUow.getTransactionContext() ?? capturedContext;
+          if (pausePoint === 'during_flush') {
+            const em = capturedContext!.em;
+            const flush = em.flush.bind(em);
+            em.flush = async () => {
+              await flush();
+              signalWriteReached();
+              await barrierPromise;
+            };
+            return;
           }
+          if (sqlWait) {
+            const rows = await capturedContext!.em.execute('SELECT pg_backend_pid() AS pid');
+            backendPid = rows[0].pid;
+            signalWriteReached();
+            if (pausePoint === 'query_wait') await capturedContext!.em.execute('SELECT pg_sleep(30)');
+            return;
+          }
+          signalWriteReached();
+          await barrierPromise;
+        });
+
+        // Lease cobre a barreira; recuperação força expiração explicitamente no PostgreSQL.
+        const order: string[] = [];
+        const originalClose = testUow.close.bind(testUow);
+        testUow.close = async () => {
+          expect(testUow.getActiveTransactionsCount()).toBe(0);
+          expect(order).toEqual(['execution-ended']);
+          order.push('orm-close');
+          await originalClose();
         };
-        check();
-      });
-      await cancelTriggeredPromise;
+        const executionPromise = testWorkerService.executeBatch(5, 60000).then(result => {
+          order.push('execution-ended');
+          return result;
+        });
 
-      // C. Confirmar solicitação de cancelamento e que o ORM permanece disponível até a transação encerrar
-      expect(testWorkerService.isAbortRequested()).toBe(true);
-      expect(isAppClosed).toBe(false); // app.close() NÃO pode ter finalizado ainda!
-      expect(testUow.isClosed()).toBe(false); // ORM permanece aberto e ativo para suportar o rollback!
+        // Aguarda handshake comprovar que a escrita foi realizada no banco
+        await writeReachedPromise;
+        if (sqlWait) {
+          // Explicit server-side handshake: shutdown starts only after SQL is waiting.
+          const deadline = Date.now() + 3000;
+          while (true) {
+            const activity = await adminPool.query('SELECT wait_event_type, wait_event FROM pg_stat_activity WHERE pid = $1', [backendPid]);
+            const row = activity.rows[0];
+            if (pausePoint === 'lock_wait' ? row?.wait_event_type === 'Lock' : row?.wait_event === 'PgSleep') break;
+            if (Date.now() > deadline) throw new Error('SQL wait barrier not reached');
+            await new Promise(resolve => setTimeout(resolve, 5));
+          }
+        }
+        const closeStartedAt = Date.now();
+        expect(testUow.getTransactionContext()).toBeUndefined();
 
-      // D. Liberar a barreira e comprovar rollback integral
-      if (releaseBarrierFn) {
-        (releaseBarrierFn as () => void)();
-      }
+        // B. Disparar app.close() e forçar timeout de drenagem
+        let isAppClosed = false;
+        const closePromise = timeoutApp.close().then(() => {
+          isAppClosed = true;
+        });
 
-      // Aguarda conclusão da execução do worker e do encerramento da aplicação
-      await executionPromise;
-      await closePromise;
+        // Aguarda o timeout de drenagem (150ms) expirar e o cancelamento ser solicitado
+        const controller = (testWorkerService as any).abortController as AbortController;
+        if (!controller.signal.aborted) {
+          await new Promise<void>(resolve => controller.signal.addEventListener('abort', () => resolve(), { once: true }));
+        }
+        expect(testWorkerService.isShuttingDownStatus()).toBe(true);
+        expect((await testWorkerService.executeBatch()).processed).toBe(0);
+        if (pausePoint !== 'after_commit') {
+          expect(capturedContext!.rollbackOnly).toBe(true);
+          expect((capturedContext!.rollbackReason as Error).message).toBe('DRAIN_TIMEOUT_EXCEEDED');
+        } else {
+          expect(capturedContext!.phase).toBe('committed');
+          expect(capturedContext!.rollbackOnly).toBe(false);
+        }
+        // Cross the diagnostic cancellation deadline while the explicit barrier stays closed.
+        await new Promise(resolve => setTimeout(resolve, 60));
+        // C. Confirmar solicitação de cancelamento e que o ORM permanece disponível até a transação encerrar
+        expect(testWorkerService.isAbortRequested()).toBe(true);
+        expect(isAppClosed).toBe(false); // app.close() NÃO pode ter finalizado ainda!
+        expect(testUow.isClosed()).toBe(false); // ORM permanece aberto e ativo para suportar o rollback!
 
-      // Comprova rollback integral via adminPool independente
-      const stateAfterRollback = await captureDbState(wallet.id, txId);
-      expect(stateAfterRollback.wallet.balance).toBe('85.00'); // Saldo inalterado (rollback do WIN de 30.00)
-      expect(stateAfterRollback.transaction.status).toBe('PENDING_REFERENCE'); // Transação continua pendente
-      expect(stateAfterRollback.transaction.attempts).toBe(1); // Tentativas de negócio NÃO foram consumidas
-      expect(stateAfterRollback.transaction.operationalBlockReason).toBeNull();
-      expect(stateAfterRollback.ledgerCount).toBe(2); // Apenas 1 OPENING + 1 BET
-
-      // E. Confirmar encerramento das conexões
-      expect(isAppClosed).toBe(true);
-      expect(testUow.isClosed()).toBe(true); // ORM fechou com sucesso apenas após a conclusão do rollback
-      expect(() => testUow.getOrm()).toThrow(); // Chamadas subsequentes confirmam pool fechado
-
-      // F. Outra instância retoma e aplica exatamente um efeito
-      // Aguarda o lease curto de 800ms expirar no relógio do PostgreSQL
-      await new Promise((resolve) => setTimeout(resolve, 900));
-
-      const recoveryResult = await reprocessUseCase.execute(5, 30000, 'recovery-worker');
-      expect(recoveryResult.processed).toBe(1);
-
-      const finalState = await captureDbState(wallet.id, txId);
-      expect(finalState.transaction.status).toBe('PROCESSED');
-      expect(finalState.wallet.balance).toBe('115.00'); // 85.00 + 30.00
-      expect(finalState.ledgerCount).toBe(3); // 1 OPENING + 1 BET + 1 WIN
-    } finally {
-      if (releaseBarrierFn) {
-        try {
+        // D. Liberar a barreira e comprovar rollback integral
+        if (releaseBarrierFn) {
           (releaseBarrierFn as () => void)();
-        } catch {}
+        }
+
+        // Aguarda conclusão da execução do worker e do encerramento da aplicação
+        const outcome = await executionPromise;
+        await closePromise;
+        expect(order).toEqual(['execution-ended', 'orm-close']);
+        if (sqlWait) expect(Date.now() - closeStartedAt).toBeLessThan(2500);
+        if (lockClient) {
+          await lockClient.query('ROLLBACK');
+          lockClient.release();
+          lockClient = undefined;
+        }
+        expect(outcome.processed).toBe(pausePoint === 'after_commit' ? 1 : 0);
+        expect(getEventListeners(controller.signal, 'abort')).toEqual([]);
+
+        // Comprova rollback integral via adminPool independente
+        const stateAfterRollback = await captureDbState(wallet.id, txId);
+        expect(stateAfterRollback.wallet.balance).toBe(pausePoint === 'after_commit' ? '115.00' : '85.00'); // Saldo inalterado (rollback do WIN de 30.00)
+        expect(stateAfterRollback.transaction.status).toBe(pausePoint === 'after_commit' ? 'PROCESSED' : 'PENDING_REFERENCE'); // Transação continua pendente
+        expect(stateAfterRollback.transaction.attempts).toBe(1); // Tentativas de negócio NÃO foram consumidas
+        expect(stateAfterRollback.transaction.operationalBlockReason).toBeNull();
+        expect(stateAfterRollback.outboxCount).toBe(baseline.outboxCount + (pausePoint === 'after_commit' ? 2 : 0));
+        if (pausePoint !== 'after_commit') {
+          expect(stateAfterRollback.wallet).toEqual(baseline.wallet);
+          expect(stateAfterRollback.transaction.responseSnapshot).toEqual(baseline.transaction.responseSnapshot);
+          expect(stateAfterRollback.transaction.nextAttemptAt).toEqual(baseline.transaction.nextAttemptAt);
+        }
+        expect(stateAfterRollback.ledgerCount).toBe(pausePoint === 'after_commit' ? 3 : 2); // Apenas 1 OPENING + 1 BET
+
+        // E. Confirmar encerramento das conexões
+        expect(isAppClosed).toBe(true);
+        expect(testUow.isClosed()).toBe(true); // ORM fechou com sucesso apenas após a conclusão do rollback
+        const remainingSessions = await adminPool.query('SELECT pid FROM pg_stat_activity WHERE datname = current_database() AND usename = $1 AND NOT (pid = ANY($2::int[]))', [isolatedDb.appConfig.user, existingPids]);
+        expect(remainingSessions.rows).toEqual([]);
+        expect(() => testUow.getOrm()).toThrow(); // Chamadas subsequentes confirmam pool fechado
+
+        // F. Outra instância retoma e aplica exatamente um efeito
+        // Expira o lease no PostgreSQL, sem sleep de coordenação.
+        await adminPool.query("UPDATE wager_transactions SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1 AND status = 'PENDING_REFERENCE'", [txId]);
+
+        const recoveryResult = await reprocessUseCase.execute(5, 30000, 'recovery-worker');
+        expect(recoveryResult.processed).toBe(pausePoint === 'after_commit' ? 0 : 1);
+
+        const finalState = await captureDbState(wallet.id, txId);
+        expect(finalState.transaction.status).toBe('PROCESSED');
+        expect(finalState.wallet.balance).toBe('115.00'); // 85.00 + 30.00
+        expect(finalState.ledgerCount).toBe(3); // 1 OPENING + 1 BET + 1 WIN
+        expect(finalState.outboxCount).toBe(baseline.outboxCount + 2);
+        expect((await reprocessUseCase.execute(5, 30000, 'second-recovery')).processed).toBe(0);
+        expect(await captureDbState(wallet.id, txId)).toEqual(finalState);
+      } finally {
+        if (releaseBarrierFn) {
+          try {
+            (releaseBarrierFn as () => void)();
+          } catch {}
+        }
+        if (lockClient) { await lockClient.query('ROLLBACK'); lockClient.release(); }
+        if (prevLockTimeout === undefined) delete process.env.DB_LOCK_TIMEOUT_MS;
+        else process.env.DB_LOCK_TIMEOUT_MS = prevLockTimeout;
+        if (prevStatementTimeout === undefined) delete process.env.DB_STATEMENT_TIMEOUT_MS;
+        else process.env.DB_STATEMENT_TIMEOUT_MS = prevStatementTimeout;
+        if (prevCancelTimeout === undefined) delete process.env.PENDING_WORKER_CANCELLATION_TIMEOUT_MS;
+        else process.env.PENDING_WORKER_CANCELLATION_TIMEOUT_MS = prevCancelTimeout;
+        if (prevDrainTimeout !== undefined) {
+          process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS = prevDrainTimeout;
+        } else {
+          delete process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS;
+        }
+        if (timeoutApp) {
+          try {
+            await timeoutApp.close();
+          } catch {}
+        }
       }
-      if (prevDrainTimeout !== undefined) {
-        process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS = prevDrainTimeout;
-      } else {
-        delete process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS;
-      }
-      if (timeoutApp) {
-        try {
-          await timeoutApp.close();
-        } catch {}
-      }
-    }
-  }, 30000);
+    }, 30000);
+  }
 });
