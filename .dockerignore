@@ -1,0 +1,10 @@
+**
+!package.json
+!bun.lock
+!tsconfig.json
+!src/
+!src/**
+!infra/
+!infra/**
+infra/**/*.env
+infra/**/.env*
