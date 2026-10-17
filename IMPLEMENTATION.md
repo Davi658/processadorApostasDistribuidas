@@ -1,5 +1,21 @@
 # Plano de Execução e Status da Implementação
 
+## M12 — Ledger e Constraints (17/10/2026)
+
+**CONCLUÍDO:** `bun run typecheck` exit 0; `bun run test` exit 0, **354 pass / 0 fail em 22 arquivos** (M12: 21/21). PostgreSQL descartável encerrado e removido após a confirmação de ausência de bancos de teste remanescentes.
+
+Base combinada: `6a85ab1f7c921b77b4f82cbe2dcd0896394b1ac9`, main remota do repositório pessoal. Trabalho isolado em `codex/m12-ledger-constraints`, worktree `.worktrees/m12-ledger-constraints`. M10, M11, M17, Money, hash e UoW foram preservados. Nenhum push, merge ou publicação faz parte desta entrega.
+
+A auditoria encontrou FK composta, unicidade por transação/carteira, checks de magnitude/aritmética/saldos, trigger de imutabilidade e privilégios restritos já implementados. As lacunas reais foram o overflow intermediário da reconciliação por soma de Money na ordem timestamp/UUID e a aceitação de NaN pelos checks históricos de NUMERIC. A correção limita-se a acumular centavos bigint nos relatórios e adicionar a migration incremental reversível `007_ledger_finite_values`, que rejeita NaN no ledger e no saldo da carteira. Dados legados inválidos fazem o UP abortar, sem apagar ou corrigir registros automaticamente. UP/DOWN/UP preserva linhas completas. Migrations históricas não foram reescritas.
+
+`tests/integration/ledger-constraints-m12.test.ts` complementa as lacunas significativas: SQLSTATE e constraint exatos para referências inexistentes/incompatíveis, magnitude, aritmética, saldos, overflow, NaN e duplicação; trigger UPDATE/DELETE administrativo ativo; UPDATE/DELETE/TRUNCATE recusados ao papel restrito; escrita anterior desfeita após cada recusa e transação abortada com 25P02; reconciliação sem lançamentos, em valores acima da precisão segura de number, com giro alto e com divergências assinadas acima do limite de uma coluna. O fluxo combinado de abertura positiva, BET, WIN, REFUND e ROLLBACK reconcilia após cada operação; LOSS, rejeição e replay não acrescentam lançamentos.
+
+Os testes existentes de abertura, M05/UoW, M06, M07/M08 e concorrência continuam cobrindo falhas injetadas após cada repositório, ausência por identificador, retry único, disputas e três processos independentes com reconciliação final. Não foram duplicados. Os testes de reversibilidade existentes só receberam o passo 007 na sequência, preservando as verificações anteriores de M06/M11.
+
+**Limite comprovado:** constraints não garantem igualdade de wallets.balance com o total do ledger, continuidade entre linhas ou correspondência de tipo/valor/status com a operação referenciada. A UoW e os processadores mantêm esses vínculos sob lock; SQL direto pode gerar divergência e a reconciliação a reporta. TRUNCATE é protegido pelos privilégios de app_user, sem trigger contra administrador. NUMERIC arredonda escala excedente; o contrato canônico é validado por Money. Totais/deltas de reconciliação são relatórios exatos em strings, podendo exceder o limite persistível ao diagnosticar divergência.
+
+Ambiente: Windows, Bun e PostgreSQL 16.8 real em cluster exclusivo descartável, porta 55413, com migrations reais e app_user restrito. Nenhum cluster com dados do usuário foi alterado. Docker, containers e Linux permanecem não validados. Diagnóstico, comandos, exit codes e resultados da validação integrada estão em [evidências M12](docs/evidence/m12-ledger-constraints.md).
+
 ## 1. Status Geral da Entrega (Rodada Atual)
 
 | Bloco | Requisito | Status | Teste Automatizado |

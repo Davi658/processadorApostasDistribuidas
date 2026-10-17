@@ -1,7 +1,12 @@
-import { Money } from '../../domain/value-objects/money.vo';
-import { WalletNotFoundError } from '../../domain/errors/domain.error';
+import { CurrencyMismatchError, WalletNotFoundError } from '../../domain/errors/domain.error';
 import { ReconciliationResponseDto } from '../dto/wallet.dto';
 import { UnitOfWorkPort, WalletLedgerRepositoryPort, WalletRepositoryPort } from '../ports/ports';
+
+// Report totals may exceed a single NUMERIC(18,2) column, especially when diagnosing drift.
+function formatCents(cents: bigint): string {
+  const magnitude = cents < 0n ? -cents : cents;
+  return `${cents < 0n ? '-' : ''}${magnitude / 100n}.${(magnitude % 100n).toString().padStart(2, '0')}`;
+}
 
 export class ReconcileWalletUseCase {
   constructor(
@@ -24,18 +29,23 @@ export class ReconcileWalletUseCase {
 
       const entries = await this.ledgerRepo.listByWalletId(wallet.id);
 
-      let calculated = Money.zero(wallet.currency);
+      // Timestamp/UUID order is not a financial sequence. Bound only persisted Money,
+      // not intermediate report sums, so high turnover cannot overflow reconciliation.
+      let calculatedCents = 0n;
 
       for (const entry of entries) {
+        if (entry.amount.getCurrency() !== wallet.currency) {
+          throw new CurrencyMismatchError('Ledger amount currency does not match wallet currency');
+        }
         if (entry.entryType === 'CREDIT') {
-          calculated = calculated.add(entry.amount);
+          calculatedCents += entry.amount.getCents();
         } else if (entry.entryType === 'DEBIT') {
-          calculated = calculated.subtract(entry.amount);
+          calculatedCents -= entry.amount.getCents();
         }
       }
 
-      const difference = wallet.balance.subtract(calculated);
-      const consistent = difference.isZero();
+      const differenceCents = wallet.balance.getCents() - calculatedCents;
+      const consistent = differenceCents === 0n;
 
       return {
         walletId: wallet.id,
@@ -44,11 +54,11 @@ export class ReconcileWalletUseCase {
           currency: wallet.currency,
         },
         calculatedBalance: {
-          amount: calculated.getAmount(),
+          amount: formatCents(calculatedCents),
           currency: wallet.currency,
         },
         difference: {
-          amount: difference.getAmount(),
+          amount: formatCents(differenceCents),
           currency: wallet.currency,
         },
         consistent,

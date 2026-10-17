@@ -177,6 +177,20 @@ A função histórica da migration 003 referencia observed_balance, coluna inexi
 
 ---
 
+### 4.3 Ledger e reconciliação (M12)
+
+As migrations 001–003 já garantem a referência exata `(transaction_id, wallet_id, currency)`, magnitude positiva, saldos não negativos e aritmética CREDIT/DEBIT por linha. A unicidade `uq_wallet_ledger_entries_tx_wallet`, combinada com a FK composta, admite no máximo um lançamento por transação financeira. Isso não exige que toda transação tenha lançamento: LOSS, rejeições e pendências legitimamente não têm efeito financeiro.
+
+A migration incremental 007 exclui `NaN` de amount/balance_before/balance_after do ledger (`chk_ledger_finite_values`) e de wallets.balance (`chk_wallets_balance_finite`). NUMERIC(18,2) já recusa overflow e infinidades com SQLSTATE 22003, mas aceita NaN; os checks históricos de comparação e aritmética não o excluem. Os novos checks validam dados existentes e abortam o UP se houver dados inválidos, sem modificar o histórico. DOWN remove somente esses dois checks e reabre essa lacuna; UP/DOWN/UP preserva registros válidos. Nenhuma migration histórica foi alterada. PostgreSQL arredonda escala excedente ao converter para NUMERIC(18,2); a rejeição de entradas não canônicas com mais de duas casas pertence ao contrato Money, não a uma garantia desses checks.
+
+O trigger `trg_protect_wallet_ledger_entries`, instalado em 001, impede UPDATE e DELETE por linha mesmo sob administrador, com SQLSTATE P0001 e mensagem `Modifications and deletions are strictly prohibited on wallet_ledger_entries`. O papel restrito app_user recebe somente SELECT/INSERT nessa tabela: UPDATE, DELETE e TRUNCATE são recusados com 42501. Não existe trigger contra TRUNCATE administrativo: a proteção de TRUNCATE é uma fronteira de permissões. Um proprietário/superusuário capaz de alterar triggers ou privilégios permanece fora dessa garantia.
+
+**Fronteira da UoW:** o banco valida cada lançamento, mas não exige igualdade entre wallets.balance e a soma do ledger, continuidade entre balance_before/balance_after de linhas diferentes, igualdade de amount/tipo com a operação referenciada, nem a existência de ledger para toda operação PROCESSED. Esses vínculos semânticos dependem dos processadores financeiros e da UoW com lock da carteira, que confirma saldo, transação e ledger atomicamente. SQL direto com privilégios de escrita pode produzir divergência válida para os checks; o teste M12 demonstra esse limite. A reconciliação detecta diferença de totais, sem certificar completude ou sequência histórica quando erros se compensam.
+
+`ReconcileWalletUseCase` mantém o lock da carteira durante a leitura e soma centavos em bigint, sem conversão para number. A ordenação por created_at/id não é uma sequência financeira: lançamentos no mesmo instante podem aparecer em ordem de UUID. Acumular Money limitado a NUMERIC(18,2) em cada passo causava overflow intermediário em giro alto mesmo com saldo final válido. Os totais e diferenças do relatório agora são strings decimais exatas, inclusive assinadas e acima do limite de uma coluna quando houver divergência; Money e valores persistidos mantêm seus limites. Sem lançamentos, o total é 0.00. A leitura é coerente com escritores que seguem o mesmo protocolo de lock/UoW; não promete isolamento de SQL arbitrário que o ignore.
+
+As provas estão em `tests/integration/ledger-constraints-m12.test.ts` e nos testes existentes de UoW, concorrência, operações, abertura e reversões. Os resultados da base combinada e limites de ambiente estão em [M12 — evidências](docs/evidence/m12-ledger-constraints.md).
+
 ## 5. Eventos de Integração e Envelope Transacional
 
 Todos os eventos gravados na outbox transacional seguem a estrutura padronizada `IntegrationEventEnvelope<T>`:
