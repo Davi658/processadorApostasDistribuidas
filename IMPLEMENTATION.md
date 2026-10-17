@@ -20,7 +20,7 @@
 | **Frente M03** | 14. Estabilização da Abertura de Carteira (Contrato, atomicidade SQL, 20 concorrentes, rollback em falhas injetadas, reconciliação, limite Money) | **CONCLUÍDO** | `tests/integration/wallet-opening.test.ts` |
 | **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
 | **Frente M06** | 17. Estabilização e Finalização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado, Migration 004 permitindo múltiplas WINs na mesma BET sequencial e concorrentemente com down seguro, WIN fora de ordem via PENDING_REFERENCE e 202, WinProcessor dedicado, resolução determinística e replays) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (38 testes passando) |
-| **Frente M10** | 18. Worker de Referências Pendentes e Concorrência Distribuída (Reserva com relógio PostgreSQL NOW(), lease persistente imune a drift de Date.now(), operações atômicas com RETURNING id sem ressuscitar lease expirado nem permitir bloqueio por worker antigo, shutdown coordenado NestJS impedindo novos claims e drenando antes de fechar o ORM, timeout de drenagem cancelando com rollback, contadores e logs estritamente pós-commit, classificação de erros transitório / stale lease / snapshot inválido / defeito inesperado sem rejeição falsa, crash recovery com processos OS reais via SIGKILL e handshakes, 3 processos concorrentes com barreira) | **CONCLUÍDO** | `tests/integration/pending-reference-worker-m10.test.ts` (16 testes passando) |
+| **Frente M10** | 18. Worker de Referências Pendentes e Concorrência Distribuída (Reserva com relógio PostgreSQL NOW(), lease persistente imune a drift de Date.now(), operações atômicas com RETURNING id sem ressuscitar lease expirado nem permitir bloqueio por worker antigo, shutdown coordenado NestJS impedindo novos claims e drenando antes de fechar o ORM, timeout de drenagem cancelando com rollback, contadores e logs estritamente pós-commit, classificação de erros transitório / stale lease / snapshot inválido / defeito inesperado sem rejeição falsa, crash recovery com processos OS reais via SIGKILL e handshakes, 3 processos concorrentes com barreira) | **CONCLUÍDO** | `tests/integration/pending-reference-worker-m10.test.ts` (21 testes passando) |
 
 ---
 
@@ -226,7 +226,10 @@
   - Drenagem coordenada implementando `OnModuleDestroy` e `BeforeApplicationShutdown`:
     - Bloqueia novos claims imediatamente (`isShuttingDown = true; stop()`).
     - Drena tarefas in-flight com timeout configurável (`drainTimeoutMs`).
-    - Caso o timeout de drenagem seja excedido, cancela o trabalho em andamento via `AbortController`, marcando `ctx.rollbackOnly = true` para forçar rollback seguro no PostgreSQL.
+    - Caso a drenagem expire, `AbortController` marca o contexto transacional capturado explicitamente pela Unit of Work, independente do AsyncLocalStorage do chamador.
+    - O segundo prazo (`cancellationTimeoutMs`) é diagnóstico: mesmo excedido, aguarda a execução terminar. `start()` e `executeBatch()` não iniciam novos claims no shutdown; chamadas simultâneas de batch compartilham a execução ativa.
+    - Begin e commit explícitos mantêm o listener ativo durante preparação e flush. A última verificação e o envio de COMMIT não têm await intermediário. Após envio, aguarda confirmação sem rotular commit confirmado como rollback; recursos e listeners são limpos em finally.
+    - Limites PostgreSQL de lock e statement, também nas conexões usadas fora da transação, encerram consultas e esperas SQL. Os padrões são 5000 ms e 10000 ms; AbortController sozinho não interrompe SQL. Os limites são por instrução, e trabalho JavaScript precisa cooperar para encerrar.
     - O fechamento do ORM (`MikroOrmUnitOfWork.onApplicationShutdown`) é executado estritamente por último, após a conclusão ou cancelamento com rollback das operações em andamento, impedindo que transações financeiras continuem operando em conexões encerradas.
     - Comprovado com aplicação Nest real e operação pausada por barreira: `app.close()` impede novos claims, a barreira é liberada e o commit/rollback é verificado com fechamento limpo das conexões.
 - **Resultados Pós-Commit e Classificação Rigorosa de Erros:**
@@ -242,7 +245,9 @@
     - *Cenário A:* Filho anuncia marco `CLAIM_CONFIRMED` e pausa; coordenador mata o filho com `SIGKILL`; outro worker retoma o item após a expiração natural do lease no PostgreSQL.
     - *Cenário B:* Filho confirma commit financeiro na base emitindo marco `COMMIT_CONFIRMED` e pausa antes de finalizar o ciclo; coordenador mata o filho com `SIGKILL` e reinicia o worker; nenhum efeito financeiro, contábil ou evento se repete.
 - **Comprovação com PostgreSQL Real Descartável:**
-  - Suíte `tests/integration/pending-reference-worker-m10.test.ts` (16 testes passando, 100% de sucesso) cobrindo todos os cenários de A a P, incluindo 3 processos concorrentes com barreira de arquivos, concorrência distribuída, duas reversões da mesma referência, falhas injetadas e reconciliação contábil integral.
+  - Suíte `tests/integration/pending-reference-worker-m10.test.ts` (21 testes passando, 100% de sucesso) cobrindo os cenários existentes e seis variantes de shutdown com barreiras (escrita, before_commit, flush, commit confirmado, lock e consulta longa), incluindo 3 processos concorrentes com barreira de arquivos, concorrência distribuída, duas reversões da mesma referência, falhas injetadas e reconciliação contábil integral.
+
+Evidências finais, comandos, códigos de saída e limitações: [M10 shutdown](docs/evidence/m10-shutdown.md).
 
 ---
 

@@ -34,6 +34,14 @@ const mikroOrmConfig: Options = {
     OutboxMessageOrmEntity,
   ],
   debug: false,
+  // Also bound queries outside a UnitOfWork (notably the atomic claim).
+  // PostgreSQL enforces these limits even when JavaScript requests cancellation.
+  driverOptions: {
+    connection: {
+      get lock_timeout() { return Number(process.env.DB_LOCK_TIMEOUT_MS) || 5000; },
+      get statement_timeout() { return Number(process.env.DB_STATEMENT_TIMEOUT_MS) || 10000; },
+    },
+  },
   migrations: {
     path: './src/infrastructure/persistence/migrations',
     disableForeignKeys: false,

@@ -1,0 +1,169 @@
+[
+  {
+    "command": "bun run typecheck",
+    "exitCode": 0,
+    "summary": []
+  },
+  {
+    "command": "bun test tests\\concurrency\\concurrency.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 6 pass",
+      " 0 fail",
+      "Ran 6 tests across 1 file. [13.95s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\http-endpoints.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 21 pass",
+      " 0 fail",
+      "Ran 21 tests across 1 file. [14.71s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\migrations.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 1 pass",
+      " 0 fail",
+      "Ran 1 test across 1 file. [5.40s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\mikro-orm-uow-m05.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 18 pass",
+      " 0 fail",
+      "Ran 18 tests across 1 file. [20.13s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\money-postgres-roundtrip.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 9 pass",
+      " 0 fail",
+      "Ran 9 tests across 1 file. [7.40s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\pending-reference-worker-m10.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 21 pass",
+      " 0 fail",
+      "Ran 21 tests across 1 file. [22.64s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\postgres-invariants.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 22 pass",
+      " 0 fail",
+      "Ran 22 tests across 1 file. [8.30s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\wager-bet-replay.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 16 pass",
+      " 0 fail",
+      "Ran 16 tests across 1 file. [13.06s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\wager-operations.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 8 pass",
+      " 0 fail",
+      "Ran 8 tests across 1 file. [7.70s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\wager-pending-replay-m09.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 22 pass",
+      " 0 fail",
+      "Ran 22 tests across 1 file. [11.86s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\wager-reversals-m07.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 28 pass",
+      " 0 fail",
+      "Ran 28 tests across 1 file. [14.42s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\wager-reversals-m08.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 23 pass",
+      " 0 fail",
+      "Ran 23 tests across 1 file. [10.70s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\wager-win-loss-m06.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 38 pass",
+      " 0 fail",
+      "Ran 38 tests across 1 file. [29.52s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\integration\\wallet-opening.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 30 pass",
+      " 0 fail",
+      "Ran 30 tests across 1 file. [8.21s]"
+    ]
+  },
+  {
+    "command": "bun test tests\\unit\\money.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 21 pass",
+      " 0 fail",
+      "Ran 21 tests across 1 file. [19.00ms]"
+    ]
+  },
+  {
+    "command": "bun test tests\\unit\\payload-hash.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 6 pass",
+      " 0 fail",
+      "Ran 6 tests across 1 file. [26.00ms]"
+    ]
+  },
+  {
+    "command": "bun test tests\\unit\\wallet-ledger-entry.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 5 pass",
+      " 0 fail",
+      "Ran 5 tests across 1 file. [20.00ms]"
+    ]
+  },
+  {
+    "command": "bun test tests\\unit\\wallet.test.ts --timeout 30000",
+    "exitCode": 0,
+    "summary": [
+      " 7 pass",
+      " 0 fail",
+      "Ran 7 tests across 1 file. [18.00ms]"
+    ]
+  }
+]

@@ -31,6 +31,7 @@ export function isTransientError(err: unknown): boolean {
     '55P03',
     '40001',
     '57P01',
+    '57014',
     '08006',
     '08001',
     'ECONNRESET',
@@ -44,6 +45,8 @@ export function isTransientError(err: unknown): boolean {
   const transientPatterns = [
     'deadlock',
     'lock timeout',
+    'statement timeout',
+    'canceling statement due to statement timeout',
     'could not obtain lock',
     'serialization failure',
     'connection timeout',
@@ -134,32 +137,12 @@ export class ReprocessPendingReferencesUseCase {
             throw new Error('ABORTED_BY_SHUTDOWN');
           }
 
-          let cleanupAbortListener: (() => void) | null = null;
-          if (abortSignal) {
-            const abortHandler = () => {
-              const ctx = (this.uow as any).getTransactionContext?.();
-              if (ctx) {
-                ctx.rollbackOnly = true;
-                ctx.rollbackReason = abortSignal.reason ?? new Error('ABORTED_BY_SHUTDOWN');
-              }
-            };
-            if (abortSignal.aborted) {
-              abortHandler();
-              throw new Error('ABORTED_BY_SHUTDOWN');
-            }
-            abortSignal.addEventListener('abort', abortHandler, { once: true });
-            cleanupAbortListener = () => {
-              abortSignal.removeEventListener('abort', abortHandler);
-            };
+          // Canonical lock order: lock wallet first, then transaction
+          const wallet = await this.walletRepo.findById(claimed.walletId, true);
+          if (!wallet) {
+            await this.wagerRepo.releaseLease(claimed.id, claimed.leaseToken);
+            return { outcome: 'SKIPPED' };
           }
-
-          try {
-            // Canonical lock order: lock wallet first, then transaction
-            const wallet = await this.walletRepo.findById(claimed.walletId, true);
-            if (!wallet) {
-              await this.wagerRepo.releaseLease(claimed.id, claimed.leaseToken);
-              return { outcome: 'SKIPPED' };
-            }
 
           // Fetch fresh transaction state under pessimistic write lock
           const tx = await this.wagerRepo.findById(claimed.id, true);
@@ -310,11 +293,8 @@ export class ReprocessPendingReferencesUseCase {
             };
           }
 
-            return { outcome: 'SKIPPED' };
-          } finally {
-            cleanupAbortListener?.();
-          }
-        });
+          return { outcome: 'SKIPPED' };
+        }, abortSignal);
 
         // ONLY update counters and emit success logs AFTER transaction commit confirmation
         if (itemResult.outcome === 'PROCESSED') {
@@ -367,6 +347,26 @@ export class ReprocessPendingReferencesUseCase {
             error: err.message,
           });
           continue;
+        }
+
+        const isShutdownAborted =
+          abortSignal?.aborted ||
+          (err instanceof Error &&
+            (err.message === 'ABORTED_BY_SHUTDOWN' ||
+              err.message === 'DRAIN_TIMEOUT_EXCEEDED' ||
+              err.message.includes('rollback-only') ||
+              (err as any).cause?.message === 'DRAIN_TIMEOUT_EXCEEDED' ||
+              (err as any).rollbackReason?.message === 'DRAIN_TIMEOUT_EXCEEDED'));
+
+        if (isShutdownAborted) {
+          this.logStructured({
+            level: 'warn',
+            event: 'PENDING_REFERENCE_SHUTDOWN_ABORTED',
+            workerId,
+            transactionId: claimed.id,
+            reason: err instanceof Error ? err.message : String(err),
+          });
+          break;
         }
 
         if (isTransientError(err)) {

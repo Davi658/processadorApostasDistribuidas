@@ -43,5 +43,5 @@ export interface OutboxRepositoryPort {
 }
 
 export interface UnitOfWorkPort {
-  runInTransaction<T>(work: () => Promise<T>): Promise<T>;
+  runInTransaction<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T>;
 }

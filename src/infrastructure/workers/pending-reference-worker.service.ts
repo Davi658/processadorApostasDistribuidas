@@ -17,6 +17,7 @@ export interface PendingReferenceWorkerOptions {
   batchSize?: number;
   leaseDurationMs?: number;
   drainTimeoutMs?: number;
+  cancellationTimeoutMs?: number;
   workerId?: string;
 }
 
@@ -29,7 +30,7 @@ export class PendingReferenceWorkerService
   private isTickRunning = false;
   private isShuttingDown = false;
   private timer: NodeJS.Timeout | null = null;
-  private activeExecutionPromise: Promise<ReprocessResult | null> | null = null;
+  private activeExecutionPromise: Promise<ReprocessResult> | null = null;
   private shutdownPromise: Promise<void> | null = null;
   private abortController: AbortController | null = null;
 
@@ -38,6 +39,7 @@ export class PendingReferenceWorkerService
   public readonly batchSize: number;
   public readonly leaseDurationMs: number;
   public readonly drainTimeoutMs: number;
+  public readonly cancellationTimeoutMs: number;
   public readonly workerId: string;
 
   constructor(
@@ -59,6 +61,9 @@ export class PendingReferenceWorkerService
     this.drainTimeoutMs =
       options?.drainTimeoutMs ??
       (Number(process.env.PENDING_WORKER_DRAIN_TIMEOUT_MS) || 5000);
+    this.cancellationTimeoutMs =
+      options?.cancellationTimeoutMs ??
+      (Number(process.env.PENDING_WORKER_CANCELLATION_TIMEOUT_MS) || 5000);
     this.workerId =
       options?.workerId ??
       `worker-${crypto.randomUUID().slice(0, 8)}`;
@@ -88,13 +93,13 @@ export class PendingReferenceWorkerService
       this.stop();
 
       if (this.activeExecutionPromise) {
-        let timeoutHandle: NodeJS.Timeout | null = null;
-        const timeoutPromise = new Promise<'timeout'>((resolve) => {
-          timeoutHandle = setTimeout(() => resolve('timeout'), this.drainTimeoutMs);
+        let drainTimeoutHandle: NodeJS.Timeout | null = null;
+        const drainTimeoutPromise = new Promise<'timeout'>((resolve) => {
+          drainTimeoutHandle = setTimeout(() => resolve('timeout'), this.drainTimeoutMs);
         });
 
         try {
-          const res = await Promise.race([this.activeExecutionPromise, timeoutPromise]);
+          const res = await Promise.race([this.activeExecutionPromise, drainTimeoutPromise]);
           if (res === 'timeout') {
             this.logger.warn(
               `Worker drainage timed out after ${this.drainTimeoutMs}ms during ${phase}. Aborting active operations.`
@@ -102,12 +107,23 @@ export class PendingReferenceWorkerService
             if (this.abortController) {
               this.abortController.abort(new Error('DRAIN_TIMEOUT_EXCEEDED'));
             }
+
+            // This is a diagnostic deadline, never permission to close an ORM
+            // still owned by an execution. SQL waits are bounded by PostgreSQL.
+            const warning = setTimeout(() => {
+              this.logger.error(`Cancellation still pending after ${this.cancellationTimeoutMs}ms during ${phase}; waiting for execution termination.`);
+            }, this.cancellationTimeoutMs);
+            try {
+              await this.activeExecutionPromise;
+            } finally {
+              clearTimeout(warning);
+            }
           }
         } catch (err) {
           this.logger.error('Error draining in-flight worker batch during shutdown', err);
         } finally {
-          if (timeoutHandle) {
-            clearTimeout(timeoutHandle);
+          if (drainTimeoutHandle) {
+            clearTimeout(drainTimeoutHandle);
           }
         }
       }
@@ -116,8 +132,16 @@ export class PendingReferenceWorkerService
     return await this.shutdownPromise;
   }
 
+  public isAbortRequested(): boolean {
+    return this.abortController?.signal.aborted ?? false;
+  }
+
+  public isShuttingDownStatus(): boolean {
+    return this.isShuttingDown;
+  }
+
   public start(): void {
-    if (this.isRunning) return;
+    if (this.isRunning || this.isShuttingDown) return;
     this.isRunning = true;
     this.scheduleNextTick(0);
   }
@@ -170,12 +194,15 @@ export class PendingReferenceWorkerService
     if (this.isShuttingDown) {
       return { processed: 0, rejected: 0, rescheduled: 0, blocked: 0, failed: 0 };
     }
-    this.abortController = new AbortController();
+    // A worker owns at most one execution, including manual executeBatch calls.
+    if (this.activeExecutionPromise) return await this.activeExecutionPromise;
+    const controller = new AbortController();
+    this.abortController = controller;
     const execPromise = this.reprocessUseCase.execute(
       batchSize,
       leaseDurationMs,
       this.workerId,
-      this.abortController.signal
+      controller.signal
     );
     this.activeExecutionPromise = execPromise;
     try {
@@ -184,7 +211,7 @@ export class PendingReferenceWorkerService
       if (this.activeExecutionPromise === execPromise) {
         this.activeExecutionPromise = null;
       }
-      this.abortController = null;
+      if (this.abortController === controller) this.abortController = null;
     }
   }
 }
