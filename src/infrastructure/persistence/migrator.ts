@@ -9,27 +9,89 @@ export interface MigratorOptions {
   connectionTimeoutMillis?: number;
 }
 
+function parseAndValidateInteger(
+  value: unknown,
+  name: string,
+  min: number,
+  isStrictlyGreaterThan = false
+): number {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    (isStrictlyGreaterThan ? value <= min : value < min)
+  ) {
+    const comparator = isStrictlyGreaterThan ? `> ${min}` : `>= ${min}`;
+    throw new Error(`Invalid ${name}: must be a finite integer ${comparator}, got ${value}`);
+  }
+  return value;
+}
+
+function resolveOption(
+  customVal: unknown,
+  envVal: string | undefined,
+  defaultVal: number,
+  name: string,
+  min: number,
+  isStrictlyGreaterThan = false
+): number {
+  if (customVal !== undefined) {
+    return parseAndValidateInteger(customVal, name, min, isStrictlyGreaterThan);
+  }
+  if (envVal !== undefined && envVal.trim() !== '') {
+    const parsed = Number(envVal);
+    return parseAndValidateInteger(parsed, name, min, isStrictlyGreaterThan);
+  }
+  return defaultVal;
+}
+
 export class DatabaseMigrator {
   private readonly pool: pg.Pool;
   private readonly maxRetries: number;
   private readonly initialDelayMs: number;
+  private readonly connectionTimeoutMillis: number;
 
   constructor(customConfig?: pg.PoolConfig & MigratorOptions) {
-    const baseConfig = customConfig ?? getMigrationDatabaseConfig();
-    const timeoutMs =
-      customConfig?.connectionTimeoutMillis ??
-      (Number(process.env.MIGRATION_CONNECT_TIMEOUT_MS) || 3000);
+    const timeoutMs = resolveOption(
+      customConfig?.connectionTimeoutMillis,
+      process.env.MIGRATION_CONNECT_TIMEOUT_MS,
+      3000,
+      'connectionTimeoutMillis',
+      0,
+      true
+    );
 
-    this.maxRetries =
-      customConfig?.maxRetries ??
-      (Number(process.env.MIGRATION_MAX_RETRIES) || 10);
-    this.initialDelayMs =
-      customConfig?.initialDelayMs ??
-      (Number(process.env.MIGRATION_INITIAL_DELAY_MS) || 200);
+    this.maxRetries = resolveOption(
+      customConfig?.maxRetries,
+      process.env.MIGRATION_MAX_RETRIES,
+      10,
+      'maxRetries',
+      1,
+      false
+    );
+
+    this.initialDelayMs = resolveOption(
+      customConfig?.initialDelayMs,
+      process.env.MIGRATION_INITIAL_DELAY_MS,
+      200,
+      'initialDelayMs',
+      0,
+      false
+    );
+
+    this.connectionTimeoutMillis = timeoutMs;
+
+    const baseConfig = customConfig ?? getMigrationDatabaseConfig();
+    const {
+      connectionTimeoutMillis: _rawTimeout,
+      maxRetries: _rawMaxRetries,
+      initialDelayMs: _rawInitialDelay,
+      ...poolConfig
+    } = baseConfig as any;
 
     this.pool = new pg.Pool({
+      ...poolConfig,
       connectionTimeoutMillis: timeoutMs,
-      ...baseConfig,
     });
   }
 
@@ -55,17 +117,35 @@ export class DatabaseMigrator {
       '08004', // sqlserver_rejected_establishment_of_sqlconnection
       '08006', // connection_failure
     ]);
-    if (err.code && transientCodes.has(String(err.code))) {
-      return true;
+
+    const transientMessageSnippets = [
+      'connection terminated due to connection timeout',
+      'connection terminated unexpectedly',
+      'the database system is starting up',
+      'connection refused',
+      'timeout expired',
+      'econnrefused',
+      'econnreset',
+      'etimedout',
+    ];
+
+    let current: any = err;
+    let depth = 0;
+    while (current && depth < 5) {
+      if (current.code && transientCodes.has(String(current.code))) {
+        return true;
+      }
+      const msg = String(current.message || '').toLowerCase();
+      for (const snippet of transientMessageSnippets) {
+        if (msg.includes(snippet)) {
+          return true;
+        }
+      }
+      current = current.cause;
+      depth++;
     }
-    const msg = String(err.message || '');
-    return (
-      msg.includes('ECONNREFUSED') ||
-      msg.includes('connection refused') ||
-      msg.includes('the database system is starting up') ||
-      msg.includes('timeout expired') ||
-      msg.includes('Connection terminated unexpectedly')
-    );
+
+    return false;
   }
 
   private async connectWithRetry(): Promise<pg.PoolClient> {

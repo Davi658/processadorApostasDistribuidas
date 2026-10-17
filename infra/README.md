@@ -54,8 +54,10 @@ O `.dockerignore` usa lista de inclusão, excluindo Git, worktrees, segredos e d
   `bun run src/infrastructure/persistence/migrator.ts up`. Ele mantém
   `schema_migrations` e trava transacional advisory, aplicando somente versões novas.
   O `DatabaseMigrator` possui robustez aprimorada:
-  - `connectionTimeoutMillis` finito no `pg.Pool` (padrão 3000ms), prevenindo travamento indefinido de socket.
-  - Retentativas com backoff restritas exclusivamente à aquisição inicial de conexão contra erros transitórios (`ECONNREFUSED`, `57P03`), preservando a causa original.
+  - Validação rigorosa das opções no construtor antes da criação do pool: `connectionTimeoutMillis` (inteiro finito > 0, padrão 3000ms), `maxRetries` (inteiro finito >= 1, padrão 10) e `initialDelayMs` (inteiro finito >= 0, padrão 200ms). O spread de `customConfig` não sobrescreve o timeout validado com `undefined` ou valores inválidos.
+  - `connectionTimeoutMillis` finito no `pg.Pool`, prevenindo travamento indefinido de socket. Reconhece o timeout real do driver `pg` ("Connection terminated due to connection timeout"), inspecionando também `code` e cadeia de `cause` para identificar falhas transitórias de conexão (`ECONNREFUSED`, `ETIMEDOUT`, `57P03`).
+  - Retentativas com backoff exponencial (fator 1.5, teto 2000ms) restritas **exclusivamente** à fase de aquisição da conexão inicial (`connectWithRetry()`).
+  - **Orçamento nominal das tentativas/backoffs padrão**: com os parâmetros padrão (10 tentativas, timeout de conexão de 3000ms e delay inicial de 200ms), o orçamento nominal acumulado das tentativas e backoffs na fase de conexão é de aproximadamente ~40,16 s (10 × 3 s de timeout + ~10,16 s de backoffs somados: 200 + 300 + 450 + 675 + 1012,5 + 1518,75 + 2000 + 2000 + 2000 ms). Este valor representa um orçamento nominal estimado das tentativas e esperas de conexão, e **não** um máximo absoluto (variações de latência de rede, resolução DNS e escalonamento de sockets pelo sistema operacional podem alterar o tempo decorrido total) nem um limite para a execução de consultas SQL.
   - Erros de execução SQL falham imediatamente na primeira tentativa, disparando `ROLLBACK` e abortando sem repetição.
   - Execução CLI encapsulada em bloco `try / catch / finally` que garante o encerramento do pool via `migrator.close()` e propaga código de saída não-zero em caso de erro.
   - Comprovado pela suíte automatizada `tests/unit/migrator-robustness.test.ts`.
