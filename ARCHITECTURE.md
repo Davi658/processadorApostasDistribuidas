@@ -153,7 +153,7 @@ A estabilização de `WIN` e `LOSS` (M06) assegura a precisão contábil, a idem
 
 ## 4. Garantias e Proteções no Banco de Dados (PostgreSQL)
 
-A integridade do sistema é sustentada por três migrações incrementais reversíveis (`001`, `002` e `003`):
+A integridade do sistema é sustentada por migrações incrementais reversíveis; a proteção terminal descrita abaixo exige a migration `006` aplicada:
 
 ### 4.1 Integridade Referencial Composta no Ledger
 Constraint `fk_ledger_wager_tx_wallet_currency`:
@@ -167,28 +167,13 @@ ALTER TABLE wallet_ledger_entries
 Impede fisicamente no PostgreSQL que um lançamento contábil pertencente à carteira B faça referência a uma transação registrada para a carteira A, ou com moeda divergente.
 
 ### 4.2 Proteção Rigorosa de Transações Terminais
-Trigger `prevent_terminal_transaction_modification()` ativado antes de `UPDATE`:
-```sql
-IF OLD.status IN ('PROCESSED', 'REJECTED', 'FAILED') AND (
-    NEW.wallet_id IS DISTINCT FROM OLD.wallet_id OR
-    NEW.player_id IS DISTINCT FROM OLD.player_id OR
-    NEW.provider_id IS DISTINCT FROM OLD.provider_id OR
-    NEW.external_transaction_id IS DISTINCT FROM OLD.external_transaction_id OR
-    NEW.round_id IS DISTINCT FROM OLD.round_id OR
-    NEW.game_id IS DISTINCT FROM OLD.game_id OR
-    NEW.kind IS DISTINCT FROM OLD.kind OR
-    NEW.amount IS DISTINCT FROM OLD.amount OR
-    NEW.currency IS DISTINCT FROM OLD.currency OR
-    NEW.idempotency_key IS DISTINCT FROM OLD.idempotency_key OR
-    NEW.payload_hash IS DISTINCT FROM OLD.payload_hash OR
-    NEW.response_snapshot IS DISTINCT FROM OLD.response_snapshot OR
-    NEW.status IS DISTINCT FROM OLD.status
-) THEN
-    RAISE EXCEPTION 'wager_transactions in terminal state cannot be modified'
-        USING ERRCODE = '55000';
-END IF;
-```
-Utiliza `IS DISTINCT FROM` para tratar com segurança valores nulos e protege integralmente todos os campos de identidade, payload e resultado original, permitindo apenas transições de estados não terminais (`PENDING` -> `PROCESSED`, etc.).
+A migration incremental 006 instala o trigger antes de UPDATE e DELETE. Para linhas já em PROCESSED, REJECTED ou FAILED, compara com IS DISTINCT FROM as representações JSONB completas, removendo somente esta lista explícita de campos operacionais: updated_at, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, is_operationally_blocked e operational_block_reason.
+
+Todos os demais campos ficam imutáveis, incluindo id, created_at, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, idempotency_key, payload_hash, response_snapshot, status, rejection_reason e reference_external_transaction_id. A comparação cobre NULL nas duas direções e protege também futuras colunas por padrão. UPDATE protegido retorna SQLSTATE 55000 com terminal_transaction_protected_fields; DELETE terminal retorna 55000 com terminal_transaction_delete_forbidden, mesmo sem ledger associado.
+
+O papel app_user continua sem DELETE; sua recusa por privilégio é complementada por prova administrativa do trigger. Atualizações operacionais e limpeza de lease permanecem permitidas, inclusive após resolução terminal; mudanças financeiras na mesma instrução continuam proibidas. Transições a partir de PENDING e PENDING_REFERENCE permanecem disponíveis ao M10.
+
+A função histórica da migration 003 referencia observed_balance, coluna inexistente. A migration 006 corrige a função sem alterar o histórico. Seu DOWN restaura exatamente o comportamento anterior, inclusive esse defeito e a ausência de proteção a DELETE; destina-se à reversibilidade, não à manutenção das garantias M11.
 
 ---
 
