@@ -13,6 +13,7 @@ import { GetWalletUseCase } from '../../src/application/use-cases/get-wallet.use
 import { ProcessWagerUseCase } from '../../src/application/use-cases/process-wager.use-case';
 import { ReconcileWalletUseCase } from '../../src/application/use-cases/reconcile-wallet.use-case';
 import { ReprocessPendingReferencesUseCase } from '../../src/application/use-cases/reprocess-pending-references.use-case';
+import { Money } from '../../src/domain/value-objects/money.vo';
 import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
 
 describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas', () => {
@@ -164,7 +165,9 @@ describe('M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas'
     const gameId = params.gameId ?? 'gm-curr';
     const initialBalance = params.initialBalance ?? '100.00';
     const betAmount = params.betAmount ?? '20.00';
-    const finalBalance = (Number(initialBalance) - Number(betAmount)).toFixed(2);
+    const finalBalance = Money.create(initialBalance, 'USD')
+      .subtract(Money.create(betAmount, 'USD'))
+      .getAmount();
 
     // 1. Wallets table (version = 2: 1 abertura + 1 bet)
     await adminPool.query(
