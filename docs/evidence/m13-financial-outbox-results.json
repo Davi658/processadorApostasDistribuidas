@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-17",
+  "timezone": "America/Sao_Paulo",
+  "milestone": "M13",
+  "title": "Outbox Financeira",
+  "base": "4f6ab2d88ccc01fa27f3d7b0d4ef09c3001d515b",
+  "branch": "feat/m13-financial-outbox",
+  "worktree": "D:/processadorApostasDistribuidas/.worktrees/m13-financial-outbox",
+  "environment": {
+    "platform": "Windows x64",
+    "bun": "1.4.3",
+    "postgres": "16.8",
+    "host": "127.0.0.1",
+    "port": 55414,
+    "isolatedCluster": ".data/m13-pg",
+    "fsync": "on",
+    "synchronous_commit": "on",
+    "full_page_writes": "on",
+    "applicationRole": "app_user: NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS",
+    "localInfrastructureIntact": true,
+    "containers": "isolated / not touched"
+  },
+  "typecheck": {
+    "command": "bun run typecheck",
+    "exitCode": 0
+  },
+  "dedicatedSuite": {
+    "file": "tests/integration/financial-outbox-m13.test.ts",
+    "command": "bun test tests/integration/financial-outbox-m13.test.ts --timeout 30000",
+    "exitCode": 0,
+    "passed": 27,
+    "failed": 0,
+    "expectCalls": 229
+  },
+  "combinedSuite": {
+    "command": "bun run test",
+    "exitCode": 0,
+    "files": 23,
+    "failedFiles": 0,
+    "totalPassed": 381,
+    "totalFailed": 0
+  },
+  "matrixCoverage": {
+    "positiveOpening": "2 events: WagerTransactionProcessed + WalletBalanceChanged",
+    "zeroOpening": "0 events",
+    "betProcessed": "2 events: WagerTransactionProcessed + WalletBalanceChanged",
+    "betRejected": "1 event: WagerTransactionRejected",
+    "lossProcessed": "1 event: WagerTransactionProcessed",
+    "winProcessed": "2 events: WagerTransactionProcessed + WalletBalanceChanged",
+    "winPendingReference": "1 event: WagerTransactionPendingReference",
+    "winRescheduled": "0 new events",
+    "winResolvedLater": "2 terminal events: WagerTransactionProcessed + WalletBalanceChanged",
+    "winRejected": "1 event: WagerTransactionRejected",
+    "refundProcessed": "2 events: WagerTransactionProcessed + WalletBalanceChanged",
+    "refundPendingReference": "1 event: WagerTransactionPendingReference",
+    "refundRejected": "1 event: WagerTransactionRejected",
+    "rollbackBetCredit": "2 events: WagerTransactionProcessed + WalletBalanceChanged",
+    "rollbackWinDebit": "2 events: WagerTransactionProcessed + WalletBalanceChanged",
+    "rollbackRejected": "1 event: WagerTransactionRejected",
+    "idempotentReplay": "0 additional events",
+    "idempotencyConflict": "0 additional events",
+    "technicalFailureRollback": "0 events committed"
+  },
+  "outOfScope": [
+    "publisher (M14)",
+    "publication lease (M14)",
+    "SQS integration (M15)",
+    "consumer/inbox (M15-M16)",
+    "DLQ (M15)"
+  ]
+}

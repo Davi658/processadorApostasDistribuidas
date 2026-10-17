@@ -191,19 +191,58 @@ O trigger `trg_protect_wallet_ledger_entries`, instalado em 001, impede UPDATE e
 
 As provas estão em `tests/integration/ledger-constraints-m12.test.ts` e nos testes existentes de UoW, concorrência, operações, abertura e reversões. Os resultados da base combinada e limites de ambiente estão em [M12 — evidências](docs/evidence/m12-ledger-constraints.md).
 
-## 5. Eventos de Integração e Envelope Transacional
+## 5. Eventos de Integração, Outbox Financeira e Envelope Transacional (M13)
 
+### 5.1 Estrutura do Envelope Padronizado
 Todos os eventos gravados na outbox transacional seguem a estrutura padronizada `IntegrationEventEnvelope<T>`:
-- `eventId`: UUID v4 único da mensagem.
-- `eventType`: Nome canônico da classe do evento (ex: `WalletBalanceChangedEvent`).
-- `version`: Versão do esquema do evento (padrão 1).
-- `aggregateId`: ID do agregado raiz (carteira).
-- `correlationId`: Identificador de correlação propagado fim a fim (até 255 caracteres).
-- `causationId`: Identificador da causa da transação (chave de idempotência, até 255 caracteres).
-- `occurredAt`: Timestamp ISO 8601 em UTC.
+- `eventId`: UUID v4 estável e único da mensagem (chave primária em `outbox_messages.id`).
+- `eventType`: Nome canônico da classe do evento (`WagerTransactionProcessed`, `WalletBalanceChanged`, `WagerTransactionRejected`, `WagerTransactionPendingReference`).
+- `version`: Versão do contrato do evento (fixado em `1`).
+- `aggregateId`: ID do agregado raiz (UUID da carteira `wallets.id`).
+- `correlationId`: Identificador de correlação de negócio propagado fim a fim (suporta UUIDs e strings arbitrárias de até 255 caracteres).
+- `causationId`: Identificador da causa da transação (`Idempotency-Key` ou `null`/`undefined` na abertura).
+- `occurredAt`: Timestamp ISO 8601 em UTC (`Date.toISOString()`).
 - `data`: Carga útil tipada da transação.
 
-A entidade `IntegrationEvent` implementa `toEnvelope()` para serialização JSON padronizada e `reconstruct()` como ponto único de reconstrução testada.
+A entidade abstrata `IntegrationEvent` implementa `toEnvelope()` para serialização estruturada e `reconstruct()` como ponto único de reconstrução determinística, garantindo preservação de identidade e timestamp sem regeneração de UUIDs.
+
+### 5.2 Precisão Monetária no Payload
+Todos os campos monetários nos payloads dos eventos (`amount`, `balance`, `previousBalance`, `currentBalance`) utilizam estritamente o formato `{ amount: string, currency: string }`. A utilização de ponto flutuante (`number`) é proibida em qualquer nível de evento.
+
+### 5.3 Matriz de Auditoria e Contrato de Eventos (M13)
+
+| Operação | Cenário / Resultado | Eventos Persistidos na Outbox | Qtd | Detalhes do Envelope & Payload |
+| :--- | :--- | :--- | :---: | :--- |
+| **Abertura** | Saldo positivo (`> 0.00`) | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | `kind: 'OPENING'`, `balanceBefore: 0.00`, `balanceAfter: initialBalance`, `version: 1`, `correlationId: openingTxId` |
+| **Abertura** | Saldo zero (`0.00` ou omitido) | *(nenhum)* | 0 | Sem transação financeira, sem ledger, sem eventos na outbox |
+| **BET** | Processado com movimento | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | `kind: 'BET'`, débito em carteira, `version: V+1`, `triggerTransactionId: tx.id`, `correlationId` preservado |
+| **BET** | Rejeição por saldo insuficiente (`INSUFFICIENT_FUNDS`) | `WagerTransactionRejected` | 1 | `failureCode: 'INSUFFICIENT_FUNDS'`, saldo inalterado, sem ledger, sem `BalanceChanged` |
+| **LOSS** | Processado neutro | `WagerTransactionProcessed` | 1 | `kind: 'LOSS'`, saldo e versão inalterados, sem ledger, sem `BalanceChanged` |
+| **WIN** | Processado com movimento (sem ref ou ref `PROCESSED`) | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | `kind: 'WIN'`, crédito em carteira, `version: V+1`, `triggerTransactionId: tx.id` |
+| **WIN** | Referência ausente (`PENDING_REFERENCE`) | `WagerTransactionPendingReference` | 1 | `kind: 'WIN'`, `attempts: 1`, `nextAttemptAt` no futuro, saldo inalterado |
+| **WIN** | Reagendamento via worker (`RESCHEDULED`) | *(nenhum)* | 0 | Atualiza `attempts` e `nextAttemptAt` no banco; sem duplicação acidental de eventos |
+| **WIN** | Resolução posterior (ref confirmada) | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | Transição para terminal `PROCESSED`, crédito em carteira e lançamento contábil |
+| **WIN** | Rejeição (ref incompatível / timeout de tentativas) | `WagerTransactionRejected` | 1 | `failureCode: 'REFERENCE_INCOMPATIBLE'` ou `'REFERENCE_NOT_FOUND'`, saldo inalterado |
+| **REFUND** | Processado com movimento (ref BET confirmada) | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | `kind: 'REFUND'`, crédito do valor, `version: V+1`, lançamento contábil |
+| **REFUND** | Referência ausente (`PENDING_REFERENCE`) | `WagerTransactionPendingReference` | 1 | `kind: 'REFUND'`, `attempts: 1`, `nextAttemptAt`, saldo inalterado |
+| **REFUND** | Reagendamento via worker (`RESCHEDULED`) | *(nenhum)* | 0 | Sem eventos adicionais na outbox |
+| **REFUND** | Resolução posterior via worker | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | Transição para terminal `PROCESSED` com crédito |
+| **REFUND** | Rejeição (ref não processada / incompatível) | `WagerTransactionRejected` | 1 | `failureCode: 'REFERENCE_NOT_PROCESSED'` ou `'REFERENCE_INCOMPATIBLE'` |
+| **ROLLBACK** | Processado de BET (crédito) | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | `kind: 'ROLLBACK'`, estorno de débito via crédito contábil |
+| **ROLLBACK** | Processado de WIN (débito) | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | `kind: 'ROLLBACK'`, estorno de crédito via débito contábil |
+| **ROLLBACK** | Referência ausente (`PENDING_REFERENCE`) | `WagerTransactionPendingReference` | 1 | `kind: 'ROLLBACK'`, `attempts: 1`, `nextAttemptAt`, saldo inalterado |
+| **ROLLBACK** | Reagendamento via worker (`RESCHEDULED`) | *(nenhum)* | 0 | Sem eventos adicionais na outbox |
+| **ROLLBACK** | Resolução posterior via worker | `WagerTransactionProcessed` + `WalletBalanceChanged` | 2 | Transição para terminal `PROCESSED` com movimento contábil |
+| **ROLLBACK** | Rejeição (saldo insuficiente para estornar WIN) | `WagerTransactionRejected` | 1 | `failureCode: 'REVERSAL_INSUFFICIENT_FUNDS'` |
+| **Replay** | Mesma chave de idempotência e payload idêntico | *(nenhum)* | 0 | Resposta retornada do snapshot imutável; zero eventos emitidos |
+| **Conflito** | Mesma chave de idempotência com payload diferente | *(nenhum)* | 0 | Exceção `IdempotencyConflictError` aborta transação; zero eventos emitidos |
+| **Falha técnica** | Erro de infraestrutura / exceção antes do commit | *(nenhum)* | 0 | Rollback total no PostgreSQL; zero eventos confirmados |
+
+### 5.4 Garantias de Atomicidade e Fronteira Transacional
+- **Atomicidade Real Única:** Carteira, transação financeira, lançamento no ledger e eventos de outbox são gravados sob o mesmo `txid_current()` e confirmados em um único `COMMIT` SQL.
+- **Barreira MVCC Pré-Commit:** Nenhuma mutação ou evento é visível a conexões externas antes da confirmação do commit no PostgreSQL.
+- **Isolamento de Rollback:** Falhas injetadas após a primeira ou após a última gravação na outbox revertem integralmente saldo, versão, transação, ledger e outbox, sem linhas órfãs. Reenvio subsequente produz exatamente o conjunto esperado.
+- **Fronteira de Escopo M13:** Os eventos são persistidos em estado inicial não publicado (`published_at IS NULL`). Publisher externo (M14), leases de publicação (M14), filas SQS (M15) e consumidores/inbox (M15-M16) estão estritamente fora do escopo desta meta.
 
 ---
 
