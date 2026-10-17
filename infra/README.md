@@ -1,16 +1,17 @@
 # Infraestrutura local e Integração com Main
 
-Integração realizada na branch `codex/infra-main-integration`, a partir da `origin/main` mais recente:
-- **Base SHA**: `953607868f919e60db2eb90ffd7210b7ef994197` (merge de PR #8 `feat/m13-financial-outbox` e PR #7 `codex/local-infrastructure`).
-- **Commits de infraestrutura incorporados**: `05d09c8`, `4528b05`, `4701a10`, `b63b64a`, `d69e6bc`.
-- **Marcos preservados**: M10 (worker lease e shutdown), M11 (proteção de terminais), M12 (ledger constraints e reconciliação finita), M17 (consultas de transações e ledger paginado) e M13 (outbox financeira transacional e matriz de eventos).
-- **Worktree**: `D:\processadorApostasDistribuidas\.worktrees\infra-main-integration`.
+Estabilização realizada na branch `codex/main-stabilization-final`, a partir da ponta revisada de `origin/main`:
+- **Base SHA**: `bef5481551b246539e18ced210d5392c764ac5fd` (merge de PR #10 `codex/m17-queries-pagination` sobre `11d73f8`).
+- **Preservação**: Integração Docker oficial (`ef5141c`), M17 oficial finalizado em `52bfa20` (`WageringQueryModule` e rotas oficiais), e volume preexistente `wagers-local_local_pgdata`.
+- **Saneamento PR #10**: Remoção cirúrgica dos 6 artefatos duplicados (`M17-INTEGRATION.md`, `financial-queries.port.ts`, `financial-queries.ts`, `financial-queries.controller.ts`, `financial-queries.module.ts`, `financial-queries-m17.test.ts`), mantendo `WageringQueryModule` e infraestrutura compartilhada intactos.
+- **Correções M13**: Eventos identificados por tipo e ID de transação (sem presunção de ordem por timestamp/UUID); reuso do DTO completo com `roundId` nos retries após rollback; cobertura de timestamps rigorosamente iguais com ordenação de UUID reversa à emissão.
+- **Worktree**: `D:\processadorApostasDistribuidas\.worktrees\main-stabilization`.
 
-Nenhum push ou merge em `main` foi executado. As worktrees `local-infrastructure` e `m13-financial-outbox`, bem como o volume preexistente `wagers-local_local_pgdata`, foram preservados intactos.
+Nenhum push ou merge em `main` foi executado. As worktrees preexistentes e o volume `wagers-local_local_pgdata` foram preservados intactos.
 
 ## Subir e parar
 
-O Compose suporta parametrização via variáveis de ambiente, permitindo execução padrão (`wagers-local`) ou em projetos isolados (ex: `wagers-integration`):
+O Compose suporta parametrização via variáveis de ambiente, permitindo execução padrão (`wagers-local`) ou em projetos isolados (ex: `wagers-integration`, `wagers-stab-isolated`):
 
 ```powershell
 docker compose -f docker-compose.local.yml config
@@ -24,11 +25,11 @@ docker compose -f docker-compose.local.yml down
 `down` preserva `local_pgdata`. Para isolamento total em testes, defina variáveis ou use um arquivo `.env` dedicado:
 
 ```powershell
-$env:COMPOSE_PROJECT_NAME = 'wagers-integration'
-$env:APP_IMAGE = 'wagers-integration-app:bun-1.4.3'
-$env:LOCAL_API_PORT = '3001'
-$env:LOCAL_POSTGRES_PORT = '5435'
-$env:LOCAL_SQS_PORT = '4568'
+$env:COMPOSE_PROJECT_NAME = 'wagers-stab-isolated'
+$env:APP_IMAGE = 'wagers-stab-isolated-app:bun-1.4.3'
+$env:LOCAL_API_PORT = '3002'
+$env:LOCAL_POSTGRES_PORT = '5436'
+$env:LOCAL_SQS_PORT = '4569'
 docker compose -f docker-compose.local.yml up -d --wait --wait-timeout 180
 ```
 
@@ -64,10 +65,10 @@ O script de smoke valida o ciclo financeiro integrado fim a fim:
 1. **Abertura**: `POST /wallets` com saldo inicial de `100.00 BRL` (201 Created) e leitura via `GET /wallets/:id` (200 OK).
 2. **BET**: `POST /wagering/transactions` com débito de `25.00 BRL`, validando status `PROCESSED`, saldo resultante `75.00 BRL` e `idempotentReplay: false`.
 3. **Replay**: Reenvio idêntico com mesma `idempotency-key`, retornando status `PROCESSED`, saldo `75.00 BRL` e `idempotentReplay: true`.
-4. **Consultas**:
-   - `GET /wagering/transactions/:transactionId`: Retorna a transação com `kind: BET`, valor `25.00` e status `PROCESSED`.
-   - `GET /wallets/:walletId/ledger`: Retorna o extrato contábil paginado (`hasMore: false`, 2 lançamentos: crédito de abertura e débito de aposta).
-5. **Reconciliação**: `POST /wallets/:walletId/reconciliation` comprovando consistência matemática exata (`consistent: true`, `difference: 0.00`).
+4. **Consultas Estritas**:
+   - `GET /wagering/transactions/:transactionId`: Valida campos de valor e moeda consultados via `money.amount === '25.00'` e `money.currency === 'BRL'`, com status `PROCESSED` e kind `BET`.
+   - `GET /wallets/:walletId/ledger`: Valida extrato contábil contendo exatamente 2 lançamentos (1 `CREDIT` de abertura de 100.00 e 1 `DEBIT` de aposta de 25.00), com `hasMore === false` e `nextCursor === null`.
+5. **Reconciliação**: `POST /wallets/:walletId/reconciliation` comprovando consistência matemática exata (`consistent: true`, `difference: 0.00`, 2 lançamentos auditados).
 
 ## Validação e Resultados Reais
 
@@ -75,20 +76,17 @@ Validações executadas em 2026-10-17:
 
 | Verificação | Comando | Ambiente | Resultado |
 | :--- | :--- | :--- | :--- |
-| **Compose Config** | `docker compose --env-file infra/.env.integration -f docker-compose.local.yml config` | Host Windows | OK (exit 0): 5 serviços e rede/volumes isolados |
-| **Build da Imagem API** | `docker compose ... build` | Docker Engine (Linux x86_64) | OK (exit 0): Imagem `wagers-integration-app:bun-1.4.3` gerada |
-| **Primeira Subida (Volume Novo)** | `docker compose ... up -d --wait` | Docker Compose (`wagers-integration`) | OK (exit 0): 7 migrations aplicadas com sucesso (001 a 007) |
-| **Verificação das Filas FIFO** | `aws sqs list-queues` | LocalStack 4.0.3 | OK (exit 0): 3 filas FIFO criadas |
-| **Verificação do Redrive** | `aws sqs get-queue-attributes` | LocalStack 4.0.3 | OK (exit 0): `deadLetterTargetArn` configurado, `maxReceiveCount: 5` |
-| **Smoke Test no Contêiner** | `docker compose exec app bun run infra/smoke-api.ts` | Contêiner Linux (`bun:1.4.3`) | OK (exit 0): Abertura, BET, replay, consultas e reconciliação aprovados |
-| **Smoke Test no Host** | `bun run infra/smoke-api.ts` contra porta 3001 | Host Windows (`win32 x64`) | OK (exit 0): Todas as operações concluídas com sucesso |
-| **Segunda Subida Idempotente** | `docker compose ... run --rm migrate` | Docker Compose (`wagers-integration`) | OK (exit 0): "No new migrations to apply." |
-| **Testes Unitários em Contêiner** | `docker compose run --rm test-runner bun run test:unit` | Contêiner Linux (`target: tester`) | OK (exit 0): 6 arquivos, 0 falhas |
+| **Compose Config** | `docker compose -f docker-compose.local.yml config` | Host Windows | OK (exit 0): 5 serviços e rede/volumes isolados |
+| **Build da Imagem API** | `docker compose ... build` | Docker Engine (Linux x86_64) | OK (exit 0): Imagem `wagers-stab-isolated-app:bun-1.4.3` gerada |
+| **Primeira Subida (Volume Novo)** | `docker compose ... up -d --wait` | Docker Compose (`wagers-stab-isolated`) | OK (exit 0): 7 migrations aplicadas com sucesso (001 a 007) |
+| **Smoke Test no Contêiner** | `docker exec wagers-stab-isolated-app-1 bun run infra/smoke-api.ts` | Contêiner Linux (`bun:1.4.3`) | OK (exit 0): Abertura, BET, replay, consultas estritas e reconciliação aprovados |
+| **Smoke Test no Host** | `bun run infra/smoke-api.ts` contra porta 3002 | Host Windows (`win32 x64`) | OK (exit 0): Todas as operações estritas concluídas com sucesso |
 | **Typecheck Oficial** | `bun run typecheck` | Host Windows | OK (exit 0): 0 erros de compilação |
 | **Suíte Oficial Completa** | `bun run test` (via `scripts/run-tests.ts`) | Host Windows contra PostgreSQL descartável (porta 5439) | OK (exit 0): 24 arquivos de teste, 0 falhas |
+| **Provas M13 Isoladas** | `bun test tests/integration/financial-outbox-m13.test.ts` | Host Windows contra PostgreSQL descartável (porta 5439) | OK (exit 0): 28 testes aprovados, 0 falhas, 218 asserções |
 
 ### Documentação Exata dos Ambientes:
-- **Smoke test**: Executado primariamente dentro do contêiner da aplicação (`oven/bun:1.4.3` em Linux x86_64 na rede interna do Docker) e também comprovado no host Windows via porta publicada `3001`.
-- **Suíte oficial de testes**: Executada no host Windows (`win32 x64`) com Bun 1.4.3 contra contêiner descartável PostgreSQL `16.6-alpine` na porta 5439 com tmpfs. O estágio `tester` em contêiner Linux também foi exercitado e validado.
+- **Smoke test**: Executado dentro do contêiner da aplicação (`oven/bun:1.4.3` em Linux x86_64 na rede interna do Docker) e no host Windows via porta publicada `3002`.
+- **Suíte oficial de testes**: Executada no host Windows (`win32 x64`) com Bun 1.4.3 contra contêiner descartável PostgreSQL `16.6-alpine` na porta 5439 com tmpfs. O número oficial real de arquivos de teste é 24 (28 testes no M13).
 - **Limitações e Escopo**: Não inclui implementação de publisher, consumidor de fila SQS, inbox ou DLQ listener (funcionalidades reservadas para os marcos M14–M16). As variáveis e filas SQS permanecem preparadas para futuro consumo. Nenhum publisher, consumidor, inbox ou worker foi alterado fora do escopo desta infraestrutura.
 

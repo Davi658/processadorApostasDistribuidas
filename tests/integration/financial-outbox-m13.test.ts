@@ -12,7 +12,12 @@ import {
 import { CreateWalletUseCase } from '../../src/application/use-cases/create-wallet.use-case';
 import { ProcessWagerUseCase } from '../../src/application/use-cases/process-wager.use-case';
 import { ReprocessPendingReferencesUseCase } from '../../src/application/use-cases/reprocess-pending-references.use-case';
-import { IntegrationEvent, IntegrationEventEnvelope } from '../../src/domain/events/events';
+import {
+  IntegrationEvent,
+  IntegrationEventEnvelope,
+  WagerTransactionProcessedEvent,
+  WalletBalanceChangedEvent,
+} from '../../src/domain/events/events';
 import { IdempotencyConflictError } from '../../src/domain/errors/domain.error';
 
 function createDeferred<T = void>() {
@@ -80,6 +85,25 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
     return res.rows;
   }
 
+  // Helper to identify events by type and payload matching without presuming timestamp or UUID array order
+  function findEvent(
+    events: any[],
+    eventType: string,
+    predicate?: (payload: any, ev: any) => boolean
+  ): any {
+    const match = events.find(
+      (ev) => ev.event_type === eventType && (!predicate || predicate(ev.payload, ev))
+    );
+    if (!match) {
+      throw new Error(
+        `Event of type "${eventType}" matching predicate was not found in: ${JSON.stringify(
+          events.map((e) => ({ id: e.id, type: e.event_type, payload: e.payload }))
+        )}`
+      );
+    }
+    return match;
+  }
+
   // =========================================================================
   // 1. AUDITORIA E CONTRATO DE EVENTOS (MATRIZ COMPLETA DE OPERAÇÕES)
   // =========================================================================
@@ -94,14 +118,22 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const events = await queryExternalOutbox(res.id);
       expect(events.length).toBe(2);
 
-      const [processedEvent, balanceEvent] = events;
-      expect(processedEvent.event_type).toBe('WagerTransactionProcessed');
+      const processedEvent = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.kind === 'OPENING'
+      );
+      const balanceEvent = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === processedEvent.payload.transactionId
+      );
+
       expect(processedEvent.payload.kind).toBe('OPENING');
       expect(processedEvent.payload.amount).toEqual({ amount: '150.00', currency: 'BRL' });
       expect(processedEvent.payload.balance).toEqual({ amount: '150.00', currency: 'BRL' });
       expect(processedEvent.published_at).toBeNull();
 
-      expect(balanceEvent.event_type).toBe('WalletBalanceChanged');
       expect(balanceEvent.payload.previousBalance).toEqual({ amount: '0.00', currency: 'BRL' });
       expect(balanceEvent.payload.currentBalance).toEqual({ amount: '150.00', currency: 'BRL' });
       expect(balanceEvent.payload.version).toBe(1);
@@ -144,18 +176,23 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // 2 events from positive opening + 2 from BET = 4 total
       expect(events.length).toBe(4);
 
-      const betEvents = events.slice(2);
-      expect(betEvents.length).toBe(2);
+      const processedEvent = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === betRes.transactionId
+      );
+      const balanceEvent = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === betRes.transactionId
+      );
 
-      const [processedEvent, balanceEvent] = betEvents;
-      expect(processedEvent.event_type).toBe('WagerTransactionProcessed');
       expect(processedEvent.payload.kind).toBe('BET');
       expect(processedEvent.payload.amount).toEqual({ amount: '30.00', currency: 'BRL' });
       expect(processedEvent.payload.balance).toEqual({ amount: '70.00', currency: 'BRL' });
       expect(processedEvent.correlation_id).toBe(idempotencyKey);
       expect(processedEvent.causation_id).toBe(idempotencyKey);
 
-      expect(balanceEvent.event_type).toBe('WalletBalanceChanged');
       expect(balanceEvent.payload.previousBalance).toEqual({ amount: '100.00', currency: 'BRL' });
       expect(balanceEvent.payload.currentBalance).toEqual({ amount: '70.00', currency: 'BRL' });
       expect(balanceEvent.payload.version).toBe(2);
@@ -186,8 +223,11 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // 2 from opening + 1 from rejected BET = 3 total
       expect(events.length).toBe(3);
 
-      const rejectedEvent = events[2];
-      expect(rejectedEvent.event_type).toBe('WagerTransactionRejected');
+      const rejectedEvent = findEvent(
+        events,
+        'WagerTransactionRejected',
+        (p) => p.transactionId === betRes.transactionId
+      );
       expect(rejectedEvent.payload.kind).toBe('BET');
       expect(rejectedEvent.payload.failureCode).toBe('INSUFFICIENT_FUNDS');
       expect(rejectedEvent.payload.amount).toEqual({ amount: '50.00', currency: 'BRL' });
@@ -221,8 +261,11 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // 2 from opening + 1 from LOSS = 3 total
       expect(events.length).toBe(3);
 
-      const lossEvent = events[2];
-      expect(lossEvent.event_type).toBe('WagerTransactionProcessed');
+      const lossEvent = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === lossRes.transactionId
+      );
       expect(lossEvent.payload.kind).toBe('LOSS');
       expect(lossEvent.payload.amount).toEqual({ amount: '10.00', currency: 'BRL' });
       expect(lossEvent.payload.balance).toEqual({ amount: '100.00', currency: 'BRL' });
@@ -251,15 +294,23 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const events = await queryExternalOutbox(wallet.id);
       expect(events.length).toBe(4); // 2 opening + 2 win
 
-      const winEvents = events.slice(2);
-      expect(winEvents[0].event_type).toBe('WagerTransactionProcessed');
-      expect(winEvents[0].payload.kind).toBe('WIN');
-      expect(winEvents[0].payload.amount).toEqual({ amount: '25.00', currency: 'BRL' });
-      expect(winEvents[0].payload.balance).toEqual({ amount: '75.00', currency: 'BRL' });
+      const winProcessed = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === winRes.transactionId
+      );
+      const winBalance = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === winRes.transactionId
+      );
 
-      expect(winEvents[1].event_type).toBe('WalletBalanceChanged');
-      expect(winEvents[1].payload.previousBalance).toEqual({ amount: '50.00', currency: 'BRL' });
-      expect(winEvents[1].payload.currentBalance).toEqual({ amount: '75.00', currency: 'BRL' });
+      expect(winProcessed.payload.kind).toBe('WIN');
+      expect(winProcessed.payload.amount).toEqual({ amount: '25.00', currency: 'BRL' });
+      expect(winProcessed.payload.balance).toEqual({ amount: '75.00', currency: 'BRL' });
+
+      expect(winBalance.payload.previousBalance).toEqual({ amount: '50.00', currency: 'BRL' });
+      expect(winBalance.payload.currentBalance).toEqual({ amount: '75.00', currency: 'BRL' });
     });
 
     it('1.7 WIN aceito como PENDING_REFERENCE: persiste 1 evento de pendência', async () => {
@@ -285,8 +336,11 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const events = await queryExternalOutbox(wallet.id);
       expect(events.length).toBe(3); // 2 opening + 1 pending reference
 
-      const pendingEvent = events[2];
-      expect(pendingEvent.event_type).toBe('WagerTransactionPendingReference');
+      const pendingEvent = findEvent(
+        events,
+        'WagerTransactionPendingReference',
+        (p) => p.transactionId === winRes.transactionId
+      );
       expect(pendingEvent.payload.kind).toBe('WIN');
       expect(pendingEvent.payload.attempts).toBe(1);
       expect(pendingEvent.payload.referenceExternalTransactionId).toBeDefined();
@@ -385,13 +439,21 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // 2 opening + 1 pending + 2 parent bet + 2 resolved win = 7 total
       expect(eventsAfterResolution.length).toBe(7);
 
-      const terminalEvents = eventsAfterResolution.slice(5);
-      expect(terminalEvents[0].event_type).toBe('WagerTransactionProcessed');
-      expect(terminalEvents[0].payload.kind).toBe('WIN');
-      expect(terminalEvents[0].payload.amount).toEqual({ amount: '40.00', currency: 'BRL' });
+      const terminalWinEvent = findEvent(
+        eventsAfterResolution,
+        'WagerTransactionProcessed',
+        (p) => p.externalTransactionId === winExtId
+      );
+      const terminalBalanceEvent = findEvent(
+        eventsAfterResolution,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === terminalWinEvent.payload.transactionId
+      );
 
-      expect(terminalEvents[1].event_type).toBe('WalletBalanceChanged');
-      expect(terminalEvents[1].payload.currentBalance).toEqual({ amount: '80.00', currency: 'BRL' });
+      expect(terminalWinEvent.payload.kind).toBe('WIN');
+      expect(terminalWinEvent.payload.amount).toEqual({ amount: '40.00', currency: 'BRL' });
+
+      expect(terminalBalanceEvent.payload.currentBalance).toEqual({ amount: '80.00', currency: 'BRL' });
     });
 
     it('1.10 REFUND processado com movimento: persiste 2 eventos (Processed + BalanceChanged)', async () => {
@@ -433,14 +495,22 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // 2 opening + 2 bet + 2 refund = 6 total
       expect(events.length).toBe(6);
 
-      const refundEvents = events.slice(4);
-      expect(refundEvents[0].event_type).toBe('WagerTransactionProcessed');
-      expect(refundEvents[0].payload.kind).toBe('REFUND');
-      expect(refundEvents[0].payload.amount).toEqual({ amount: '20.00', currency: 'BRL' });
+      const refundProcessed = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === refundRes.transactionId
+      );
+      const refundBalance = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === refundRes.transactionId
+      );
 
-      expect(refundEvents[1].event_type).toBe('WalletBalanceChanged');
-      expect(refundEvents[1].payload.previousBalance).toEqual({ amount: '80.00', currency: 'BRL' });
-      expect(refundEvents[1].payload.currentBalance).toEqual({ amount: '100.00', currency: 'BRL' });
+      expect(refundProcessed.payload.kind).toBe('REFUND');
+      expect(refundProcessed.payload.amount).toEqual({ amount: '20.00', currency: 'BRL' });
+
+      expect(refundBalance.payload.previousBalance).toEqual({ amount: '80.00', currency: 'BRL' });
+      expect(refundBalance.payload.currentBalance).toEqual({ amount: '100.00', currency: 'BRL' });
     });
 
     it('1.11 ROLLBACK de WIN (débito): persiste 2 eventos (Processed + BalanceChanged)', async () => {
@@ -483,13 +553,21 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // 2 opening + 2 win + 2 rollback = 6 total
       expect(events.length).toBe(6);
 
-      const rollbackEvents = events.slice(4);
-      expect(rollbackEvents[0].event_type).toBe('WagerTransactionProcessed');
-      expect(rollbackEvents[0].payload.kind).toBe('ROLLBACK');
+      const rollbackProcessed = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === rollbackRes.transactionId
+      );
+      const rollbackBalance = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === rollbackRes.transactionId
+      );
 
-      expect(rollbackEvents[1].event_type).toBe('WalletBalanceChanged');
-      expect(rollbackEvents[1].payload.previousBalance).toEqual({ amount: '80.00', currency: 'BRL' });
-      expect(rollbackEvents[1].payload.currentBalance).toEqual({ amount: '50.00', currency: 'BRL' });
+      expect(rollbackProcessed.payload.kind).toBe('ROLLBACK');
+
+      expect(rollbackBalance.payload.previousBalance).toEqual({ amount: '80.00', currency: 'BRL' });
+      expect(rollbackBalance.payload.currentBalance).toEqual({ amount: '50.00', currency: 'BRL' });
     });
 
     it('1.12 Replay e Conflito de idempotência: nenhum evento adicional é emitido', async () => {
@@ -575,8 +653,11 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const events = await queryExternalOutbox(wallet.id);
       // 2 opening + 2 bet + 1 rejected win = 5 total
       expect(events.length).toBe(5);
-      const rejectedEvent = events[4];
-      expect(rejectedEvent.event_type).toBe('WagerTransactionRejected');
+      const rejectedEvent = findEvent(
+        events,
+        'WagerTransactionRejected',
+        (p) => p.transactionId === winRes.transactionId
+      );
       expect(rejectedEvent.payload.kind).toBe('WIN');
       expect(rejectedEvent.payload.failureCode).toBe('REFERENCE_INCOMPATIBLE');
     });
@@ -603,9 +684,13 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
 
       const events = await queryExternalOutbox(wallet.id);
       expect(events.length).toBe(3); // 2 opening + 1 pending reference
-      expect(events[2].event_type).toBe('WagerTransactionPendingReference');
-      expect(events[2].payload.kind).toBe('REFUND');
-      expect(events[2].payload.amount).toEqual({ amount: '15.00', currency: 'BRL' });
+      const pendingEvent = findEvent(
+        events,
+        'WagerTransactionPendingReference',
+        (p) => p.transactionId === refundRes.transactionId
+      );
+      expect(pendingEvent.payload.kind).toBe('REFUND');
+      expect(pendingEvent.payload.amount).toEqual({ amount: '15.00', currency: 'BRL' });
     });
 
     it('1.15 REFUND rejeitado: persiste 1 evento (Rejected)', async () => {
@@ -646,9 +731,13 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const events = await queryExternalOutbox(wallet.id);
       // 2 opening + 1 rejected bet + 1 rejected refund = 4 total
       expect(events.length).toBe(4);
-      expect(events[3].event_type).toBe('WagerTransactionRejected');
-      expect(events[3].payload.kind).toBe('REFUND');
-      expect(events[3].payload.failureCode).toBe('REFERENCE_NOT_PROCESSED');
+      const rejectedEvent = findEvent(
+        events,
+        'WagerTransactionRejected',
+        (p) => p.transactionId === refundRes.transactionId
+      );
+      expect(rejectedEvent.payload.kind).toBe('REFUND');
+      expect(rejectedEvent.payload.failureCode).toBe('REFERENCE_NOT_PROCESSED');
     });
 
     it('1.16 ROLLBACK de BET (crédito): persiste 2 eventos (Processed + BalanceChanged)', async () => {
@@ -689,10 +778,18 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const events = await queryExternalOutbox(wallet.id);
       // 2 opening + 2 bet + 2 rollback = 6 total
       expect(events.length).toBe(6);
-      expect(events[4].event_type).toBe('WagerTransactionProcessed');
-      expect(events[4].payload.kind).toBe('ROLLBACK');
-      expect(events[5].event_type).toBe('WalletBalanceChanged');
-      expect(events[5].payload.currentBalance).toEqual({ amount: '100.00', currency: 'BRL' });
+      const rbProcessed = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === rbRes.transactionId
+      );
+      const rbBalance = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === rbRes.transactionId
+      );
+      expect(rbProcessed.payload.kind).toBe('ROLLBACK');
+      expect(rbBalance.payload.currentBalance).toEqual({ amount: '100.00', currency: 'BRL' });
     });
 
     it('1.17 ROLLBACK aceito como PENDING_REFERENCE: persiste 1 evento de pendência', async () => {
@@ -717,8 +814,12 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
 
       const events = await queryExternalOutbox(wallet.id);
       expect(events.length).toBe(3); // 2 opening + 1 pending
-      expect(events[2].event_type).toBe('WagerTransactionPendingReference');
-      expect(events[2].payload.kind).toBe('ROLLBACK');
+      const pendingEvent = findEvent(
+        events,
+        'WagerTransactionPendingReference',
+        (p) => p.transactionId === rbRes.transactionId
+      );
+      expect(pendingEvent.payload.kind).toBe('ROLLBACK');
     });
 
     it('1.18 ROLLBACK rejeitado por saldo insuficiente ao estornar WIN: persiste 1 evento (Rejected)', async () => {
@@ -773,9 +874,13 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const events = await queryExternalOutbox(wallet.id);
       // 2 opening + 2 win + 2 bet + 1 rejected rollback = 7 total
       expect(events.length).toBe(7);
-      expect(events[6].event_type).toBe('WagerTransactionRejected');
-      expect(events[6].payload.kind).toBe('ROLLBACK');
-      expect(events[6].payload.failureCode).toBe('REVERSAL_INSUFFICIENT_FUNDS');
+      const rejectedEvent = findEvent(
+        events,
+        'WagerTransactionRejected',
+        (p) => p.transactionId === rbRes.transactionId
+      );
+      expect(rejectedEvent.payload.kind).toBe('ROLLBACK');
+      expect(rejectedEvent.payload.failureCode).toBe('REVERSAL_INSUFFICIENT_FUNDS');
     });
   });
 
@@ -792,7 +897,7 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const customCorrelation = `custom-corr-partner#9988_${uuidv4()}`;
       const idempotencyKey = `bet_envelope_${uuidv4()}`;
 
-      await processWagerUseCase.execute(idempotencyKey, {
+      const betRes = await processWagerUseCase.execute(idempotencyKey, {
         walletId: wallet.id,
         playerId: wallet.playerId,
         providerId: 'prv_m13',
@@ -805,10 +910,20 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       });
 
       const events = await queryExternalOutbox(wallet.id);
-      const betEvents = events.slice(2);
-      expect(betEvents.length).toBe(2);
+      expect(events.length).toBe(4);
 
-      for (const ev of betEvents) {
+      const processedEvent = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === betRes.transactionId
+      );
+      const balanceEvent = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === betRes.transactionId
+      );
+
+      for (const ev of [processedEvent, balanceEvent]) {
         // eventId must be a valid UUID
         expect(ev.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
         expect(ev.aggregate_type).toBe('Wallet');
@@ -821,7 +936,7 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       }
 
       // Check monetary payload exactness: amount & balance MUST NOT be numbers
-      const processedPayload = betEvents[0].payload;
+      const processedPayload = processedEvent.payload;
       expect(typeof processedPayload.amount.amount).toBe('string');
       expect(typeof processedPayload.amount.currency).toBe('string');
       expect(typeof processedPayload.balance.amount).toBe('string');
@@ -829,7 +944,7 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       expect(processedPayload.amount).toEqual({ amount: '12.34', currency: 'BRL' });
       expect(processedPayload.balance).toEqual({ amount: '87.66', currency: 'BRL' });
 
-      const balancePayload = betEvents[1].payload;
+      const balancePayload = balanceEvent.payload;
       expect(typeof balancePayload.previousBalance.amount).toBe('string');
       expect(typeof balancePayload.currentBalance.amount).toBe('string');
       expect(balancePayload.previousBalance).toEqual({ amount: '100.00', currency: 'BRL' });
@@ -845,7 +960,7 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       const longCustomCorrelation = 'X'.repeat(250);
       const idempotencyKey = `bet_long_corr_${uuidv4()}`;
 
-      await processWagerUseCase.execute(idempotencyKey, {
+      const betRes = await processWagerUseCase.execute(idempotencyKey, {
         walletId: wallet.id,
         playerId: wallet.playerId,
         providerId: 'prv_m13',
@@ -858,7 +973,11 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       });
 
       const events = await queryExternalOutbox(wallet.id);
-      const betEvent = events[2];
+      const betEvent = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === betRes.transactionId
+      );
       expect(betEvent.correlation_id).toBe(longCustomCorrelation);
       expect(betEvent.correlation_id.length).toBe(250);
     });
@@ -1010,8 +1129,18 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
         // 4. All outbox events must now be visible with published_at null
         const outboxPostCommit = await queryExternalOutbox(wallet.id);
         expect(outboxPostCommit.length).toBe(4);
-        expect(outboxPostCommit[2].event_type).toBe('WagerTransactionProcessed');
-        expect(outboxPostCommit[3].event_type).toBe('WalletBalanceChanged');
+        const postCommitProcessed = findEvent(
+          outboxPostCommit,
+          'WagerTransactionProcessed',
+          (p) => p.transactionId === result.transactionId
+        );
+        const postCommitBalance = findEvent(
+          outboxPostCommit,
+          'WalletBalanceChanged',
+          (p) => p.triggerTransactionId === result.transactionId
+        );
+        expect(postCommitProcessed).toBeDefined();
+        expect(postCommitBalance).toBeDefined();
       } finally {
         uow.clearTestHooks();
       }
@@ -1025,6 +1154,16 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
 
       const idempotencyKey = `bet_fail_first_${uuidv4()}`;
       const extTxId = `ext_fail_first_${uuidv4()}`;
+      const betDto = {
+        walletId: wallet.id,
+        playerId: wallet.playerId,
+        providerId: 'prv_m13',
+        externalTransactionId: extTxId,
+        roundId: `round_${uuidv4()}`,
+        gameId: 'slot_m13',
+        kind: 'BET' as const,
+        money: { amount: '35.00', currency: 'BRL' },
+      };
 
       let outboxSaveCount = 0;
       uow.setTestHook('after_outbox_save', async () => {
@@ -1036,16 +1175,7 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
 
       try {
         await expect(
-          processWagerUseCase.execute(idempotencyKey, {
-            walletId: wallet.id,
-            playerId: wallet.playerId,
-            providerId: 'prv_m13',
-            externalTransactionId: extTxId,
-            roundId: `round_${uuidv4()}`,
-            gameId: 'slot_m13',
-            kind: 'BET',
-            money: { amount: '35.00', currency: 'BRL' },
-          })
+          processWagerUseCase.execute(idempotencyKey, betDto)
         ).rejects.toThrow('SIMULATED_FAILURE_AFTER_FIRST_OUTBOX_SAVE');
 
         // --- VERIFY POSTGRESQL ROLLBACK VIA EXTERNAL CLIENT ---
@@ -1077,17 +1207,8 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
         uow.clearTestHooks();
       }
 
-      // --- RESEND / RETRY WITH SAME IDEMPOTENCY KEY ---
-      const retryRes = await processWagerUseCase.execute(idempotencyKey, {
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: 'prv_m13',
-        externalTransactionId: extTxId,
-        roundId: `round_${uuidv4()}`,
-        gameId: 'slot_m13',
-        kind: 'BET',
-        money: { amount: '35.00', currency: 'BRL' },
-      });
+      // --- RESEND / RETRY WITH SAME IDEMPOTENCY KEY AND FULL DTO (INCLUDING roundId) ---
+      const retryRes = await processWagerUseCase.execute(idempotencyKey, betDto);
 
       expect(retryRes.status).toBe('PROCESSED');
       expect(retryRes.balance.amount).toBe('65.00');
@@ -1095,8 +1216,18 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // Verify that after retry, exactly the expected 2 events are persisted (total 4)
       const outboxAfterRetry = await queryExternalOutbox(wallet.id);
       expect(outboxAfterRetry.length).toBe(4);
-      expect(outboxAfterRetry[2].event_type).toBe('WagerTransactionProcessed');
-      expect(outboxAfterRetry[3].event_type).toBe('WalletBalanceChanged');
+      const retryProcessed = findEvent(
+        outboxAfterRetry,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === retryRes.transactionId
+      );
+      const retryBalance = findEvent(
+        outboxAfterRetry,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === retryRes.transactionId
+      );
+      expect(retryProcessed).toBeDefined();
+      expect(retryBalance).toBeDefined();
     });
 
     it('3.3 Falha após a última gravação de outbox: reverte tudo; reenvio gera exatamente o conjunto esperado', async () => {
@@ -1107,6 +1238,16 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
 
       const idempotencyKey = `bet_fail_last_${uuidv4()}`;
       const extTxId = `ext_fail_last_${uuidv4()}`;
+      const betDto = {
+        walletId: wallet.id,
+        playerId: wallet.playerId,
+        providerId: 'prv_m13',
+        externalTransactionId: extTxId,
+        roundId: `round_${uuidv4()}`,
+        gameId: 'slot_m13',
+        kind: 'BET' as const,
+        money: { amount: '45.00', currency: 'BRL' },
+      };
 
       let outboxSaveCount = 0;
       uow.setTestHook('after_outbox_save', async () => {
@@ -1119,16 +1260,7 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
 
       try {
         await expect(
-          processWagerUseCase.execute(idempotencyKey, {
-            walletId: wallet.id,
-            playerId: wallet.playerId,
-            providerId: 'prv_m13',
-            externalTransactionId: extTxId,
-            roundId: `round_${uuidv4()}`,
-            gameId: 'slot_m13',
-            kind: 'BET',
-            money: { amount: '45.00', currency: 'BRL' },
-          })
+          processWagerUseCase.execute(idempotencyKey, betDto)
         ).rejects.toThrow('SIMULATED_FAILURE_AFTER_LAST_OUTBOX_SAVE');
 
         // External client check: all rolled back
@@ -1144,23 +1276,26 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
         uow.clearTestHooks();
       }
 
-      // Retry with same idempotency key
-      const retryRes = await processWagerUseCase.execute(idempotencyKey, {
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: 'prv_m13',
-        externalTransactionId: extTxId,
-        roundId: `round_${uuidv4()}`,
-        gameId: 'slot_m13',
-        kind: 'BET',
-        money: { amount: '45.00', currency: 'BRL' },
-      });
+      // Retry with same idempotency key and full DTO (including roundId)
+      const retryRes = await processWagerUseCase.execute(idempotencyKey, betDto);
 
       expect(retryRes.status).toBe('PROCESSED');
       expect(retryRes.balance.amount).toBe('55.00');
 
       const outboxAfterRetry = await queryExternalOutbox(wallet.id);
       expect(outboxAfterRetry.length).toBe(4);
+      const retryProcessed = findEvent(
+        outboxAfterRetry,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === retryRes.transactionId
+      );
+      const retryBalance = findEvent(
+        outboxAfterRetry,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === retryRes.transactionId
+      );
+      expect(retryProcessed).toBeDefined();
+      expect(retryBalance).toBeDefined();
     });
 
     it('3.4 Concorrência de duplicatas: requisições concorrentes idênticas não multiplicam eventos', async () => {
@@ -1203,8 +1338,18 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       // Verify in PostgreSQL: exactly 2 outbox events generated for this BET (4 total with opening)
       const events = await queryExternalOutbox(wallet.id);
       expect(events.length).toBe(4);
-      expect(events[2].event_type).toBe('WagerTransactionProcessed');
-      expect(events[3].event_type).toBe('WalletBalanceChanged');
+      const processedEv = findEvent(
+        events,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === originals[0].transactionId
+      );
+      const balanceEv = findEvent(
+        events,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === originals[0].transactionId
+      );
+      expect(processedEv).toBeDefined();
+      expect(balanceEv).toBeDefined();
     });
 
     it('3.5 Falha técnica genérica antes do commit: nenhum evento financeiro ou de outbox é confirmado', async () => {
@@ -1265,6 +1410,102 @@ describe('M13: Financial Outbox & Transactional Event Persistence Suite', () => 
       } finally {
         uow.clearTestHooks();
       }
+    });
+
+    it('3.6 Timestamps iguais com ordenação de UUID contrária à emissão: identifica eventos por tipo e ID sem presumir ordenação de array ou UUID', async () => {
+      const wallet = await createWalletUseCase.execute({
+        playerId: uuidv4(),
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+
+      const txId = uuidv4();
+      const highUuid = 'ffffffff-ffff-4fff-bfff-ffffffffffff';
+      const lowUuid = '00000000-0000-4000-8000-000000000001';
+
+      // First emitted logically: WagerTransactionProcessed, but given a lexicographically HIGH UUID
+      const firstEmitted = new WagerTransactionProcessedEvent({
+        eventId: highUuid,
+        aggregateId: wallet.id,
+        correlationId: txId,
+        causationId: txId,
+        data: {
+          transactionId: txId,
+          walletId: wallet.id,
+          playerId: wallet.playerId,
+          providerId: 'prv_m13',
+          externalTransactionId: `ext_${txId}`,
+          roundId: `round_${txId}`,
+          gameId: 'slot_m13',
+          kind: 'BET',
+          amount: { amount: '10.00', currency: 'BRL' },
+          balance: { amount: '90.00', currency: 'BRL' },
+        },
+      });
+
+      // Second emitted logically: WalletBalanceChanged, but given a lexicographically LOW UUID
+      const secondEmitted = new WalletBalanceChangedEvent({
+        eventId: lowUuid,
+        aggregateId: wallet.id,
+        correlationId: txId,
+        causationId: txId,
+        data: {
+          walletId: wallet.id,
+          playerId: wallet.playerId,
+          currency: 'BRL',
+          previousBalance: { amount: '100.00', currency: 'BRL' },
+          currentBalance: { amount: '90.00', currency: 'BRL' },
+          version: 2,
+          triggerTransactionId: txId,
+        },
+      });
+
+      // Persist both in the exact same transaction
+      await uow.runInTransaction(async () => {
+        await outboxRepo.save(firstEmitted);
+        await outboxRepo.save(secondEmitted);
+      });
+
+      // Force identical created_at timestamp in PostgreSQL to explicitly cover equal timestamps
+      const equalTimestamp = '2026-10-17 12:00:00.000000+00';
+      await externalClient.query(
+        'UPDATE outbox_messages SET created_at = $1 WHERE id IN ($2, $3);',
+        [equalTimestamp, highUuid, lowUuid]
+      );
+
+      // Query external client ordered by created_at ASC, id ASC
+      const allEvents = await queryExternalOutbox(wallet.id);
+      // 2 opening events + 2 newly persisted events = 4 total
+      expect(allEvents.length).toBe(4);
+
+      // Verify that under `ORDER BY created_at ASC, id ASC`, row with lowUuid comes BEFORE row with highUuid,
+      // which is contrary to emission order (firstEmitted had highUuid, secondEmitted had lowUuid)
+      const txEvents = allEvents.filter(
+        (ev) => ev.id === highUuid || ev.id === lowUuid
+      );
+      expect(txEvents.length).toBe(2);
+      expect(txEvents[0].id).toBe(lowUuid); // WalletBalanceChanged is at index 0 in the SQL result!
+      expect(txEvents[1].id).toBe(highUuid); // WagerTransactionProcessed is at index 1 in the SQL result!
+
+      // Despite the reverse UUID ordering in the raw array, resolution by eventType and transactionId
+      // correctly and robustly identifies each event without relying on array indices or UUID ordering:
+      const resolvedProcessed = findEvent(
+        allEvents,
+        'WagerTransactionProcessed',
+        (p) => p.transactionId === txId
+      );
+      const resolvedBalance = findEvent(
+        allEvents,
+        'WalletBalanceChanged',
+        (p) => p.triggerTransactionId === txId
+      );
+
+      expect(resolvedProcessed.id).toBe(highUuid);
+      expect(resolvedProcessed.payload.kind).toBe('BET');
+      expect(resolvedProcessed.payload.amount).toEqual({ amount: '10.00', currency: 'BRL' });
+
+      expect(resolvedBalance.id).toBe(lowUuid);
+      expect(resolvedBalance.payload.triggerTransactionId).toBe(txId);
+      expect(resolvedBalance.payload.currentBalance).toEqual({ amount: '90.00', currency: 'BRL' });
     });
   });
 });
