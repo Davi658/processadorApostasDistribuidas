@@ -21,6 +21,7 @@
 | **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
 | **Frente M06** | 17. Estabilização e Finalização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado, Migration 004 permitindo múltiplas WINs na mesma BET sequencial e concorrentemente com down seguro, WIN fora de ordem via PENDING_REFERENCE e 202, WinProcessor dedicado, resolução determinística e replays) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (38 testes passando) |
 | **Frente M10** | 18. Worker de Referências Pendentes e Concorrência Distribuída (Reserva com relógio PostgreSQL NOW(), lease persistente imune a drift de Date.now(), operações atômicas com RETURNING id sem ressuscitar lease expirado nem permitir bloqueio por worker antigo, shutdown coordenado NestJS impedindo novos claims e drenando antes de fechar o ORM, timeout de drenagem cancelando com rollback, contadores e logs estritamente pós-commit, classificação de erros transitório / stale lease / snapshot inválido / defeito inesperado sem rejeição falsa, crash recovery com processos OS reais via SIGKILL e handshakes, 3 processos concorrentes com barreira) | **CONCLUÍDO** | `tests/integration/pending-reference-worker-m10.test.ts` (21 testes passando) |
+| **Frente M17** | Consultas por UUID e identidade externa, ledger keyset por microssegundos, integração AppModule/UoW única e validação independente de transporte | **CONCLUÍDO** | `tests/integration/m17-read-endpoints.test.ts` (21 testes) |
 
 ---
 
@@ -250,6 +251,17 @@
 Evidências finais, comandos, códigos de saída e limitações: [M10 shutdown](docs/evidence/m10-shutdown.md).
 
 ---
+
+### 2.14 M17 — Consultas e paginação integradas
+
+- Rotas reais expostas no AppModule principal, com PersistenceModule compartilhando a UoW e os repositórios existentes com comandos, worker e consultas. Removidas as factories duplicadas de persistência do módulo de consultas.
+- Contrato único de transação via DTO e mapper compartilhados; identidade externa sempre vinculada ao provedor. Dinheiro exato até NUMERIC(18,2), serializado como string.
+- Ledger preserva consultas parametrizadas, `limit + 1`, vínculo com walletId e ordenação ascendente created_at + id. Timestamp canônico UTC com seis dígitos de microssegundos; calendário estrito rejeita datas impossíveis e formatos alternativos antes de SQL.
+- Codec do cursor em application/pagination, sem importação de QueryValidator HTTP no caso de uso. Base64URL é somente codificação; não há assinatura criptográfica.
+- Os 21 testes M17 usam NestFactory.create(AppModule), HTTP e PostgreSQL descartável: rotas, 400/404, identidade externa em provedores diferentes, carteira vazia, limites, última página, cursor de outra carteira, empates por UUID, diferenças só em microssegundos, dinheiro acima de Number.MAX_SAFE_INTEGER, snapshots completos sem mutações, UoW única e shutdown sem sessões vazadas.
+- Comando oficial corrigido para `bun run test`: processos separados por arquivo em runner TypeScript portátil, timeout padrão de 30 segundos e exit não zero diante de qualquer falha. O teste do runner introduz uma falha real controlada em processo filho para comprovar a propagação.
+- Evidências, comandos e resultados da validação combinada: `docs/evidence/m17-final.md`.
+
 
 ## 3. Próxima Rodada (Fatia de Mensageria e Concorrência Externa — M14, M15, M16)
 

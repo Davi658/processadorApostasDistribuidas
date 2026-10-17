@@ -26,5 +26,5 @@
       "@interfaces/*": ["src/interfaces/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": ["src/**/*", "tests/**/*", "scripts/run-tests.ts"]
 }

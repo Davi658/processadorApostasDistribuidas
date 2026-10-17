@@ -1,3 +1,5 @@
+import { PersistenceModule } from '../../infrastructure/persistence/persistence.module';
+import { WageringQueryModule } from './wagering-query.module';
 import { Module } from '@nestjs/common';
 import {
   MikroOrmOutboxRepository,
@@ -17,32 +19,9 @@ import { WalletController } from './controllers/wallet.controller';
 import { WageringController } from './controllers/wagering.controller';
 
 @Module({
+  imports: [PersistenceModule, WageringQueryModule],
   controllers: [WalletController, WageringController],
   providers: [
-    {
-      provide: MikroOrmUnitOfWork,
-      useFactory: () => new MikroOrmUnitOfWork(),
-    },
-    {
-      provide: MikroOrmWalletRepository,
-      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmWalletRepository(uow),
-      inject: [MikroOrmUnitOfWork],
-    },
-    {
-      provide: MikroOrmWagerTransactionRepository,
-      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmWagerTransactionRepository(uow),
-      inject: [MikroOrmUnitOfWork],
-    },
-    {
-      provide: MikroOrmWalletLedgerRepository,
-      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmWalletLedgerRepository(uow),
-      inject: [MikroOrmUnitOfWork],
-    },
-    {
-      provide: MikroOrmOutboxRepository,
-      useFactory: (uow: MikroOrmUnitOfWork) => new MikroOrmOutboxRepository(uow),
-      inject: [MikroOrmUnitOfWork],
-    },
     {
       provide: CreateWalletUseCase,
       useFactory: (

@@ -6,7 +6,7 @@ import type {
   GetWalletLedgerQueryDto,
   WalletLedgerPageResponseDto,
 } from '../dto/query-wallet-ledger.dto';
-import { QueryValidator } from '../../interfaces/http/validation/query-validator';
+import { LedgerCursorCodec } from '../pagination/ledger-cursor-codec';
 
 @Injectable()
 export class GetWalletLedgerUseCase {
@@ -29,7 +29,7 @@ export class GetWalletLedgerUseCase {
 
     const nextCursor =
       result.hasMore && result.nextCursorData
-        ? QueryValidator.encodeCursor(result.nextCursorData)
+        ? LedgerCursorCodec.encode(result.nextCursorData)
         : null;
 
     return {

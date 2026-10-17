@@ -1,3 +1,4 @@
+import { toWagerTransactionQueryResponse } from '../dto/query-wagering-transaction.dto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { WagerTransactionRepositoryPort } from '../ports/ports';
 import type { WagerTransactionQueryResponseDto } from '../dto/query-wagering-transaction.dto';
@@ -17,24 +18,6 @@ export class GetWageringTransactionByIdUseCase {
       });
     }
 
-    return {
-      id: tx.id,
-      walletId: tx.walletId,
-      playerId: tx.playerId,
-      providerId: tx.providerId,
-      externalTransactionId: tx.externalTransactionId,
-      roundId: tx.roundId,
-      gameId: tx.gameId,
-      kind: tx.kind,
-      money: {
-        amount: tx.money.getAmount(),
-        currency: tx.money.getCurrency(),
-      },
-      status: tx.status,
-      rejectionReason: tx.rejectionReason,
-      referenceExternalTransactionId: tx.referenceExternalTransactionId,
-      createdAt: tx.createdAt,
-      updatedAt: tx.updatedAt,
-    };
+    return toWagerTransactionQueryResponse(tx);
   }
 }

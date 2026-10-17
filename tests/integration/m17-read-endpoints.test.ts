@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { INestApplication, Module } from '@nestjs/common';
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import pg from 'pg';
 import crypto from 'crypto';
@@ -8,13 +8,20 @@ import { WageringQueryModule } from '../../src/interfaces/http/wagering-query.mo
 import { DomainExceptionFilter } from '../../src/interfaces/http/filters/domain-exception.filter';
 import { MikroOrmUnitOfWork } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
 import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
-import { QueryValidator } from '../../src/interfaces/http/validation/query-validator';
+import { LedgerCursorCodec } from '../../src/application/pagination/ledger-cursor-codec';
+import { PersistenceModule } from '../../src/infrastructure/persistence/persistence.module';
+import { MikroOrmWalletRepository, MikroOrmWagerTransactionRepository } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
+import { MikroOrmWalletLedgerQueryRepository } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-wallet-ledger-query-repository';
+import { GetWalletLedgerUseCase } from '../../src/application/use-cases/get-wallet-ledger.use-case';
+import { ProcessWagerUseCase } from '../../src/application/use-cases/process-wager.use-case';
+import { ModulesContainer } from '@nestjs/core';
 
 describe('M17: Read Endpoints & Keyset Ledger Pagination', () => {
   let app: INestApplication;
   let serverUrl: string;
   let isolatedDb: IsolatedTestDatabase;
   let adminPool: pg.Pool;
+  const previousWorkerEnabled = process.env.PENDING_WORKER_ENABLED;
 
   beforeAll(async () => {
     // 1. Create disposable database for isolated execution
@@ -22,8 +29,9 @@ describe('M17: Read Endpoints & Keyset Ledger Pagination', () => {
     adminPool = new pg.Pool(isolatedDb.adminConfig);
     adminPool.on('error', () => {});
 
-    // 2. Start NestJS application against isolated database with query module
-    app = await NestFactory.create(WageringQueryModule, { logger: false });
+    process.env.PENDING_WORKER_ENABLED = 'false';
+    // Exercise the actual application entry module, including its worker and persistence.
+    app = await NestFactory.create(AppModule, { logger: false });
     app.useGlobalFilters(new DomainExceptionFilter());
     await app.listen(0);
 
@@ -34,18 +42,19 @@ describe('M17: Read Endpoints & Keyset Ledger Pagination', () => {
   }, 30000);
 
   afterAll(async () => {
-    if (app) {
-      try {
+    try {
+      if (app) {
         const uow = app.get(MikroOrmUnitOfWork);
-        await uow.close();
-      } catch {}
-      await app.close();
-    }
-    if (adminPool) {
-      await adminPool.end();
-    }
-    if (isolatedDb) {
-      await isolatedDb.closeAndDrop();
+        await app.close();
+        expect(uow.isClosed()).toBe(true);
+        const sessions = await adminPool.query('SELECT pid FROM pg_stat_activity WHERE datname = $1 AND usename = $2', [isolatedDb.dbName, isolatedDb.appConfig.user]);
+        expect(sessions.rows).toEqual([]);
+      }
+    } finally {
+      if (previousWorkerEnabled === undefined) delete process.env.PENDING_WORKER_ENABLED;
+      else process.env.PENDING_WORKER_ENABLED = previousWorkerEnabled;
+      if (adminPool) await adminPool.end();
+      if (isolatedDb) await isolatedDb.closeAndDrop();
     }
   }, 30000);
 
@@ -515,9 +524,9 @@ describe('M17: Read Endpoints & Keyset Ledger Pagination', () => {
       await insertWallet(walletB, crypto.randomUUID(), '10.00');
 
       // Generate a legitimate cursor encoded for Wallet A
-      const cursorForWalletA = QueryValidator.encodeCursor({
+      const cursorForWalletA = LedgerCursorCodec.encode({
         walletId: walletA,
-        createdAt: new Date().toISOString(),
+        createdAt: '2026-10-17T12:30:00.000001Z',
         id: crypto.randomUUID(),
       });
 
@@ -549,7 +558,7 @@ describe('M17: Read Endpoints & Keyset Ledger Pagination', () => {
       expect(body1.nextCursor).toBeNull();
 
       // If client creates a cursor for that last item and requests next page
-      const syntheticCursor = QueryValidator.encodeCursor({
+      const syntheticCursor = LedgerCursorCodec.encode({
         walletId,
         createdAt: body1.items[0].createdAt,
         id: body1.items[0].id,
@@ -596,17 +605,12 @@ describe('M17: Read Endpoints & Keyset Ledger Pagination', () => {
 
       // Snapshot database counts and balance before queries
       const getCounts = async () => {
-        const walletsRes = await adminPool.query('SELECT COUNT(*) AS cnt, balance, version FROM wallets WHERE id = $1 GROUP BY balance, version', [walletId]);
-        const txsRes = await adminPool.query('SELECT COUNT(*) AS cnt FROM wager_transactions');
-        const ledgerRes = await adminPool.query('SELECT COUNT(*) AS cnt FROM wallet_ledger_entries');
-        const outboxRes = await adminPool.query('SELECT COUNT(*) AS cnt FROM outbox_messages');
-
-        return {
-          walletRow: walletsRes.rows[0],
-          txCount: txsRes.rows[0].cnt,
-          ledgerCount: ledgerRes.rows[0].cnt,
-          outboxCount: outboxRes.rows[0].cnt,
-        };
+        const snapshot: Record<string, string[]> = {};
+        for (const table of ['wallets', 'wager_transactions', 'wallet_ledger_entries', 'outbox_messages']) {
+          const rows = await adminPool.query(`SELECT row_to_json(t)::text AS row FROM ${table} t ORDER BY id`);
+          snapshot[table] = rows.rows.map(row => row.row);
+        }
+        return snapshot;
       };
 
       const before = await getCounts();
@@ -623,11 +627,117 @@ describe('M17: Read Endpoints & Keyset Ledger Pagination', () => {
       // Snapshot database counts and balance after queries
       const after = await getCounts();
 
-      expect(after.walletRow.balance).toBe(before.walletRow.balance);
-      expect(after.walletRow.version).toBe(before.walletRow.version);
-      expect(after.txCount).toBe(before.txCount);
-      expect(after.ledgerCount).toBe(before.ledgerCount);
-      expect(after.outboxCount).toBe(before.outboxCount);
+      expect(after).toEqual(before);
     });
   });
+  it('shares one UoW and existing repositories between command and query providers', () => {
+    const uow = app.get(MikroOrmUnitOfWork);
+    expect(app.select(PersistenceModule).get(MikroOrmUnitOfWork, { strict: true })).toBe(uow);
+    const modules = app.get(ModulesContainer);
+    const instances = [...modules.values()].flatMap(module => [...module.providers.values()])
+      .map(provider => provider.instance).filter(instance => instance instanceof MikroOrmUnitOfWork);
+    expect(instances).toEqual([uow]);
+    const query = app.select(WageringQueryModule).get(GetWalletLedgerUseCase, { strict: true });
+    expect((query as any).walletRepo).toBe(app.get(MikroOrmWalletRepository));
+    expect((query as any).ledgerQueryRepo).toBe(app.get(MikroOrmWalletLedgerQueryRepository));
+    expect((app.get(MikroOrmWalletLedgerQueryRepository) as any).uow).toBe(uow);
+    expect((app.get(MikroOrmWagerTransactionRepository) as any).uow).toBe(uow);
+    expect((app.get(ProcessWagerUseCase) as any).uow).toBe(uow);
+  });
+
+  it('isolates identical external IDs by provider and returns the identical transaction contract by ID', async () => {
+    const walletId = crypto.randomUUID(), playerId = crypto.randomUUID();
+    const externalId = `shared-${crypto.randomUUID()}`;
+    await insertWallet(walletId, playerId, '9999999999999999.99');
+    for (const providerId of ['provider-one', 'provider-two']) {
+      const id = crypto.randomUUID();
+      await insertTransaction({ id, walletId, playerId, providerId, externalTransactionId: externalId, amount: '9999999999999999.99' });
+      const byId = await fetch(`${serverUrl}/wagering/transactions/${id}`);
+      const byExternal = await fetch(`${serverUrl}/providers/${providerId}/wagering/transactions/${externalId}`);
+      expect(byId.status).toBe(200);
+      expect(byExternal.status).toBe(200);
+      const body = await byId.json() as any;
+      expect(await byExternal.json()).toEqual(body);
+      expect(body.id).toBe(id);
+      expect(body.providerId).toBe(providerId);
+      expect(body.money).toEqual({ amount: '9999999999999999.99', currency: 'BRL' });
+    }
+    expect((await fetch(`${serverUrl}/providers/provider-three/wagering/transactions/${externalId}`)).status).toBe(404);
+    expect((await fetch(`${serverUrl}/providers/%20/wagering/transactions/${externalId}`)).status).toBe(400);
+    expect((await fetch(`${serverUrl}/providers/${'p'.repeat(129)}/wagering/transactions/${externalId}`)).status).toBe(400);
+  });
+
+  it('preserves every microsecond across pages, identical timestamps, UUID ties and exact large ledger amounts', async () => {
+    const walletId = crypto.randomUUID(), playerId = crypto.randomUUID();
+    await insertWallet(walletId, playerId, '9999999999999999.99');
+    // Deliberately reverse UUID order across distinct microseconds: losing precision
+    // would repeat or omit rows when crossing a cursor boundary.
+    const fractions = ['000001', '000001', '000002', '000999', '001000', '001001'];
+    const ids = ['a', 'b', '9', '8', '7', '6'].map(prefix => `${prefix}0000000-0000-0000-0000-000000000017`);
+    for (let i = 0; i < ids.length; i++) {
+      const transactionId = crypto.randomUUID();
+      await insertTransaction({ id: transactionId, walletId, playerId, providerId: 'micros', externalTransactionId: transactionId });
+      await insertLedgerEntry({ id: ids[i], walletId, transactionId, entryType: 'CREDIT', amount: '9999999999999999.99', balanceBefore: '0.00', balanceAfter: '9999999999999999.99', createdAt: `2024-02-29T12:34:56.${fractions[i]}Z` });
+    }
+    const collected: string[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < ids.length; i++) {
+      const response = await fetch(`${serverUrl}/wallets/${walletId}/ledger?limit=1${cursor ? `&cursor=${cursor}` : ''}`);
+      expect(response.status).toBe(200);
+      const page = await response.json() as any;
+      expect(page.items).toHaveLength(1);
+      const item = page.items[0];
+      collected.push(item.id);
+      expect(item.createdAt).toBe(`2024-02-29T12:34:56.${fractions[i]}Z`);
+      expect(item.amount).toEqual({ amount: '9999999999999999.99', currency: 'BRL' });
+      expect(item.balanceBefore.amount).toBe('0.00');
+      expect(item.balanceAfter.amount).toBe('9999999999999999.99');
+      expect(page.hasMore).toBe(i < ids.length - 1);
+      cursor = page.nextCursor;
+      if (cursor) expect(LedgerCursorCodec.decode(cursor, walletId)?.createdAt).toBe(item.createdAt);
+      else expect(i).toBe(ids.length - 1);
+    }
+    expect(collected).toEqual(ids);
+    expect(new Set(collected).size).toBe(ids.length);
+  });
+
+  it('rejects impossible dates and noncanonical cursor formats before any repository SQL', async () => {
+    const walletId = crypto.randomUUID();
+    const invalidDates = [
+      '2025-02-29T00:00:00.000001Z', '2024-02-30T00:00:00.000001Z',
+      '1900-02-29T00:00:00.000001Z', '2024-04-31T00:00:00.000001Z',
+      '0000-01-01T00:00:00.000001Z', '2024-00-01T00:00:00.000001Z',
+      '2024-13-01T00:00:00.000001Z', '2024-01-00T00:00:00.000001Z',
+      '2024-01-01T24:00:00.000001Z', '2024-01-01T00:60:00.000001Z',
+      '2024-01-01T00:00:60.000001Z', '2024-01-01', 'October 17, 2026',
+      '2024-01-01T00:00:00.123Z', '2024-01-01T00:00:00Z',
+      '2024-01-01T00:00:00.1234567Z', '2024-01-01T00:00:00.000001+00:00',
+      '2024-01-01 00:00:00.000001Z', '2024-01-01T00:00:00.000001z',
+      '2024-01-01T00:00:00.000001Z\' OR 1=1 --',
+    ];
+    const uow = app.get(MikroOrmUnitOfWork);
+    const sqlAccess = spyOn(uow, 'getEntityManager');
+    try {
+      for (const createdAt of invalidDates) {
+        const cursor = Buffer.from(JSON.stringify({ walletId, id: crypto.randomUUID(), createdAt })).toString('base64url');
+        const response = await fetch(`${serverUrl}/wallets/${walletId}/ledger?cursor=${cursor}`);
+        expect(response.status).toBe(400);
+        expect((await response.json() as any).message).toContain('cursor');
+      }
+      expect(sqlAccess).not.toHaveBeenCalled();
+    } finally { sqlAccess.mockRestore(); }
+  });
+
+  it('accepts default and maximum limits and rejects repeated query parameters', async () => {
+    const walletId = crypto.randomUUID();
+    await insertWallet(walletId, crypto.randomUUID(), '0.00');
+    for (const [suffix, limit] of [['', 50], ['?limit=100', 100]] as const) {
+      const response = await fetch(`${serverUrl}/wallets/${walletId}/ledger${suffix}`);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ items: [], nextCursor: null, hasMore: false, limit });
+    }
+    expect((await fetch(`${serverUrl}/wallets/${walletId}/ledger?limit=1&limit=2`)).status).toBe(400);
+    expect((await fetch(`${serverUrl}/wallets/${walletId}/ledger?cursor=a&cursor=b`)).status).toBe(400);
+  });
+
 });

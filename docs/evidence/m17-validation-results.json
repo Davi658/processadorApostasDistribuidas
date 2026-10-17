@@ -1,0 +1,156 @@
+{
+  "command": "bun run test",
+  "exitCode": 0,
+  "typecheck": {
+    "command": "bun run typecheck",
+    "exitCode": 0
+  },
+  "base": "a47d1e2039e3e6267a910fd9331e342a8c013cb2",
+  "platform": "Windows",
+  "runtime": "Bun 1.4.3",
+  "testsPassed": 324,
+  "testsFailed": 0,
+  "files": [
+    {
+      "file": "tests/concurrency/concurrency.test.ts",
+      "exitCode": 0,
+      "pass": 6,
+      "fail": 0,
+      "summary": "Ran 6 tests across 1 file. [4.44s]"
+    },
+    {
+      "file": "tests/integration/http-endpoints.test.ts",
+      "exitCode": 0,
+      "pass": 21,
+      "fail": 0,
+      "summary": "Ran 21 tests across 1 file. [2.35s]"
+    },
+    {
+      "file": "tests/integration/m17-read-endpoints.test.ts",
+      "exitCode": 0,
+      "pass": 21,
+      "fail": 0,
+      "summary": "Ran 21 tests across 1 file. [2.15s]"
+    },
+    {
+      "file": "tests/integration/migrations.test.ts",
+      "exitCode": 0,
+      "pass": 1,
+      "fail": 0,
+      "summary": "Ran 1 test across 1 file. [1071.00ms]"
+    },
+    {
+      "file": "tests/integration/mikro-orm-uow-m05.test.ts",
+      "exitCode": 0,
+      "pass": 18,
+      "fail": 0,
+      "summary": "Ran 18 tests across 1 file. [7.03s]"
+    },
+    {
+      "file": "tests/integration/money-postgres-roundtrip.test.ts",
+      "exitCode": 0,
+      "pass": 9,
+      "fail": 0,
+      "summary": "Ran 9 tests across 1 file. [1.95s]"
+    },
+    {
+      "file": "tests/integration/pending-reference-worker-m10.test.ts",
+      "exitCode": 0,
+      "pass": 21,
+      "fail": 0,
+      "summary": "Ran 21 tests across 1 file. [11.40s]"
+    },
+    {
+      "file": "tests/integration/postgres-invariants.test.ts",
+      "exitCode": 0,
+      "pass": 22,
+      "fail": 0,
+      "summary": "Ran 22 tests across 1 file. [2.62s]"
+    },
+    {
+      "file": "tests/integration/wager-bet-replay.test.ts",
+      "exitCode": 0,
+      "pass": 16,
+      "fail": 0,
+      "summary": "Ran 16 tests across 1 file. [9.95s]"
+    },
+    {
+      "file": "tests/integration/wager-operations.test.ts",
+      "exitCode": 0,
+      "pass": 8,
+      "fail": 0,
+      "summary": "Ran 8 tests across 1 file. [31.74s]"
+    },
+    {
+      "file": "tests/integration/wager-pending-replay-m09.test.ts",
+      "exitCode": 0,
+      "pass": 22,
+      "fail": 0,
+      "summary": "Ran 22 tests across 1 file. [46.66s]"
+    },
+    {
+      "file": "tests/integration/wager-reversals-m07.test.ts",
+      "exitCode": 0,
+      "pass": 28,
+      "fail": 0,
+      "summary": "Ran 28 tests across 1 file. [63.63s]"
+    },
+    {
+      "file": "tests/integration/wager-reversals-m08.test.ts",
+      "exitCode": 0,
+      "pass": 23,
+      "fail": 0,
+      "summary": "Ran 23 tests across 1 file. [21.53s]"
+    },
+    {
+      "file": "tests/integration/wager-win-loss-m06.test.ts",
+      "exitCode": 0,
+      "pass": 38,
+      "fail": 0,
+      "summary": "Ran 38 tests across 1 file. [11.49s]"
+    },
+    {
+      "file": "tests/integration/wallet-opening.test.ts",
+      "exitCode": 0,
+      "pass": 30,
+      "fail": 0,
+      "summary": "Ran 30 tests across 1 file. [27.58s]"
+    },
+    {
+      "file": "tests/unit/money.test.ts",
+      "exitCode": 0,
+      "pass": 21,
+      "fail": 0,
+      "summary": "Ran 21 tests across 1 file. [74.00ms]"
+    },
+    {
+      "file": "tests/unit/payload-hash.test.ts",
+      "exitCode": 0,
+      "pass": 6,
+      "fail": 0,
+      "summary": "Ran 6 tests across 1 file. [43.00ms]"
+    },
+    {
+      "file": "tests/unit/test-runner.test.ts",
+      "exitCode": 0,
+      "pass": 1,
+      "fail": 0,
+      "summary": "Ran 1 test across 1 file. [340.00ms]"
+    },
+    {
+      "file": "tests/unit/wallet-ledger-entry.test.ts",
+      "exitCode": 0,
+      "pass": 5,
+      "fail": 0,
+      "summary": "Ran 5 tests across 1 file. [25.00ms]"
+    },
+    {
+      "file": "tests/unit/wallet.test.ts",
+      "exitCode": 0,
+      "pass": 7,
+      "fail": 0,
+      "summary": "Ran 7 tests across 1 file. [20.00ms]"
+    }
+  ],
+  "stdoutSHA256": "bfb4a5ea8e89124a91f2a69f32046a60bca8f87bb8e0786bca17b7a2c5780e0e"
+}
