@@ -84,24 +84,35 @@ O caso de uso valida diretamente suas invariantes antes de abrir a transação d
 7. Consistência de moeda: a moeda informada deve coincidir com a moeda da carteira.
 8. Hash canônico de payload baseado nos dados normalizados efetivamente processados.
 
-### 3.2 Referências e Reversões
-- `REFUND` e `ROLLBACK` exigem `referenceExternalTransactionId`, resolvido por `providerId + referenceExternalTransactionId`.
-- **Validações de Referência:**
-  - Mesmo provider, player, wallet, moeda e rodada (`roundId`).
-  - Referência deve estar no estado terminal `PROCESSED`.
-  - `REFUND` referencia exclusivamente transação do tipo `BET`.
-  - `ROLLBACK` referencia transação do tipo `BET`, `WIN` ou `REFUND`.
-  - Valor da reversão deve ser integralmente igual ao valor da referência.
-  - No máximo uma reversão processada por referência e tipo de operação (garantido no banco pelo índice parcial `uq_processed_reversal_per_reference`).
-- **Saldo Insuficiente em Reversão:** Se um `ROLLBACK` de `WIN` exigir débito maior que o saldo disponível, a operação é rejeitada com código específico `REVERSAL_INSUFFICIENT_FUNDS` (distinto de `INSUFFICIENT_FUNDS`), sem lançar ledger.
+### 3.2 Motor Unificado de Validação e Aplicação de Reversões (`ReversalProcessor` — M08)
+Para eliminar qualquer discrepância de regras entre o fluxo imediato (`ProcessWagerUseCase`) e o worker agendado (`ReprocessPendingReferencesUseCase`), a lógica de validação e movimentação financeira de reversões foi extraída e centralizada no serviço reutilizável `ReversalProcessor`:
+- **Transação Única In-Flight:** O `ReversalProcessor` não cria novas transações de banco de dados; executa diretamente dentro do escopo transacional já aberto pelo caso de uso (`uow.runInTransaction`).
+- **Validações Pré-Movimento Obrigatórias:**
+  1. *Resolução da Referência:* Identificada por `providerId + referenceExternalTransactionId`.
+  2. *Status Terminal Válido:* Referência deve estar no estado `PROCESSED`. Se estiver em `REJECTED` ou `FAILED`, a reversão é rejeitada com código estável `REFERENCE_NOT_PROCESSED`.
+  3. *Compatibilidade Rigorosa:*
+     - Mesmo provider (`providerId`).
+     - Mesmo jogador (`playerId.toLowerCase()`).
+     - Mesma carteira (`walletId.toLowerCase()`).
+     - Mesma moeda (`currency`).
+     - Mesma rodada (`roundId`).
+     - Valor integral idêntico (`money.getAmount() == refTx.money.getAmount()`).
+     - Regra de tipo: `REFUND` referencia exclusivamente transação do tipo `BET`; `ROLLBACK` referencia `BET`, `WIN` ou `REFUND`.
+     - *Falha de compatibilidade:* Resulta em `REJECTED` persistida com código estável `REFERENCE_INCOMPATIBLE`.
+  4. *Garantia de Reversão Única por Tipo:* Consulta no banco se já existe reversão `PROCESSED` do mesmo tipo para aquela referência (`findByProviderAndReference`). Se existir, resulta em `REJECTED` com código estável `REVERSAL_ALREADY_PROCESSED`. A política não impõe exclusividade global entre `REFUND` e `ROLLBACK`, sendo garantida no banco pelo índice parcial `uq_processed_reversal_per_reference`.
+  5. *Proteção de Saldo Negativo:* Se a reversão exigir débito (`ROLLBACK` de `WIN` ou `REFUND`) e o saldo for insuficiente, a reversão é rejeitada com código estável `REVERSAL_INSUFFICIENT_FUNDS`.
+- **Invariantes em Cenários de Rejeição:**
+  - Status `REJECTED` é persistido com seu respectivo `failureCode`.
+  - Publica exclusivamente o evento `WagerTransactionRejectedEvent` na outbox.
+  - **Zero movimentação financeira:** Saldo da carteira não se altera, versão não é incrementada, nenhum registro contábil é criado em `wallet_ledger_entries` e nunca é emitido `WalletBalanceChangedEvent`.
 
 ### 3.3 Tratamento de Referências Fora de Ordem (`PENDING_REFERENCE`)
 Quando uma reversão (`REFUND` ou `ROLLBACK`) chega antes da transação de referência:
-1. O use case persiste a transação com status `PENDING_REFERENCE`, `attempts = 1` e agendamento de retry em `next_attempt_at`.
-2. Publica o evento `WagerTransactionPendingReferenceEvent` na outbox.
-3. Responde imediatamente ao chamador com HTTP 202 Accepted.
-4. O worker agendado `ReprocessPendingReferencesUseCase` pesquisa transações pendentes elegíveis com lock pessimista `SKIP LOCKED`, reprocessando a operação financeira quando a referência é confirmada, ou aplicando backoff exponencial com jitter.
-5. Se a referência for posteriormente rejeitada/falhada ou o limite de retries for esgotado, a transação transiciona para `REJECTED` com código estável `REFERENCE_NOT_PROCESSED` ou `REFERENCE_NOT_FOUND`.
+1. No fluxo imediato, o use case persiste a transação com status `PENDING_REFERENCE`, `attempts = 1` e agendamento de retry em `next_attempt_at`.
+2. Publica o evento `WagerTransactionPendingReferenceEvent` na outbox e responde imediatamente com HTTP 202 Accepted.
+3. O worker agendado `ReprocessPendingReferencesUseCase` pesquisa transações pendentes elegíveis com lock pessimista `SKIP LOCKED`, delegando a validação e movimentação ao `ReversalProcessor` sob a mesma regra do fluxo imediato.
+4. Se a referência ainda estiver ausente ou pendente: aplica backoff exponencial com jitter (até 5 tentativas). Esgotadas as tentativas, transiciona terminalmente para `REJECTED` com código `REFERENCE_NOT_FOUND`.
+5. Se a referência for posteriormente confirmada, ambos os caminhos (referência prévia ou referência tardia) produzem exatamente o mesmo resultado contábil, saldo, versão, ledger, outbox e reconciliação.
 
 ---
 

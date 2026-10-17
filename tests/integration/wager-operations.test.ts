@@ -215,20 +215,23 @@ describe('Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, R
       referenceExternalTransactionId: betExtId,
     });
 
-    // Second refund for same reference with different key must be rejected
-    await expect(
-      processWagerUseCase.execute(`key-ref-2-${crypto.randomUUID()}`, {
-        providerId: 'prv-ref',
-        externalTransactionId: `ext-ref-2-${crypto.randomUUID()}`,
-        playerId: wallet.playerId,
-        walletId: wallet.id,
-        roundId: 'rnd-dup-ref',
-        gameId: 'gm-ref',
-        kind: 'REFUND',
-        money: { amount: '20.00', currency: 'BRL' },
-        referenceExternalTransactionId: betExtId,
-      })
-    ).rejects.toThrow(IdempotencyConflictError);
+    // Second refund for same reference with different key must be rejected with REVERSAL_ALREADY_PROCESSED
+    const dupRes = await processWagerUseCase.execute(`key-ref-2-${crypto.randomUUID()}`, {
+      providerId: 'prv-ref',
+      externalTransactionId: `ext-ref-2-${crypto.randomUUID()}`,
+      playerId: wallet.playerId,
+      walletId: wallet.id,
+      roundId: 'rnd-dup-ref',
+      gameId: 'gm-ref',
+      kind: 'REFUND',
+      money: { amount: '20.00', currency: 'BRL' },
+      referenceExternalTransactionId: betExtId,
+    });
+    expect(dupRes.status).toBe('REJECTED');
+    expect(dupRes.failureCode).toBe('REVERSAL_ALREADY_PROCESSED');
+
+    const walletAfter = await getWalletUseCase.execute(wallet.id);
+    expect(walletAfter.balance.amount).toBe('100.00');
   });
 
   it('ROLLBACK: should reverse BET (credit) and WIN (debit), and reject rollback of WIN when insufficient funds', async () => {

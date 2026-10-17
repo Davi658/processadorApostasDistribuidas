@@ -22,15 +22,23 @@ import {
   WagerTransactionRejectedEvent,
   WalletBalanceChangedEvent,
 } from '../../domain/events/events';
+import { ReversalProcessor } from '../services/reversal-processor.service';
 
 export class ProcessWagerUseCase {
+  protected readonly reversalProcessor: ReversalProcessor;
+
   constructor(
     protected readonly walletRepo: WalletRepositoryPort,
     protected readonly wagerRepo: WagerTransactionRepositoryPort,
     protected readonly ledgerRepo: WalletLedgerRepositoryPort,
     protected readonly outboxRepo: OutboxRepositoryPort,
-    protected readonly uow: UnitOfWorkPort
-  ) {}
+    protected readonly uow: UnitOfWorkPort,
+    reversalProcessor?: ReversalProcessor
+  ) {
+    this.reversalProcessor =
+      reversalProcessor ??
+      new ReversalProcessor(this.walletRepo, this.wagerRepo, this.ledgerRepo, this.outboxRepo);
+  }
 
   public async execute(idempotencyKey: string, dto: ProcessWagerDto): Promise<WagerResponseDto> {
     // 1. Independent Domain Validation (decoupled from HTTP transport)
@@ -459,204 +467,23 @@ export class ProcessWagerUseCase {
       throw new InvalidWagerOperationError('REFUND amount must be strictly greater than zero');
     }
 
-    const refId = dto.referenceExternalTransactionId!;
-    const refTx = await this.wagerRepo.findByProviderAndExternalId(dto.providerId, refId);
-
-    // Out-of-order reference handling
-    if (!refTx || refTx.status === 'PENDING' || refTx.status === 'PENDING_REFERENCE') {
-      const nextAttemptAt = new Date(Date.now() + 500).toISOString();
-      const pendingRefTx = WagerTransaction.createPendingReference({
-        id: transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'REFUND',
-        money: refundMoney,
-        idempotencyKey,
-        payloadHash,
-        referenceExternalTransactionId: refId,
-        nextAttemptAt,
-      });
-
-      await this.wagerRepo.save(pendingRefTx);
-
-      const pendingEvent = new WagerTransactionPendingReferenceEvent({
-        aggregateId: wallet.id,
-        correlationId,
-        causationId: idempotencyKey,
-        data: {
-          transactionId,
-          walletId: wallet.id,
-          playerId: wallet.playerId,
-          providerId: dto.providerId,
-          externalTransactionId: dto.externalTransactionId,
-          roundId: dto.roundId,
-          gameId: dto.gameId,
-          kind: 'REFUND',
-          amount: { amount: refundMoney.getAmount(), currency: wallet.currency },
-          referenceExternalTransactionId: refId,
-          attempts: 1,
-          nextAttemptAt,
-        },
-      });
-      await this.outboxRepo.save(pendingEvent);
-
-      return {
-        transactionId,
-        status: 'PENDING_REFERENCE',
-        balance: {
-          amount: wallet.balance.getAmount(),
-          currency: wallet.currency,
-        },
-        idempotentReplay: false,
-      };
-    }
-
-    // Policy: Cannot refund a rejected or failed transaction
-    if (refTx.status === 'REJECTED' || refTx.status === 'FAILED') {
-      const response: WagerResponseDto = {
-        transactionId,
-        status: 'REJECTED',
-        failureCode: 'REFERENCE_NOT_PROCESSED',
-        balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        idempotentReplay: false,
-      };
-
-      const pendingTx = WagerTransaction.createPending({
-        id: transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'REFUND',
-        money: refundMoney,
-        idempotencyKey,
-        payloadHash,
-        referenceExternalTransactionId: refId,
-      });
-
-      const rejectedTx = pendingTx.markRejected('REFERENCE_NOT_PROCESSED', response);
-      await this.wagerRepo.save(rejectedTx);
-
-      const rejectedEvent = new WagerTransactionRejectedEvent({
-        aggregateId: wallet.id,
-        correlationId,
-        causationId: idempotencyKey,
-        data: {
-          transactionId,
-          walletId: wallet.id,
-          playerId: wallet.playerId,
-          providerId: dto.providerId,
-          externalTransactionId: dto.externalTransactionId,
-          roundId: dto.roundId,
-          gameId: dto.gameId,
-          kind: 'REFUND',
-          amount: { amount: refundMoney.getAmount(), currency: wallet.currency },
-          balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-          failureCode: 'REFERENCE_NOT_PROCESSED',
-          referenceExternalTransactionId: refId,
-        },
-      });
-      await this.outboxRepo.save(rejectedEvent);
-
-      return response;
-    }
-
-    // Validate reference compatibility
-    if (refTx.kind !== 'BET') {
-      throw new InvalidWagerOperationError(
-        `REFUND can only reference a BET transaction (referenced transaction is "${refTx.kind}")`
-      );
-    }
-
-    this.assertReferenceCompatibility(refTx, wallet, dto, refundMoney);
-
-    // Check unique processed refund for this reference
-    const existingRefund = await this.wagerRepo.findByProviderAndReference(dto.providerId, refId, 'REFUND');
-    if (existingRefund) {
-      throw new IdempotencyConflictError(
-        `A REFUND for reference transaction "${refId}" has already been processed`
-      );
-    }
-
-    // REFUND credits the wallet (reversing the BET debit)
-    const previousBalanceAmount = wallet.balance.getAmount();
-    const ledgerEntryId = crypto.randomUUID();
-    const ledgerEntry = wallet.credit({
+    const result = await this.reversalProcessor.processReversal(wallet, {
       transactionId,
-      amount: refundMoney,
-      ledgerEntryId,
-    });
-    await this.walletRepo.save(wallet);
-
-    const response: WagerResponseDto = {
-      transactionId,
-      status: 'PROCESSED',
-      balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-      idempotentReplay: false,
-    };
-
-    const pendingTx = WagerTransaction.createPending({
-      id: transactionId,
-      walletId: wallet.id,
-      playerId: wallet.playerId,
       providerId: dto.providerId,
       externalTransactionId: dto.externalTransactionId,
+      playerId: wallet.playerId,
+      walletId: wallet.id,
       roundId: dto.roundId,
       gameId: dto.gameId,
       kind: 'REFUND',
       money: refundMoney,
+      referenceExternalTransactionId: dto.referenceExternalTransactionId!,
       idempotencyKey,
       payloadHash,
-      referenceExternalTransactionId: refId,
-    });
-
-    const processedTx = pendingTx.markProcessed(response);
-    await this.wagerRepo.save(processedTx);
-    await this.ledgerRepo.save(ledgerEntry);
-
-    const processedEvent = new WagerTransactionProcessedEvent({
-      aggregateId: wallet.id,
       correlationId,
-      causationId: idempotencyKey,
-      data: {
-        transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'REFUND',
-        amount: { amount: refundMoney.getAmount(), currency: wallet.currency },
-        balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        referenceExternalTransactionId: refId,
-      },
     });
-    await this.outboxRepo.save(processedEvent);
 
-    const balanceChangedEvent = new WalletBalanceChangedEvent({
-      aggregateId: wallet.id,
-      correlationId,
-      causationId: idempotencyKey,
-      data: {
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        currency: wallet.currency,
-        previousBalance: { amount: previousBalanceAmount, currency: wallet.currency },
-        currentBalance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        version: wallet.version,
-        triggerTransactionId: transactionId,
-      },
-    });
-    await this.outboxRepo.save(balanceChangedEvent);
-
-    return response;
+    return result.response;
   }
 
   private async handleRollback(
@@ -672,292 +499,23 @@ export class ProcessWagerUseCase {
       throw new InvalidWagerOperationError('ROLLBACK amount must be strictly greater than zero');
     }
 
-    const refId = dto.referenceExternalTransactionId!;
-    const refTx = await this.wagerRepo.findByProviderAndExternalId(dto.providerId, refId);
-
-    // Out-of-order reference handling
-    if (!refTx || refTx.status === 'PENDING' || refTx.status === 'PENDING_REFERENCE') {
-      const nextAttemptAt = new Date(Date.now() + 500).toISOString();
-      const pendingRefTx = WagerTransaction.createPendingReference({
-        id: transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'ROLLBACK',
-        money: rollbackMoney,
-        idempotencyKey,
-        payloadHash,
-        referenceExternalTransactionId: refId,
-        nextAttemptAt,
-      });
-
-      await this.wagerRepo.save(pendingRefTx);
-
-      const pendingEvent = new WagerTransactionPendingReferenceEvent({
-        aggregateId: wallet.id,
-        correlationId,
-        causationId: idempotencyKey,
-        data: {
-          transactionId,
-          walletId: wallet.id,
-          playerId: wallet.playerId,
-          providerId: dto.providerId,
-          externalTransactionId: dto.externalTransactionId,
-          roundId: dto.roundId,
-          gameId: dto.gameId,
-          kind: 'ROLLBACK',
-          amount: { amount: rollbackMoney.getAmount(), currency: wallet.currency },
-          referenceExternalTransactionId: refId,
-          attempts: 1,
-          nextAttemptAt,
-        },
-      });
-      await this.outboxRepo.save(pendingEvent);
-
-      return {
-        transactionId,
-        status: 'PENDING_REFERENCE',
-        balance: {
-          amount: wallet.balance.getAmount(),
-          currency: wallet.currency,
-        },
-        idempotentReplay: false,
-      };
-    }
-
-    // Policy: Cannot rollback a rejected or failed transaction
-    if (refTx.status === 'REJECTED' || refTx.status === 'FAILED') {
-      const response: WagerResponseDto = {
-        transactionId,
-        status: 'REJECTED',
-        failureCode: 'REFERENCE_NOT_PROCESSED',
-        balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        idempotentReplay: false,
-      };
-
-      const pendingTx = WagerTransaction.createPending({
-        id: transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'ROLLBACK',
-        money: rollbackMoney,
-        idempotencyKey,
-        payloadHash,
-        referenceExternalTransactionId: refId,
-      });
-
-      const rejectedTx = pendingTx.markRejected('REFERENCE_NOT_PROCESSED', response);
-      await this.wagerRepo.save(rejectedTx);
-
-      const rejectedEvent = new WagerTransactionRejectedEvent({
-        aggregateId: wallet.id,
-        correlationId,
-        causationId: idempotencyKey,
-        data: {
-          transactionId,
-          walletId: wallet.id,
-          playerId: wallet.playerId,
-          providerId: dto.providerId,
-          externalTransactionId: dto.externalTransactionId,
-          roundId: dto.roundId,
-          gameId: dto.gameId,
-          kind: 'ROLLBACK',
-          amount: { amount: rollbackMoney.getAmount(), currency: wallet.currency },
-          balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-          failureCode: 'REFERENCE_NOT_PROCESSED',
-          referenceExternalTransactionId: refId,
-        },
-      });
-      await this.outboxRepo.save(rejectedEvent);
-
-      return response;
-    }
-
-    // ROLLBACK can reference BET, WIN or REFUND
-    const allowedRefKinds = ['BET', 'WIN', 'REFUND'];
-    if (!allowedRefKinds.includes(refTx.kind)) {
-      throw new InvalidWagerOperationError(
-        `ROLLBACK cannot reference kind "${refTx.kind}". Allowed kinds to rollback: ${allowedRefKinds.join(', ')}`
-      );
-    }
-
-    this.assertReferenceCompatibility(refTx, wallet, dto, rollbackMoney);
-
-    // Check unique processed rollback for this reference
-    const existingRollback = await this.wagerRepo.findByProviderAndReference(dto.providerId, refId, 'ROLLBACK');
-    if (existingRollback) {
-      throw new IdempotencyConflictError(
-        `A ROLLBACK for reference transaction "${refId}" has already been processed`
-      );
-    }
-
-    // Inverse movement calculation:
-    // If ref was BET: inverse is CREDIT (+)
-    // If ref was WIN or REFUND: inverse is DEBIT (-)
-    const isDebit = refTx.kind === 'WIN' || refTx.kind === 'REFUND';
-
-    if (isDebit && wallet.balance.lessThan(rollbackMoney)) {
-      // Distinct failure code for reversal insufficient balance
-      const response: WagerResponseDto = {
-        transactionId,
-        status: 'REJECTED',
-        failureCode: 'REVERSAL_INSUFFICIENT_FUNDS',
-        balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        idempotentReplay: false,
-      };
-
-      const pendingTx = WagerTransaction.createPending({
-        id: transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'ROLLBACK',
-        money: rollbackMoney,
-        idempotencyKey,
-        payloadHash,
-        referenceExternalTransactionId: refId,
-      });
-
-      const rejectedTx = pendingTx.markRejected('REVERSAL_INSUFFICIENT_FUNDS', response);
-      await this.wagerRepo.save(rejectedTx);
-
-      const rejectedEvent = new WagerTransactionRejectedEvent({
-        aggregateId: wallet.id,
-        correlationId,
-        causationId: idempotencyKey,
-        data: {
-          transactionId,
-          walletId: wallet.id,
-          playerId: wallet.playerId,
-          providerId: dto.providerId,
-          externalTransactionId: dto.externalTransactionId,
-          roundId: dto.roundId,
-          gameId: dto.gameId,
-          kind: 'ROLLBACK',
-          amount: { amount: rollbackMoney.getAmount(), currency: wallet.currency },
-          balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-          failureCode: 'REVERSAL_INSUFFICIENT_FUNDS',
-          referenceExternalTransactionId: refId,
-        },
-      });
-      await this.outboxRepo.save(rejectedEvent);
-
-      return response;
-    }
-
-    const previousBalanceAmount = wallet.balance.getAmount();
-    const ledgerEntryId = crypto.randomUUID();
-    const ledgerEntry = isDebit
-      ? wallet.debit({ transactionId, amount: rollbackMoney, ledgerEntryId })
-      : wallet.credit({ transactionId, amount: rollbackMoney, ledgerEntryId });
-    await this.walletRepo.save(wallet);
-
-    const response: WagerResponseDto = {
+    const result = await this.reversalProcessor.processReversal(wallet, {
       transactionId,
-      status: 'PROCESSED',
-      balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-      idempotentReplay: false,
-    };
-
-    const pendingTx = WagerTransaction.createPending({
-      id: transactionId,
-      walletId: wallet.id,
-      playerId: wallet.playerId,
       providerId: dto.providerId,
       externalTransactionId: dto.externalTransactionId,
+      playerId: wallet.playerId,
+      walletId: wallet.id,
       roundId: dto.roundId,
       gameId: dto.gameId,
       kind: 'ROLLBACK',
       money: rollbackMoney,
+      referenceExternalTransactionId: dto.referenceExternalTransactionId!,
       idempotencyKey,
       payloadHash,
-      referenceExternalTransactionId: refId,
-    });
-
-    const processedTx = pendingTx.markProcessed(response);
-    await this.wagerRepo.save(processedTx);
-    await this.ledgerRepo.save(ledgerEntry);
-
-    const processedEvent = new WagerTransactionProcessedEvent({
-      aggregateId: wallet.id,
       correlationId,
-      causationId: idempotencyKey,
-      data: {
-        transactionId,
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        providerId: dto.providerId,
-        externalTransactionId: dto.externalTransactionId,
-        roundId: dto.roundId,
-        gameId: dto.gameId,
-        kind: 'ROLLBACK',
-        amount: { amount: rollbackMoney.getAmount(), currency: wallet.currency },
-        balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        referenceExternalTransactionId: refId,
-      },
     });
-    await this.outboxRepo.save(processedEvent);
 
-    const balanceChangedEvent = new WalletBalanceChangedEvent({
-      aggregateId: wallet.id,
-      correlationId,
-      causationId: idempotencyKey,
-      data: {
-        walletId: wallet.id,
-        playerId: wallet.playerId,
-        currency: wallet.currency,
-        previousBalance: { amount: previousBalanceAmount, currency: wallet.currency },
-        currentBalance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-        version: wallet.version,
-        triggerTransactionId: transactionId,
-      },
-    });
-    await this.outboxRepo.save(balanceChangedEvent);
-
-    return response;
-  }
-
-  private assertReferenceCompatibility(
-    refTx: WagerTransaction,
-    wallet: any,
-    dto: ProcessWagerDto,
-    operationMoney: Money
-  ): void {
-    if (refTx.playerId !== dto.playerId) {
-      throw new InvalidWagerOperationError(
-        `Reference player mismatch: expected "${refTx.playerId}", got "${dto.playerId}"`
-      );
-    }
-    if (refTx.walletId !== wallet.id) {
-      throw new InvalidWagerOperationError(
-        `Reference wallet mismatch: expected "${refTx.walletId}", got "${wallet.id}"`
-      );
-    }
-    if (refTx.currency !== operationMoney.getCurrency()) {
-      throw new CurrencyMismatchError(
-        `Reference currency mismatch: expected "${refTx.currency}", got "${operationMoney.getCurrency()}"`
-      );
-    }
-    if (refTx.roundId !== dto.roundId) {
-      throw new InvalidWagerOperationError(
-        `Reference round mismatch: expected "${refTx.roundId}", got "${dto.roundId}"`
-      );
-    }
-    if (refTx.money.getAmount() !== operationMoney.getAmount()) {
-      throw new InvalidWagerOperationError(
-        `Reference amount mismatch: reversal must equal the full original amount "${refTx.money.getAmount()}", got "${operationMoney.getAmount()}"`
-      );
-    }
+    return result.response;
   }
 
   private validateDomainRules(idempotencyKey: string, dto: ProcessWagerDto): void {
