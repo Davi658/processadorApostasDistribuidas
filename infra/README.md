@@ -1,144 +1,94 @@
-# Infraestrutura local
+# Infraestrutura local e Integração com Main
 
-Branch `codex/local-infrastructure`, base exata `6acc7c3500af9bbd56c340aeca3ccdfcfa056aa1`.
-Worktree: `D:\processadorApostasDistribuidas\.worktrees\local-infrastructure`.
-Nenhum acesso remoto, push, merge ou publicação. Os arquivos existentes, inclusive
-`docker-compose.yml` e `scripts/init-db.sql`, foram inspecionados e preservados.
-Este Compose é independente: use sempre `-f docker-compose.local.yml`, sem combinar
-com o Compose antigo. Requer Docker Engine e Compose v2 com suporte a condições de dependência.
+Integração realizada na branch `codex/infra-main-integration`, a partir da `origin/main` mais recente:
+- **Base SHA**: `953607868f919e60db2eb90ffd7210b7ef994197` (merge de PR #8 `feat/m13-financial-outbox` e PR #7 `codex/local-infrastructure`).
+- **Commits de infraestrutura incorporados**: `05d09c8`, `4528b05`, `4701a10`, `b63b64a`, `d69e6bc`.
+- **Marcos preservados**: M10 (worker lease e shutdown), M11 (proteção de terminais), M12 (ledger constraints e reconciliação finita), M17 (consultas de transações e ledger paginado) e M13 (outbox financeira transacional e matriz de eventos).
+- **Worktree**: `D:\processadorApostasDistribuidas\.worktrees\infra-main-integration`.
+
+Nenhum push ou merge em `main` foi executado. As worktrees `local-infrastructure` e `m13-financial-outbox`, bem como o volume preexistente `wagers-local_local_pgdata`, foram preservados intactos.
 
 ## Subir e parar
 
-Na raiz desta worktree:
+O Compose suporta parametrização via variáveis de ambiente, permitindo execução padrão (`wagers-local`) ou em projetos isolados (ex: `wagers-integration`):
 
 ```powershell
 docker compose -f docker-compose.local.yml config
-docker compose -f docker-compose.local.yml build --pull
+docker compose -f docker-compose.local.yml build
 docker compose -f docker-compose.local.yml up -d --wait --wait-timeout 180
 docker compose -f docker-compose.local.yml ps -a
 docker compose -f docker-compose.local.yml stop
 docker compose -f docker-compose.local.yml down
 ```
 
-`down` preserva `local_pgdata`. Não há exclusão automática de volumes nem comando
-de reset. LocalStack é efêmero: as filas são recriadas ao subir; mensagens locais
-podem ser perdidas ao recriar seu container. O banco permanece no volume nomeado
-do projeto `wagers-local`, separado de `pgdata` do Compose antigo.
-
-Portas publicadas apenas em loopback. Para mudar os padrões no PowerShell:
+`down` preserva `local_pgdata`. Para isolamento total em testes, defina variáveis ou use um arquivo `.env` dedicado:
 
 ```powershell
-$env:LOCAL_API_PORT = '3100'
-$env:LOCAL_POSTGRES_PORT = '5544'
-$env:LOCAL_SQS_PORT = '4567'
+$env:COMPOSE_PROJECT_NAME = 'wagers-integration'
+$env:APP_IMAGE = 'wagers-integration-app:bun-1.4.3'
+$env:LOCAL_API_PORT = '3001'
+$env:LOCAL_POSTGRES_PORT = '5435'
+$env:LOCAL_SQS_PORT = '4568'
 docker compose -f docker-compose.local.yml up -d --wait --wait-timeout 180
 ```
 
-Padrões: API 3000, PostgreSQL 5433, SQS 4566. Nos containers as portas são sempre
-3000, 5432 e 4566. Não há montagem do diretório de código ou de `.env` na imagem.
-O `.dockerignore` usa lista de inclusão, excluindo Git, worktrees, segredos e dependências locais.
+Padrões: API 3000, PostgreSQL 5433, SQS 4566, projeto `wagers-local`. Nos containers as portas internas permanecem 3000, 5432 e 4566.
 
-## Inicialização e credenciais locais
+## Imagem Docker Multi-Stage
 
-- Bun fixado em `1.4.3`, versão indicada pelo README existente e verificada neste
-  host. Instalação via `bun install --frozen-lockfile`; imagem executa como `bun`.
-- PostgreSQL `16.6-alpine`: `migration_user` / `local_migration_only`, banco
-  `betting_db`. É o administrador exclusivamente local, usado pelo migrador.
-- Runtime: `app_user` / `local_runtime_only`, sem superuser, criação de banco,
-  criação de roles ou DDL. As migrations existentes concedem os privilégios por
-  tabela e protegem o ledger. A aplicação não recebe credenciais administrativas.
-- `infra/init-db.sql` roda somente na primeira criação do volume. Trocar senhas
-  no YAML não altera um volume já inicializado; ajuste manualmente os roles no
-  banco, sem apagar o volume. Não reutilize volumes do Compose antigo.
-- `migrate` aguarda PostgreSQL saudável e executa o migrador SQL existente
-  `bun run src/infrastructure/persistence/migrator.ts up`. Ele mantém
-  `schema_migrations` e trava transacional advisory, aplicando somente versões novas.
-  O `DatabaseMigrator` possui robustez aprimorada:
-  - Validação rigorosa das opções no construtor antes da criação do pool: `connectionTimeoutMillis` (inteiro finito > 0, padrão 3000ms), `maxRetries` (inteiro finito >= 1, padrão 10) e `initialDelayMs` (inteiro finito >= 0, padrão 200ms). O spread de `customConfig` não sobrescreve o timeout validado com `undefined` ou valores inválidos.
-  - `connectionTimeoutMillis` finito no `pg.Pool`, prevenindo travamento indefinido de socket. Reconhece o timeout real do driver `pg` ("Connection terminated due to connection timeout"), inspecionando também `code` e cadeia de `cause` para identificar falhas transitórias de conexão (`ECONNREFUSED`, `ETIMEDOUT`, `57P03`).
-  - Retentativas com backoff exponencial (fator 1.5, teto 2000ms) restritas **exclusivamente** à fase de aquisição da conexão inicial (`connectWithRetry()`).
-  - **Orçamento nominal das tentativas/backoffs padrão**: com os parâmetros padrão (10 tentativas, timeout de conexão de 3000ms e delay inicial de 200ms), o orçamento nominal acumulado das tentativas e backoffs na fase de conexão é de aproximadamente ~40,16 s (10 × 3 s de timeout + ~10,16 s de backoffs somados: 200 + 300 + 450 + 675 + 1012,5 + 1518,75 + 2000 + 2000 + 2000 ms). Este valor representa um orçamento nominal estimado das tentativas e esperas de conexão, e **não** um máximo absoluto (variações de latência de rede, resolução DNS e escalonamento de sockets pelo sistema operacional podem alterar o tempo decorrido total) nem um limite para a execução de consultas SQL.
-  - Erros de execução SQL falham imediatamente na primeira tentativa, disparando `ROLLBACK` e abortando sem repetição.
-  - Execução CLI encapsulada em bloco `try / catch / finally` que garante o encerramento do pool via `migrator.close()` e propaga código de saída não-zero em caso de erro.
-  - Comprovado pela suíte automatizada `tests/unit/migrator-robustness.test.ts`.
-- `queues` aguarda LocalStack saudável. A API só inicia após ambos os jobs
-  concluírem com sucesso. O healthcheck consulta uma carteira pela rota existente:
-  aceita carteira encontrada ou erro de domínio `WALLET_NOT_FOUND` após acesso real ao banco.
-- Para reaplicar o bootstrap sem reiniciar os serviços:
+O `Dockerfile` foi estruturado em múltiplos estágios para desacoplar produção de testes:
+1. `dependencies`: Instala dependências de produção e desenvolvimento com `bun install --frozen-lockfile`.
+2. `base`: Contém dependências, `src/`, `infra/`, `package.json`, `tsconfig.json` e executa com usuário não-root `bun` (UID 1000).
+3. `tester`: Estágio específico para execução de testes em contêiner (`target: tester`). Copia `scripts/` e `tests/` e define `CMD ["bun", "run", "test"]`.
+4. `runtime`: Estágio padrão da API (`target: runtime`), mantendo a imagem oficial enxuta e estritamente restrita ao código de produção (`src/` e `infra/`).
 
-```powershell
-docker compose -f docker-compose.local.yml run --rm migrate
-docker compose -f docker-compose.local.yml run --rm queues
-```
+## Inicialização e Migrations
 
-## SQS local e contrato futuro
+- PostgreSQL `16.6-alpine`: Usuário administrativo `migration_user` / `local_migration_only`, banco `betting_db`.
+- Runtime: `app_user` / `local_runtime_only`, sem privilégios de superusuário, criação de banco ou DDL.
+- `init-db.sql`: Executa na criação de novos volumes criando o role `app_user` e revogando privilégios públicos.
+- `migrate`: Aplica todas as **7 migrations** incrementais existentes no repositório:
+  1. `001_initial_schema`
+  2. `002_reinforce_schema_and_outbox`
+  3. `003_protect_terminals_and_composite_fk`
+  4. `004_restrict_reversal_unique_index`
+  5. `005_pending_reference_worker_lease`
+  6. `006_terminal_transaction_protection`
+  7. `007_ledger_finite_values`
+- Idempotência: Na segunda subida ou reexecução do migrador, relata `No new migrations to apply.` sem reexecuções indevidas.
+- `queues`: Cria as três filas FIFO no LocalStack 4.0.3 (`wager-transactions-dlq.fifo`, `wager-transactions.fifo`, `wager-events.fifo`) e aplica a política de redrive para a DLQ com `maxReceiveCount: 5`.
 
-LocalStack fixado em `4.0.3`; AWS access key e secret `test`, região `us-east-1`,
-conta `000000000000`. Nenhum segredo real. O cliente AWS CLI está na imagem
-LocalStack; bootstrap usa `aws --endpoint-url http://localstack:4566`.
-O entrypoint remove CR ao executar o shell montado, suportando checkout Windows
-com CRLF sem alterar configurações Git do projeto.
+## Smoke Test Integrado (`infra/smoke-api.ts`)
 
-Endpoint interno `SQS_ENDPOINT=http://localstack:4566`. Estratégia `path` e host
-anunciado `localstack:4566` mantêm as URLs retornadas utilizáveis na rede Compose:
+O script de smoke valida o ciclo financeiro integrado fim a fim:
+1. **Abertura**: `POST /wallets` com saldo inicial de `100.00 BRL` (201 Created) e leitura via `GET /wallets/:id` (200 OK).
+2. **BET**: `POST /wagering/transactions` com débito de `25.00 BRL`, validando status `PROCESSED`, saldo resultante `75.00 BRL` e `idempotentReplay: false`.
+3. **Replay**: Reenvio idêntico com mesma `idempotency-key`, retornando status `PROCESSED`, saldo `75.00 BRL` e `idempotentReplay: true`.
+4. **Consultas**:
+   - `GET /wagering/transactions/:transactionId`: Retorna a transação com `kind: BET`, valor `25.00` e status `PROCESSED`.
+   - `GET /wallets/:walletId/ledger`: Retorna o extrato contábil paginado (`hasMore: false`, 2 lançamentos: crédito de abertura e débito de aposta).
+5. **Reconciliação**: `POST /wallets/:walletId/reconciliation` comprovando consistência matemática exata (`consistent: true`, `difference: 0.00`).
 
-| Variável proposta | URL interna |
-| --- | --- |
-| WAGER_TRANSACTIONS_QUEUE_URL | http://localstack:4566/queue/us-east-1/000000000000/wager-transactions.fifo |
-| WAGER_TRANSACTIONS_DLQ_URL | http://localstack:4566/queue/us-east-1/000000000000/wager-transactions-dlq.fifo |
-| OUTBOX_EVENTS_QUEUE_URL | http://localstack:4566/queue/us-east-1/000000000000/wager-events.fifo |
+## Validação e Resultados Reais
 
-As três filas são FIFO, com deduplicação por ID explícito. A fila de transações
-tem redrive para a DLQ após 5 recebimentos. O bootstrap obtém o ARN real da DLQ,
-cria filas idempotentemente e reaplica a política de redrive. Se uma fila
-preexistente tiver atributos incompatíveis, falha explicitamente sem excluí-la.
-A fila de eventos é independente, reservada para futura publicação da outbox.
+Validações executadas em 2026-10-17:
 
-Do host, use `http://localhost:<LOCAL_SQS_PORT>` como endpoint. URLs anunciadas
-continuam internas; use os comandos abaixo dentro de `queues` para evitar
-dependência de DNS no host.
+| Verificação | Comando | Ambiente | Resultado |
+| :--- | :--- | :--- | :--- |
+| **Compose Config** | `docker compose --env-file infra/.env.integration -f docker-compose.local.yml config` | Host Windows | OK (exit 0): 5 serviços e rede/volumes isolados |
+| **Build da Imagem API** | `docker compose ... build` | Docker Engine (Linux x86_64) | OK (exit 0): Imagem `wagers-integration-app:bun-1.4.3` gerada |
+| **Primeira Subida (Volume Novo)** | `docker compose ... up -d --wait` | Docker Compose (`wagers-integration`) | OK (exit 0): 7 migrations aplicadas com sucesso (001 a 007) |
+| **Verificação das Filas FIFO** | `aws sqs list-queues` | LocalStack 4.0.3 | OK (exit 0): 3 filas FIFO criadas |
+| **Verificação do Redrive** | `aws sqs get-queue-attributes` | LocalStack 4.0.3 | OK (exit 0): `deadLetterTargetArn` configurado, `maxReceiveCount: 5` |
+| **Smoke Test no Contêiner** | `docker compose exec app bun run infra/smoke-api.ts` | Contêiner Linux (`bun:1.4.3`) | OK (exit 0): Abertura, BET, replay, consultas e reconciliação aprovados |
+| **Smoke Test no Host** | `bun run infra/smoke-api.ts` contra porta 3001 | Host Windows (`win32 x64`) | OK (exit 0): Todas as operações concluídas com sucesso |
+| **Segunda Subida Idempotente** | `docker compose ... run --rm migrate` | Docker Compose (`wagers-integration`) | OK (exit 0): "No new migrations to apply." |
+| **Testes Unitários em Contêiner** | `docker compose run --rm test-runner bun run test:unit` | Contêiner Linux (`target: tester`) | OK (exit 0): 6 arquivos, 0 falhas |
+| **Typecheck Oficial** | `bun run typecheck` | Host Windows | OK (exit 0): 0 erros de compilação |
+| **Suíte Oficial Completa** | `bun run test` (via `scripts/run-tests.ts`) | Host Windows contra PostgreSQL descartável (porta 5439) | OK (exit 0): 24 arquivos de teste, 0 falhas |
 
-## Validação e diagnóstico
+### Documentação Exata dos Ambientes:
+- **Smoke test**: Executado primariamente dentro do contêiner da aplicação (`oven/bun:1.4.3` em Linux x86_64 na rede interna do Docker) e também comprovado no host Windows via porta publicada `3001`.
+- **Suíte oficial de testes**: Executada no host Windows (`win32 x64`) com Bun 1.4.3 contra contêiner descartável PostgreSQL `16.6-alpine` na porta 5439 com tmpfs. O estágio `tester` em contêiner Linux também foi exercitado e validado.
+- **Limitações e Escopo**: Não inclui implementação de publisher, consumidor de fila SQS, inbox ou DLQ listener (funcionalidades reservadas para os marcos M14–M16). As variáveis e filas SQS permanecem preparadas para futuro consumo. Nenhum publisher, consumidor, inbox ou worker foi alterado fora do escopo desta infraestrutura.
 
-```powershell
-docker compose -f docker-compose.local.yml logs --tail=100 postgres migrate localstack queues app
-docker compose -f docker-compose.local.yml exec postgres psql -U migration_user -d betting_db -c 'SELECT version, applied_at FROM schema_migrations ORDER BY version;'
-docker compose -f docker-compose.local.yml exec -e PGPASSWORD=local_runtime_only postgres psql -h postgres -U app_user -d betting_db -c 'SELECT current_user, current_database(), count(*) FROM wallets;'
-docker compose -f docker-compose.local.yml exec postgres psql -U migration_user -d betting_db -c "SELECT rolname, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname IN ('migration_user','app_user');"
-docker compose -f docker-compose.local.yml exec postgres psql -U migration_user -d betting_db -c "SELECT has_schema_privilege('app_user','public','CREATE') AS runtime_ddl, has_table_privilege('app_user','wallet_ledger_entries','UPDATE') AS ledger_update;"
-docker compose -f docker-compose.local.yml run --rm queues
-docker compose -f docker-compose.local.yml run --rm --entrypoint aws queues --endpoint-url http://localstack:4566 sqs list-queues
-docker compose -f docker-compose.local.yml run --rm --entrypoint aws queues --endpoint-url http://localstack:4566 sqs get-queue-attributes --queue-url http://localstack:4566/queue/us-east-1/000000000000/wager-transactions.fifo --attribute-names All
-docker compose -f docker-compose.local.yml exec app id
-docker compose -f docker-compose.local.yml exec app bun run infra/smoke-api.ts
-```
-
-Esperado: cinco migrations 001 a 005; runtime `app_user`; `runtime_ddl` e
-`ledger_update` falsos; três filas FIFO, redrive com ARN da DLQ e maxReceiveCount 5;
-UID da aplicação diferente de zero. O smoke faz POST `/wallets` (201), seguido de
-GET `/wallets/:id` (200), e deixa uma carteira de saldo zero com identificador
-aleatório para inspeção. Pode ser repetido sem colidir com dados anteriores.
-
-Se a API não subir, examine primeiro os jobs `migrate` e `queues` com `ps -a`
-e `logs`; depois o log da API. Não há dependência de AWS real ou credenciais do host.
-
-Resultados validados com Docker Engine (2026-10-17):
-
-| Verificação | Comando | Resultado |
-| --- | --- | --- |
-| `docker compose config` | `docker compose -f docker-compose.local.yml config` | OK: exit 0, cinco serviços, redes e volumes válidos |
-| Build da imagem e instalação Linux | `docker compose -f docker-compose.local.yml build` | OK: exit 0, imagem `wagers-local-app:bun-1.4.3` gerada com Bun 1.4.3 |
-| Subida, prontidão e execução sem root | `docker compose -f docker-compose.local.yml up -d --wait` / `exec app id` | OK: exit 0, todos os serviços saudáveis, UID `1000(bun)` não-root |
-| Healthcheck TCP PostgreSQL | `pg_isready -h 127.0.0.1 -p 5432 -U migration_user -d betting_db` | OK: exit 0, valida conexão TCP antes de liberar migrador |
-| Migrations aplicadas e idempotência | `docker compose -f docker-compose.local.yml logs migrate` | OK: 5 migrations (001 a 005) aplicadas; "No new migrations to apply" no reenvio |
-| Consulta real ao PostgreSQL e privilégios | `psql -c ...` em roles e permissões | OK: `migration_user` admin; `app_user` sem superuser, DDL=false, ledger_update=false |
-| Filas FIFO e Redrive SQS LocalStack | `sqs list-queues` e `sqs get-queue-attributes` | OK: 3 filas FIFO criadas, `wager-transactions.fifo` com redrive para DLQ (maxReceiveCount 5) |
-| API POST/GET (smoke) | `docker compose -f docker-compose.local.yml exec app bun run infra/smoke-api.ts` | OK: exit 0, carteira criada (201) e consultada (200) com UUID válido |
-| Primeira subida isolada (volume novo) | Projeto `wagers-fresh-test`, portas 3990/5439/4599 | OK: exit 0 de primeira sem ECONNREFUSED; volume e containers descartados após prova |
-
-## Dependências de integração
-
-A validação foi executada nesta máquina com Docker Engine local.
-Não há integração SQS implementada na aplicação nesta etapa: os nomes propostos de
-variáveis foram validados na infraestrutura para futuro consumo pelos marcos M14–M16.
-Nenhum publisher, consumidor, inbox ou worker foi alterado fora do escopo desta infraestrutura.

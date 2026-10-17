@@ -6,5 +6,9 @@
 !src/**
 !infra/
 !infra/**
+!scripts/
+!scripts/**
+!tests/
+!tests/**
 infra/**/*.env
 infra/**/.env*

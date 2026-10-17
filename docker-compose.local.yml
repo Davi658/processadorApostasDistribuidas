@@ -1,4 +1,4 @@
-name: wagers-local
+name: ${COMPOSE_PROJECT_NAME:-wagers-local}
 
 services:
   postgres:
@@ -51,8 +51,10 @@ services:
     restart: "no"
 
   migrate:
-    image: wagers-local-app:bun-1.4.3
-    build: .
+    image: ${APP_IMAGE:-wagers-local-app:bun-1.4.3}
+    build:
+      context: .
+      target: runtime
     command: [bun, run, src/infrastructure/persistence/migrator.ts, up]
     environment:
       MIGRATION_DB_HOST: postgres
@@ -66,8 +68,10 @@ services:
     restart: "no"
 
   app:
-    image: wagers-local-app:bun-1.4.3
-    build: .
+    image: ${APP_IMAGE:-wagers-local-app:bun-1.4.3}
+    build:
+      context: .
+      target: runtime
     init: true
     environment:
       PORT: "3000"
@@ -99,6 +103,30 @@ services:
       retries: 20
       start_period: 10s
     stop_grace_period: 40s
+
+  test-runner:
+    image: ${TEST_IMAGE:-wagers-local-test:bun-1.4.3}
+    build:
+      context: .
+      target: tester
+    profiles:
+      - test
+    environment:
+      MIGRATION_DB_HOST: postgres
+      MIGRATION_DB_PORT: "5432"
+      MIGRATION_DB_NAME: betting_db
+      MIGRATION_DB_USER: migration_user
+      MIGRATION_DB_PASSWORD: local_migration_only
+      APP_DB_HOST: postgres
+      APP_DB_PORT: "5432"
+      APP_DB_NAME: betting_db
+      APP_DB_USER: app_user
+      APP_DB_PASSWORD: local_runtime_only
+    command: [bun, run, test]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 
 volumes:
   local_pgdata:
