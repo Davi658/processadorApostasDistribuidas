@@ -14,6 +14,8 @@ import {
   WagerTransactionRepositoryPort,
 } from '../ports/ports';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export class CreateWalletUseCase {
   constructor(
     private readonly walletRepo: WalletRepositoryPort,
@@ -29,11 +31,16 @@ export class CreateWalletUseCase {
       throw new InvalidWagerOperationError('CreateWalletDto must be an object');
     }
 
-    if (typeof dto.playerId !== 'string' || !dto.playerId.trim()) {
-      throw new InvalidWagerOperationError('PlayerId is mandatory and must be a non-empty string');
+    if (typeof dto.playerId !== 'string') {
+      throw new InvalidWagerOperationError('PlayerId is mandatory and must be a string');
     }
 
-    const normalizedPlayerId = dto.playerId.trim();
+    const trimmedPlayerId = dto.playerId.trim();
+    if (!trimmedPlayerId || !UUID_REGEX.test(trimmedPlayerId)) {
+      throw new InvalidWagerOperationError('PlayerId must be a valid canonical UUID string');
+    }
+
+    const normalizedPlayerId = trimmedPlayerId.toLowerCase();
     const currency = 'BRL';
     let initialMoney: Money;
 
@@ -55,7 +62,6 @@ export class CreateWalletUseCase {
         );
       }
 
-      const rawAmount = ib.amount.trim();
       const rawCurrency = ib.currency.trim().toUpperCase();
 
       if (rawCurrency !== 'BRL') {
@@ -64,7 +70,8 @@ export class CreateWalletUseCase {
         );
       }
 
-      initialMoney = Money.create(rawAmount, currency);
+      // Não aplicar trim no amount. Encaminhar a string original para Money.create, rejeitando espaços conforme a regra monetária
+      initialMoney = Money.create(ib.amount, currency);
     }
 
     try {

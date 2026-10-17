@@ -72,9 +72,10 @@
   - Valores presentes mas não-conformes como `null`, `false`, `0`, `""`, strings primitivas, numbers ou objetos incompletos são estritamente rejeitados na camada de transporte (`HttpValidator.validateCreateWalletBody`) com HTTP 400 Bad Request (`{ statusCode: 400, error: 'Bad Request', message: '...' }`).
 - **Validação Defensiva do Caso de Uso:**
   - O caso de uso `CreateWalletUseCase` possui validação defensiva autônoma e desacoplada do validador HTTP:
-    - Normalização consistente de `playerId` com `.trim()`, rejeitando strings vazias.
+    - `playerId`: validado estritamente como UUID canônico, com aplicação de `trim()` e conversão para minúsculas (`toLowerCase()`) antes de qualquer consulta ou persistência, garantindo que variações de caixa ou espaços externos representem o mesmo jogador.
+    - `initialBalance.amount`: **não** sofre `trim()`. A string original é encaminhada diretamente ao `Money.create`, rejeitando espaços iniciais ou finais (`" 10.00"` ou `"10.00 "`) conforme a regra monetária.
     - Exigência estrita de objeto com `amount` e `currency` quando `initialBalance` for fornecido, rejeitando `null`, `false`, `0`, `""`, números ou arrays antes de chamar métodos de string.
-    - Restrição operacional estrita a `"BRL"`, rejeitando qualquer outra moeda com erro de domínio.
+    - Restrição operacional estrita a `"BRL"` com normalização `toUpperCase()`, rejeitando qualquer outra moeda com erro de domínio.
 - **Atomicidade SQL e Efeitos Colaterais:**
   - **Abertura Positiva:** Em uma única transação SQL (`EntityManager.transactional`), cria a entidade `Wallet`, a transação interna `WagerTransaction` com `kind: 'OPENING'`, o lançamento de crédito `WalletLedgerEntry` (`CREDIT`) e os dois eventos de outbox (`WagerTransactionProcessed` e `WalletBalanceChanged`). A versão final resultante da carteira é garantidamente `1`.
   - **Abertura Zero:** Cria exclusivamente a entidade `Wallet` com saldo `"0.00"` e versão `1`. Não gera transação `OPENING`, nenhum lançamento contábil no ledger e nenhum evento na outbox.

@@ -205,6 +205,13 @@ A representação monetária é governada pelo Value Object `Money`, alinhado es
 
 ### 8.1 Contrato e Semântica de `initialBalance`
 O endpoint `POST /wallets` aceita o corpo `{ playerId: string, initialBalance?: { amount: string, currency: string } }`:
+- **Normalização e Validação de `playerId`:**
+  - Validado estritamente como formato canônico UUID.
+  - Normalizado com `trim()` e convertido para minúsculas (`toLowerCase()`) antes de qualquer consulta ou persistência, garantindo que variações de caixa ou espaços externos apontem para a mesma identidade.
+- **Normalização de `initialBalance.amount`:**
+  - Não sofre `trim()`. A string original é encaminhada diretamente ao Value Object `Money.create`, rejeitando formatos não canônicos com espaços (`" 10.00"` ou `"10.00 "`) conforme a regra monetária.
+- **Moeda:**
+  - Normalizada em maiúsculas (`toUpperCase()`) e restrita operacionalmente a `"BRL"`.
 - **Ausência vs. Nulos:**
   - Quando `initialBalance` é **ausente** (omitido no JSON ou `undefined`), a carteira é criada com saldo zero (`"0.00"` BRL), `version = 1`, sem movimentos contábeis.
   - Valores como `null`, `false`, `0`, `""` ou primitivos avulsos são estritamente rejeitados com `400 Bad Request`.

@@ -590,16 +590,113 @@ describe('M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests',
   });
 
   describe('6. Validação Defensiva do Caso de Uso (CreateWalletUseCase)', () => {
-    it('deve aceitar initialBalance ausente ou undefined e criar com saldo 0.00 BRL', async () => {
+    it('1. UUID em maiúsculas é persistido em minúsculas', async () => {
+      const rawUuid = crypto.randomUUID();
+      const upperUuid = rawUuid.toUpperCase();
+
+      const wallet = await createWalletUseCase.execute({
+        playerId: upperUuid,
+        initialBalance: { amount: '10.00', currency: 'BRL' },
+      });
+
+      expect(wallet.playerId).toBe(rawUuid.toLowerCase());
+
+      uow.getEntityManager().clear();
+      const row = (await adminPool.query('SELECT player_id FROM wallets WHERE id = $1', [wallet.id])).rows[0];
+      expect(row.player_id).toBe(rawUuid.toLowerCase());
+    });
+
+    it('2. Mesmo UUID com variações de caixa/espaços representa o mesmo jogador e gera DuplicateWalletError na segunda abertura', async () => {
+      const rawUuid = crypto.randomUUID();
+      const upperUuid = rawUuid.toUpperCase();
+      const spacedLowerUuid = `   ${rawUuid.toLowerCase()}   `;
+
+      // Primeira abertura com UUID maiúsculo
+      const first = await createWalletUseCase.execute({
+        playerId: upperUuid,
+        initialBalance: { amount: '20.00', currency: 'BRL' },
+      });
+      expect(first.playerId).toBe(rawUuid.toLowerCase());
+
+      // Segunda abertura com espaços e minúsculo
+      await expect(
+        createWalletUseCase.execute({
+          playerId: spacedLowerUuid,
+          initialBalance: { amount: '20.00', currency: 'BRL' },
+        })
+      ).rejects.toThrow(DuplicateWalletError);
+    });
+
+    it('3. UUID inválido é rejeitado antes da persistência', async () => {
+      const invalidPlayerIds = [
+        '',
+        '   ',
+        'invalid-uuid',
+        '12345',
+        '123e4567-e89b-12d3-a456-42661417400', // incompleto
+        'g23e4567-e89b-12d3-a456-426614174000', // hex inválido 'g'
+      ];
+
+      for (const invalidId of invalidPlayerIds) {
+        await expect(
+          createWalletUseCase.execute({ playerId: invalidId })
+        ).rejects.toThrow(InvalidWagerOperationError);
+      }
+
+      uow.getEntityManager().clear();
+      const count = Number(
+        (await adminPool.query('SELECT count(*) FROM wallets WHERE player_id = $1', ['invalid-uuid'])).rows[0].count
+      );
+      expect(count).toBe(0);
+    });
+
+    it('4. Amount " 10.00" ou "10.00 " é rejeitado sem efeitos no banco', async () => {
+      const spacedAmounts = [' 10.00', '10.00 ', '  10.00  '];
+
+      for (const spacedAmount of spacedAmounts) {
+        const testPlayerId = crypto.randomUUID();
+
+        await expect(
+          createWalletUseCase.execute({
+            playerId: testPlayerId,
+            initialBalance: { amount: spacedAmount, currency: 'BRL' },
+          })
+        ).rejects.toThrow(InvalidMoneyError);
+
+        uow.getEntityManager().clear();
+        const count = Number(
+          (await adminPool.query('SELECT count(*) FROM wallets WHERE player_id = $1', [testPlayerId])).rows[0].count
+        );
+        expect(count).toBe(0);
+      }
+    });
+
+    it('5. Amount "10.00" e abertura zero continuam funcionando', async () => {
+      // Amount "10.00"
       const p1 = crypto.randomUUID();
-      const w1 = await createWalletUseCase.execute({ playerId: p1 });
-      expect(w1.balance).toEqual({ amount: '0.00', currency: 'BRL' });
+      const w1 = await createWalletUseCase.execute({
+        playerId: p1,
+        initialBalance: { amount: '10.00', currency: 'BRL' },
+      });
+      expect(w1.balance).toEqual({ amount: '10.00', currency: 'BRL' });
       expect(w1.version).toBe(1);
 
+      // Abertura zero omitida
       const p2 = crypto.randomUUID();
-      const w2 = await createWalletUseCase.execute({ playerId: p2, initialBalance: undefined });
+      const w2 = await createWalletUseCase.execute({
+        playerId: p2,
+      });
       expect(w2.balance).toEqual({ amount: '0.00', currency: 'BRL' });
       expect(w2.version).toBe(1);
+
+      // Abertura zero explícita
+      const p3 = crypto.randomUUID();
+      const w3 = await createWalletUseCase.execute({
+        playerId: p3,
+        initialBalance: { amount: '0.00', currency: 'BRL' },
+      });
+      expect(w3.balance).toEqual({ amount: '0.00', currency: 'BRL' });
+      expect(w3.version).toBe(1);
     });
 
     it('deve rejeitar null, false, 0, "", arrays, números e objetos incompletos no caso de uso sem efeitos colaterais', async () => {
@@ -652,22 +749,6 @@ describe('M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests',
         (await adminPool.query('SELECT count(*) FROM wallets WHERE player_id = $1', [testPlayerId])).rows[0].count
       );
       expect(count).toBe(0);
-    });
-
-    it('deve normalizar playerId com trim e rejeitar strings vazias', async () => {
-      await expect(
-        createWalletUseCase.execute({ playerId: '   ' })
-      ).rejects.toThrow('PlayerId is mandatory');
-
-      const rawUuid = crypto.randomUUID();
-      const spacedPlayerId = `  ${rawUuid}  `;
-
-      const wallet = await createWalletUseCase.execute({ playerId: spacedPlayerId });
-      expect(wallet.playerId).toBe(rawUuid);
-
-      uow.getEntityManager().clear();
-      const row = (await adminPool.query('SELECT player_id FROM wallets WHERE id = $1', [wallet.id])).rows[0];
-      expect(row.player_id).toBe(rawUuid);
     });
   });
 
