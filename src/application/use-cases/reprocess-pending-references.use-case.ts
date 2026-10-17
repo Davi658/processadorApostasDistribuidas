@@ -7,6 +7,8 @@ import {
 } from '../ports/ports';
 import { ReversalProcessor } from '../services/reversal-processor.service';
 import { WinProcessor } from '../services/win-processor.service';
+import { WagerResponseDto } from '../dto/wager.dto';
+import { WagerTransactionRejectedEvent } from '../../domain/events/events';
 
 export interface ReprocessResult {
   processed: number;
@@ -50,16 +52,45 @@ export class ReprocessPendingReferencesUseCase {
           return;
         }
 
+        const wallet = await this.walletRepo.findById(tx.walletId, true);
+        if (!wallet) return;
+
         const refId = tx.referenceExternalTransactionId;
         if (!refId) {
-          const rejectedTx = tx.markRejected('REFERENCE_NOT_FOUND');
+          const response: WagerResponseDto = {
+            transactionId: tx.id,
+            status: 'REJECTED',
+            failureCode: 'REFERENCE_NOT_FOUND',
+            balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
+            idempotentReplay: false,
+          };
+          const rejectedTx = tx.markRejected('REFERENCE_NOT_FOUND', response);
           await this.wagerRepo.save(rejectedTx);
+
+          const rejectedEvent = new WagerTransactionRejectedEvent({
+            aggregateId: wallet.id,
+            correlationId: crypto.randomUUID(),
+            causationId: tx.idempotencyKey ?? undefined,
+            data: {
+              transactionId: tx.id,
+              walletId: wallet.id,
+              playerId: wallet.playerId,
+              providerId: tx.providerId,
+              externalTransactionId: tx.externalTransactionId,
+              roundId: tx.roundId,
+              gameId: tx.gameId,
+              kind: tx.kind as any,
+              amount: { amount: tx.money.getAmount(), currency: wallet.currency },
+              balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
+              failureCode: 'REFERENCE_NOT_FOUND',
+              referenceExternalTransactionId: null,
+            },
+          });
+          await this.outboxRepo.save(rejectedEvent);
+
           rejected++;
           return;
         }
-
-        const wallet = await this.walletRepo.findById(tx.walletId, true);
-        if (!wallet) return;
 
         if (tx.kind === 'WIN') {
           const result = await this.winProcessor.processWin(wallet, {

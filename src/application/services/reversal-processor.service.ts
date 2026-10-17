@@ -126,18 +126,28 @@ export class ReversalProcessor {
         const updatedTx = params.existingPendingTx.markPendingReference(nextAttemptAt);
         await this.wagerRepo.save(updatedTx);
 
+        const snapshot = params.existingPendingTx.responseSnapshot as WagerResponseDto | null;
         return {
           outcome: 'RESCHEDULED',
-          response: {
-            transactionId: params.transactionId,
-            status: 'PENDING_REFERENCE',
-            balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-            idempotentReplay: false,
-          },
+          response: snapshot
+            ? { ...snapshot, idempotentReplay: false }
+            : {
+                transactionId: params.transactionId,
+                status: 'PENDING_REFERENCE',
+                balance: { amount: '0.00', currency: wallet.currency },
+                idempotentReplay: false,
+              },
         };
       } else {
         // Immediate flow
         const nextAttemptAt = new Date(Date.now() + 500).toISOString();
+        const response: WagerResponseDto = {
+          transactionId: params.transactionId,
+          status: 'PENDING_REFERENCE',
+          balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
+          idempotentReplay: false,
+        };
+
         const pendingRefTx = WagerTransaction.createPendingReference({
           id: params.transactionId,
           walletId: wallet.id,
@@ -152,6 +162,7 @@ export class ReversalProcessor {
           payloadHash: params.payloadHash ?? '',
           referenceExternalTransactionId: refId,
           nextAttemptAt,
+          responseSnapshot: response,
         });
 
         await this.wagerRepo.save(pendingRefTx);
@@ -179,12 +190,7 @@ export class ReversalProcessor {
 
         return {
           outcome: 'PENDING_REFERENCE',
-          response: {
-            transactionId: params.transactionId,
-            status: 'PENDING_REFERENCE',
-            balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-            idempotentReplay: false,
-          },
+          response,
         };
       }
     }

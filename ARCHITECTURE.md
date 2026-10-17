@@ -110,10 +110,10 @@ Para eliminar qualquer discrepância de regras entre o fluxo imediato (`ProcessW
 Quando uma reversão (`REFUND` ou `ROLLBACK`) chega antes da transação de referência:
 1. No fluxo imediato, o use case persiste a transação com status `PENDING_REFERENCE`, `attempts = 1` e agendamento de retry em `next_attempt_at`.
 2. Publica o evento `WagerTransactionPendingReferenceEvent` na outbox e responde imediatamente com HTTP 202 Accepted.
-3. O serviço `ReprocessPendingReferencesUseCase` pesquisa transações pendentes elegíveis com lock pessimista `SKIP LOCKED`, delegando a validação e movimentação ao `ReversalProcessor` sob a mesma regra do fluxo imediato.
+3. O serviço `ReprocessPendingReferencesUseCase` pesquisa transações pendentes elegíveis para reprocessamento manual (a consulta concorrente distribuída com lock pessimista `FOR UPDATE SKIP LOCKED` e agendamento contínuo é reservada exclusivamente para o marco M10), delegando a validação e movimentação aos serviços `WinProcessor` e `ReversalProcessor` sob as mesmas regras do fluxo imediato.
 4. Se a referência ainda estiver ausente ou pendente: aplica backoff exponencial com jitter (até 5 tentativas). Esgotadas as tentativas, transiciona terminalmente para `REJECTED` com código `REFERENCE_NOT_FOUND`.
 5. Se a referência for posteriormente confirmada (ou rejeitada/falhada/incompatível), ambos os caminhos (referência prévia imediata ou referência tardia com reprocessador) produzem exatamente o mesmo resultado contábil, saldo, versão, ledger, outbox e reconciliação.
-6. **Delimitação Estrita de Escopo (M08 vs M10):** A validação de M08 abrange exclusivamente a integridade contábil, a compatibilidade de regras e o reprocessamento determinístico das pendências. O agendamento contínuo em background, a concorrência distribuída entre múltiplos workers e a integração com SQS pertencem à frente M10 e permanecem marcados como **NÃO VALIDADO** nesta etapa.
+6. **Delimitação Estrita de Escopo (M08 vs M09/M10):** A validação de M08 abrange exclusivamente a integridade contábil, a compatibilidade de regras e o reprocessamento determinístico das pendências. O replay completo de pendências pertence a M09. O agendamento contínuo em background, a concorrência distribuída entre múltiplos workers com `SKIP LOCKED` e a integração com SQS pertencem à frente M10 e permanecem marcados como **NÃO VALIDADO** nesta etapa.
 
 ### 3.4 Operações de Ganho e Perda: WIN e LOSS (M06)
 A estabilização de `WIN` e `LOSS` (M06) assegura a precisão contábil, a idempotência terminal e o tratamento correto de referências para fechamento de apostas:
@@ -147,7 +147,7 @@ A estabilização de `WIN` e `LOSS` (M06) assegura a precisão contábil, a idem
    - Conflitos de payload sob a mesma chave ou reutilização do mesmo identificador externo sob chaves diferentes retornam HTTP 409 `IDEMPOTENCY_CONFLICT` sem qualquer alteração no PostgreSQL.
 6. **Delimitação Estrita de Escopo:**
    - As provas de M06 atestam as regras financeiras de WIN e LOSS, idempotência, concorrência direta e resolução de pendências em PostgreSQL real.
-   - O agendamento periódico/background, a concorrência distribuída entre múltiplos workers e a infraestrutura SQS/mensageria pertencem a M09, M10 e M15 e permanecem como **NÃO VALIDADO / NÃO IMPLEMENTADO**.
+   - O agendamento periódico/background, a concorrência distribuída entre múltiplos workers com `SKIP LOCKED` e a infraestrutura SQS/mensageria pertencem a M10 e M15 e permanecem como **NÃO VALIDADO / NÃO IMPLEMENTADO**. O replay e snapshots de `PENDING_REFERENCE` foram estabilizados em M09.
 
 ---
 
@@ -360,7 +360,7 @@ O `MikroOrmUnitOfWork` rastreia a profundidade de execução (`depth`) e o estad
 > [!IMPORTANT]
 > A presente estabilização de M05 comprova exclusivamente a atomicidade e o isolamento de `wallet`, `wager_transactions`, `wallet_ledger_entries` e `outbox_messages` via MikroORM sob ciclo NestJS real.
 > **Tabela Inbox e integração SQS ainda não existem no modelo atual.** A atomicidade entre Inbox e SQS pertence ao marco **M15** e permanece explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**.
-> Da mesma forma, workers concorrentes distribuídos e filas SQS (M10) e replay completo de PENDING_REFERENCE (M09) permanecem como **NÃO VALIDADOS**.
+> Da mesma forma, workers concorrentes distribuídos com `SKIP LOCKED` e filas SQS (M10) permanecem como **NÃO VALIDADOS**. O replay completo de PENDING_REFERENCE foi estabilizado no marco M09.
 
 ---
 
@@ -430,7 +430,68 @@ Antes de qualquer alteração de saldo ou ledger, o processador valida rigorosam
 ### 11.6 Delimitação Estrita de Escopo
 > [!IMPORTANT]
 > O marco M07 consolida exclusivamente o processamento de **REFUND e ROLLBACK imediatos** sob o ciclo transacional síncrono.
-> O agendamento contínuo em background, a mensageria e filas SQS (M10, M15) e o reprocessamento periódico distribuído (M09, M10) pertencem a marcos futuros e permanecem explicitamente como **NÃO VALIDADOS / NÃO IMPLEMENTADOS**.
+> O agendamento contínuo em background, a mensageria e filas SQS (M10, M15) e a concorrência distribuída de workers com `FOR UPDATE SKIP LOCKED` (M10) pertencem a marcos futuros e permanecem explicitamente como **NÃO VALIDADOS / NÃO IMPLEMENTADOS**.
+
+---
+
+## 12. Replay de PENDING_REFERENCE e Transições Terminais (M09)
+
+A estabilização do marco M09 garante respostas completas, determinísticas e auditáveis para operações `WIN`, `REFUND` e `ROLLBACK` tanto enquanto aguardam a chegada da referência (`PENDING_REFERENCE`) quanto após a sua resolução terminal (`PROCESSED` ou `REJECTED`).
+
+### 12.1 Snapshot de Aceitação Atômico
+1. Ao persistir uma transação no estado `PENDING_REFERENCE`, o processador grava atomicamente dentro da mesma transação de banco de dados (`MikroOrmUnitOfWork`):
+   - Registro de transação em `wager_transactions` com status `PENDING_REFERENCE`.
+   - Snapshot estruturado gravado na coluna `response_snapshot` (JSONB) contendo:
+     - `transactionId`: UUID canônico da transação criada.
+     - `status`: `'PENDING_REFERENCE'`.
+     - `balance`: objeto `{ amount, currency }` observado exatamente no momento da aceitação (saldo contábil da carteira).
+     - `idempotentReplay`: `false` (na resposta primária HTTP 202).
+   - Evento de outbox `WagerTransactionPendingReference` na tabela `outbox_messages` (coluna `event_type = 'WagerTransactionPendingReference'`), contendo no payload: `transactionId`, `walletId`, `kind`, `amount`, `currency`, `referenceExternalTransactionId` e `idempotencyKey`.
+2. **Atomicidade e Integridade:** Snapshot, registro de transação e evento de outbox são comitados juntos. Em caso de falha intermediária antes do commit, ocorre rollback total; nenhum estado parcial é exposto. Nunca é retornado ou propagado snapshot nulo ou vazio no replay.
+
+### 12.2 Política de Replay e Evolução de Snapshot
+1. **Enquanto Pendente (`PENDING_REFERENCE`):**
+   - Requisições com a mesma `Idempotency-Key` e payload canônico idêntico retornam HTTP 202 Accepted.
+   - O corpo da resposta contém o snapshot de aceitação original (`transactionId`, `status: 'PENDING_REFERENCE'`, `balance` histórico de aceitação) e `idempotentReplay: true`.
+   - **Preservação de Saldo Histórico:** Mesmo se outras movimentações financeiras legítimas alterarem o saldo da carteira posteriormente, o replay da pendência preserva estritamente o saldo observado na aceitação original.
+   - **Invariância Absoluta de Efeitos:** O replay em estado pendente não movimenta saldo, não insere registros em `wallet_ledger_entries`, não emite novos eventos em `outbox_messages`, não incrementa a contagem de tentativas (`attempts`) e não modifica o agendamento (`next_attempt_at`).
+2. **Após Resolução (Transição para Estado Terminal):**
+   - Ao ser resolvida pelo reprocessador (`ReprocessPendingReferencesUseCase`), a transação grava o snapshot terminal definitivo:
+     - Se `PROCESSED`: retorna HTTP 200 OK com `status: 'PROCESSED'`, saldo resultante após o processamento, e `idempotentReplay: true`.
+     - Se `REJECTED`: retorna HTTP 422 Unprocessable Entity com `status: 'REJECTED'`, `failureCode` original (ex: `REFERENCE_NOT_FOUND`, `REFERENCE_INCOMPATIBLE`, `REFERENCE_NOT_PROCESSED`, `REVERSAL_INSUFFICIENT_FUNDS`), e `idempotentReplay: true`.
+   - Movimentações financeiras posteriores na carteira nunca alteram o snapshot terminal gravado.
+3. **Conflito de Payload (HTTP 409):**
+   - O reenvio da mesma `Idempotency-Key` com payload divergente retorna HTTP 409 Conflict em qualquer estado (pendente ou terminal).
+   - O conflito não altera a pendência existente, não incrementa `attempts` e não produz efeitos contábeis colaterais.
+
+### 12.3 Reprocessamento, Retries e Compatibilidade com Registros Legados
+1. **Preservação do Snapshot durante Reprocessamento:**
+   - Quando o reprocessador executa uma tentativa e a referência ainda não está disponível, aplica backoff exponencial com jitter e atualiza exclusivamente os metadados de retry (`attempts`, `next_attempt_at`). O snapshot de aceitação original permanece rigorosamente inalterado.
+2. **Tratamento Explícito de Pendências Legadas sem Snapshot:**
+   - Para transações pendentes legadas (criadas antes da implementação do snapshot, onde `response_snapshot` é `NULL`), o `ProcessWagerUseCase.buildReplayResponse` adota fallback determinístico auditável:
+     - Reconstitui o saldo histórico observado no momento da criação consultando `wallet_ledger_entries` até o timestamp `tx.createdAt`.
+     - Se não houver lançamentos anteriores, assume `"0.00"` na moeda da transação.
+     - **Proibição Absoluta:** O saldo histórico **nunca** é fabricado a partir do saldo atual da carteira (`wallet.balance`), evitando anacronismo contábil.
+   - Transações terminais existentes nunca são regravadas e nenhum dado é apagado silenciosamente.
+
+### 12.4 Nomes Reais de Eventos e Índices no PostgreSQL
+- **Eventos na Tabela `outbox_messages` (`event_type`):**
+  - `WagerTransactionProcessed`
+  - `WagerTransactionRejected`
+  - `WagerTransactionPendingReference`
+  - `WalletBalanceChanged`
+- **Índice de Reversões no PostgreSQL:**
+  - `uq_processed_reversal_per_reference ON wager_transactions (provider_id, reference_external_transaction_id, kind) WHERE status = 'PROCESSED' AND reference_external_transaction_id IS NOT NULL AND kind IN ('REFUND', 'ROLLBACK')`.
+
+### 12.5 Delimitação Estrita de Escopo (M09 vs M10 / M15)
+> [!IMPORTANT]
+> O marco M09 comprova exclusivamente o determinismo das respostas, a atomicidade dos snapshots de aceitação e terminais, a política de replay e a estabilização de pendências em PostgreSQL real descartável sob acionamento manual do reprocessador.
+> Os seguintes componentes pertencem aos marcos M10 e M15 e permanecem expressamente como **NÃO VALIDADOS / NÃO IMPLEMENTADOS**:
+> 1. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
+> 2. **Concorrência entre Múltiplos Workers com `FOR UPDATE SKIP LOCKED` (M10):** **NÃO VALIDADO**
+> 3. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída (M10):** **NÃO VALIDADO**
+> 4. **Tabela Inbox e Atomicidade Inbox / SQS (M15):** **NÃO VALIDADO / NÃO IMPLEMENTADO**
+> 5. **Mecanismo de Retries Distribuído e Dead Letter Queue (DLQ):** **NÃO VALIDADO**
 
 
 

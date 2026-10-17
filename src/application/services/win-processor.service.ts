@@ -131,14 +131,17 @@ export class WinProcessor {
           const updatedTx = params.existingPendingTx.markPendingReference(nextAttemptAt);
           await this.wagerRepo.save(updatedTx);
 
+          const snapshot = params.existingPendingTx.responseSnapshot as WagerResponseDto | null;
           return {
             outcome: 'RESCHEDULED',
-            response: {
-              transactionId: params.transactionId,
-              status: 'PENDING_REFERENCE',
-              balance: { amount: wallet.balance.getAmount(), currency: wallet.currency },
-              idempotentReplay: false,
-            },
+            response: snapshot
+              ? { ...snapshot, idempotentReplay: false }
+              : {
+                  transactionId: params.transactionId,
+                  status: 'PENDING_REFERENCE',
+                  balance: { amount: '0.00', currency: wallet.currency },
+                  idempotentReplay: false,
+                },
           };
         } else {
           // Immediate flow

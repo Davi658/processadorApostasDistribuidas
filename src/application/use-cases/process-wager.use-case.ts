@@ -82,11 +82,7 @@ export class ProcessWagerUseCase {
         const existingByIdempotency = await this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
         if (existingByIdempotency) {
           if (existingByIdempotency.payloadHash === payloadHash) {
-            const snapshot = existingByIdempotency.responseSnapshot as WagerResponseDto;
-            return {
-              ...snapshot,
-              idempotentReplay: true,
-            };
+            return await this.buildReplayResponse(existingByIdempotency);
           } else {
             throw new IdempotencyConflictError(
               `Idempotency key "${cleanIdempotencyKey}" was previously submitted with a different payload`
@@ -139,11 +135,7 @@ export class ProcessWagerUseCase {
 
         if (committedTx) {
           if (committedTx.payloadHash === payloadHash) {
-            const snapshot = committedTx.responseSnapshot as WagerResponseDto;
-            return {
-              ...snapshot,
-              idempotentReplay: true,
-            };
+            return await this.buildReplayResponse(committedTx);
           } else {
             throw new IdempotencyConflictError(
               `Concurrent conflict: Idempotency key "${cleanIdempotencyKey}" was registered by a racing request with a different payload`
@@ -607,5 +599,49 @@ export class ProcessWagerUseCase {
     }
 
     return null;
+  }
+
+  private async buildReplayResponse(tx: WagerTransaction): Promise<WagerResponseDto> {
+    const snap = tx.responseSnapshot as Partial<WagerResponseDto> | null;
+    if (snap && snap.transactionId && snap.status && snap.balance) {
+      return {
+        transactionId: snap.transactionId,
+        status: snap.status as any,
+        balance: {
+          amount: snap.balance.amount,
+          currency: snap.balance.currency,
+        },
+        failureCode: snap.failureCode ?? (tx.status === 'REJECTED' ? tx.rejectionReason ?? undefined : undefined),
+        idempotentReplay: true,
+      };
+    }
+
+    // Explicit fallback for legacy records without responseSnapshot:
+    // Never fabricate historical balance using current wallet balance!
+    // Try to resolve balance at acceptance time from ledger, or fallback to '0.00'.
+    let historicalBalanceAmount = '0.00';
+    try {
+      const ledgerEntries = await this.ledgerRepo.listByWalletId(tx.walletId);
+      const txCreatedAtMs = new Date(tx.createdAt).getTime();
+      const priorEntries = ledgerEntries
+        .filter((e) => new Date(e.createdAt).getTime() <= txCreatedAtMs)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      if (priorEntries.length > 0) {
+        historicalBalanceAmount = priorEntries[0].balanceAfter.getAmount();
+      }
+    } catch {
+      historicalBalanceAmount = '0.00';
+    }
+
+    return {
+      transactionId: tx.id,
+      status: tx.status === 'PENDING' ? 'PENDING_REFERENCE' : (tx.status as any),
+      balance: {
+        amount: historicalBalanceAmount,
+        currency: tx.currency,
+      },
+      failureCode: tx.status === 'REJECTED' ? (tx.rejectionReason ?? undefined) : undefined,
+      idempotentReplay: true,
+    };
   }
 }

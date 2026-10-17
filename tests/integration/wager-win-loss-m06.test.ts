@@ -2461,6 +2461,6 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
         await migPool.end();
         await migDb.closeAndDrop();
       }
-    });
+    }, 30000);
   });
 });

@@ -52,7 +52,7 @@
   - `REFUND`: crédito estornando BET processada com valor idêntico.
   - `ROLLBACK`: reversão estornando BET, WIN ou REFUND. Caso o rollback de WIN não tenha saldo, rejeita com `REVERSAL_INSUFFICIENT_FUNDS`.
 - **Worker de Referências Pendentes (`ReprocessPendingReferencesUseCase`):**
-  - Consulta registros `PENDING_REFERENCE` elegíveis com lock pessimista `SKIP LOCKED`.
+  - Consulta registros `PENDING_REFERENCE` elegíveis para reprocessamento manual (a consulta concorrente distribuída com lock pessimista `FOR UPDATE SKIP LOCKED` é reservada exclusivamente para o marco M10).
   - Se a referência foi processada, executa a reversão mantendo a atomicidade financeira.
   - Se a referência foi rejeitada ou falhou, transiciona para `REJECTED` com `REFERENCE_NOT_PROCESSED`.
   - Se o tempo limite ou número máximo de tentativas esgotar, transiciona para `REJECTED` com `REFERENCE_NOT_FOUND`.
@@ -180,20 +180,45 @@
   - Múltiplas operações WIN apontando para uma mesma BET são aceitas sequencial e concorrentemente, mantendo a consistência do saldo e do versionamento.
   - O script de reversão `004_restrict_reversal_unique_index.down.sql` implementa recusa segura com código 23505 caso encontre registros incompatíveis com a constraint 003, impedindo qualquer exclusão acidental de dados.
 
+### 2.12 Frente M09 Estabilizada (Replay de PENDING_REFERENCE e Transições Terminais)
+- **Snapshot Atômico de Aceitação:**
+  - Persistência atômica na mesma transação relacional (`MikroOrmUnitOfWork`) de:
+    - `transactionId`
+    - `status: 'PENDING_REFERENCE'`
+    - `balance: { amount, currency }` observado na aceitação
+    - `idempotentReplay: false`
+    - Snapshot persistido em `response_snapshot` (JSONB) da entidade `WagerTransaction`
+    - Evento de outbox `WagerTransactionPendingReference` na tabela `outbox_messages` (coluna `event_type = 'WagerTransactionPendingReference'`).
+- **Política de Replay em Estado Pendente:**
+  - Mesma `Idempotency-Key` e mesmo payload canônico retornam HTTP 202 com o snapshot de aceitação original e `idempotentReplay: true`.
+  - Preserva estritamente o saldo histórico mesmo após mutações posteriores na carteira.
+  - Zero efeitos colaterais no replay: não movimenta saldo, não insere registros em `wallet_ledger_entries`, não emite eventos em `outbox_messages`, não incrementa `attempts` e não altera `next_attempt_at`.
+- **Evolução do Snapshot e Replay Terminal:**
+  - O aceite pendente conserva seu snapshot de aceitação enquanto pendente; após a resolução pelo reprocessador, passa a fornecer o resultado terminal:
+    - Se `PROCESSED`: HTTP 200 OK com saldo após o processamento e `idempotentReplay: true`.
+    - Se `REJECTED`: HTTP 422 Unprocessable Entity com `failureCode` original e `idempotentReplay: true`.
+  - Mutações posteriores não alteram o resultado histórico gravado no snapshot terminal.
+- **Detecção Estrita de Conflito de Idempotência (409):**
+  - Reenvio da mesma chave com payload divergente retorna HTTP 409 Conflict em qualquer estado (pendente ou terminal), sem alterar a transação ou emitir efeitos.
+- **Retry e Compatibilidade com Registros Legados:**
+  - O reprocessamento sem referência aplica backoff exponencial com jitter e atualiza `attempts` e `next_attempt_at`, preservando integralmente o snapshot de aceitação.
+  - Para registros legados onde `response_snapshot` for `NULL`, `ProcessWagerUseCase.buildReplayResponse` recupera defensivamente o saldo histórico com base nos lançamentos contábeis de `wallet_ledger_entries` até o timestamp de criação da transação (`createdAt`), ou `"0.00"`. Nunca fabrica saldo usando o saldo atual da carteira.
+  - Transações terminais não são regravadas e nenhum dado é apagado silenciosamente.
+- **Comprovação com PostgreSQL Real Descartável:**
+  - Suíte `tests/integration/wager-pending-replay-m09.test.ts` (15 testes passando, 100% de sucesso) cobre todos os critérios A a I e compatibilidade legada.
+
 ---
 
-## 3. Próxima Rodada (Fatia de Mensageria e Resiliência — M09, M10, M15)
+## 3. Próxima Rodada (Fatia de Mensageria e Concorrência Distribuída — M10, M15)
 
 > [!IMPORTANT]
-> **Delimitação de Escopo (M05/M06/M08 vs M09/M10/M15):**
-> A presente suíte comprova a atomicidade e isolamento de `wallet`, `wager_transactions`, `wallet_ledger_entries` e `outbox_messages` via MikroORM e NestJS real.
-> O reprocessador manual (`ReprocessPendingReferencesUseCase.execute()`) comprova a consistência financeira sob referências fora de ordem.
-> Os seguintes componentes permanecem explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**:
-> 1. **Replay Completo de PENDING_REFERENCE (M09):** **NÃO VALIDADO**
-> 2. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
-> 3. **Concorrência entre Múltiplos Workers com `SKIP LOCKED` (M10):** **NÃO VALIDADO**
-> 4. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída (M10):** **NÃO VALIDADO**
-> 5. **Atomicidade Inbox / SQS (M15):** **NÃO VALIDADO / NÃO IMPLEMENTADO**
-> 6. **Publisher Concorrente da Outbox com Broker:** **NÃO VALIDADO**
-> 7. **Mecanismo de Retries Distribuído e DLQ:** **NÃO VALIDADO**
-> 8. **Crash Recovery de Instâncias:** **NÃO VALIDADO**
+> **Delimitação de Escopo (M05/M06/M07/M08/M09 vs M10/M15):**
+> A presente base comprova integralmente os fluxos síncronos de apostas, reversões imediatas, créditos de ganhos, referências tardias com reprocessamento manual e o replay completo de `PENDING_REFERENCE` com preservação de snapshots históricos (M09).
+> Os seguintes componentes pertencem aos marcos M10 e M15 e permanecem explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**:
+> 1. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
+> 2. **Concorrência entre Múltiplos Workers com `FOR UPDATE SKIP LOCKED` (M10):** **NÃO VALIDADO**
+> 3. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída (M10):** **NÃO VALIDADO**
+> 4. **Tabela Inbox e Atomicidade Inbox / SQS (M15):** **NÃO VALIDADO / NÃO IMPLEMENTADO**
+> 5. **Publisher Concorrente da Outbox com Broker:** **NÃO VALIDADO**
+> 6. **Mecanismo de Retries Distribuído e Dead Letter Queue (DLQ):** **NÃO VALIDADO**
+> 7. **Crash Recovery de Instâncias:** **NÃO VALIDADO**
