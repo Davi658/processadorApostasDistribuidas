@@ -67,7 +67,7 @@ describe('M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests',
     getWalletUseCase = app.get(GetWalletUseCase);
     reconcileWalletUseCase = app.get(ReconcileWalletUseCase);
     processWagerUseCase = app.get(ProcessWagerUseCase);
-  });
+  }, 30000);
 
   afterAll(async () => {
     if (app) {
@@ -83,7 +83,7 @@ describe('M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests',
     if (isolatedDb) {
       await isolatedDb.closeAndDrop();
     }
-  });
+  }, 30000);
 
   describe('1. Abertura Positiva: Saldo, Versão, OPENING, CREDIT e Eventos na Mesma Transação SQL', () => {
     it('deve criar wallet, transação interna OPENING, lançamento CREDIT e eventos na outbox na mesma transação', async () => {

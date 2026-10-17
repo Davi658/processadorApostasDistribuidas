@@ -78,7 +78,7 @@ describe('M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco 
     processWagerUseCase = app.get(ProcessWagerUseCase);
     processBetUseCase = new ProcessBetUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
     reconcileWalletUseCase = app.get(ReconcileWalletUseCase);
-  });
+  }, 30000);
 
   afterAll(async () => {
     if (app) {
@@ -94,7 +94,7 @@ describe('M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco 
     if (isolatedDb) {
       await isolatedDb.closeAndDrop();
     }
-  });
+  }, 30000);
 
   describe('1. BET Válida: Saldo 100.00, BET 25.00 -> Saldo 75.00, Versão Incrementada, um DEBIT e Eventos Corretos', () => {
     it('deve debitar exatamente uma vez, persistir PROCESSED, registrar 1 DEBIT e emitir eventos de outbox', async () => {

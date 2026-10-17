@@ -51,13 +51,13 @@ describe('Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, R
     processWagerUseCase = new ProcessWagerUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
     reconcileWalletUseCase = new ReconcileWalletUseCase(walletRepo, ledgerRepo, uow);
     reprocessWorker = new ReprocessPendingReferencesUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow, 3);
-  });
+  }, 30000);
 
   afterAll(async () => {
     await uow.close();
     await testPool.end();
     await isolatedDb.closeAndDrop();
-  });
+  }, 30000);
 
   it('WIN: should credit wallet balance, increment version, and record CREDIT in ledger and outbox', async () => {
     const wallet = await createWalletUseCase.execute({

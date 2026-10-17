@@ -28,7 +28,7 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
     const address = server.address();
     const port = typeof address === 'string' ? address : address.port;
     serverUrl = `http://127.0.0.1:${port}`;
-  });
+  }, 30000);
 
   afterAll(async () => {
     if (app) {
@@ -44,7 +44,7 @@ describe('HTTP Endpoints Real Integration & Validation Tests', () => {
     if (isolatedDb) {
       await isolatedDb.closeAndDrop();
     }
-  });
+  }, 30000);
 
   describe('Wallet Creation & Consultation Contracts', () => {
     it('POST /wallets should create a wallet with initial balance and return 201 with aligned contract', async () => {

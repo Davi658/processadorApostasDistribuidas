@@ -57,14 +57,14 @@ describe('PostgreSQL Real Integration & Financial Invariants Tests', () => {
     getWalletUseCase = new GetWalletUseCase(walletRepo);
     processWagerUseCase = new ProcessWagerUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
     reconcileWalletUseCase = new ReconcileWalletUseCase(walletRepo, ledgerRepo, uow);
-  });
+  }, 30000);
 
   afterAll(async () => {
     await uow.close();
     await appPool.end();
     await testPool.end();
     await isolatedDb.closeAndDrop();
-  });
+  }, 30000);
 
   it('should create wallet with zero balance without ledger or opening transaction', async () => {
     const playerId = crypto.randomUUID();

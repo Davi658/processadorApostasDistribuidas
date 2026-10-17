@@ -6,8 +6,8 @@ import {
   MikroOrmWalletLedgerRepository,
   MikroOrmWalletRepository,
 } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
-import { ProcessBetUseCase } from '../../src/application/use-cases/process-bet.use-case';
-import { ProcessBetDto } from '../../src/application/dto/wager.dto';
+import { ProcessWagerUseCase } from '../../src/application/use-cases/process-wager.use-case';
+import { ProcessWagerDto } from '../../src/application/dto/wager.dto';
 
 async function main() {
   const [, , idempotencyKey, payloadJson, barrierFilePath] = process.argv;
@@ -17,7 +17,7 @@ async function main() {
     process.exit(1);
   }
 
-  const payload: ProcessBetDto = JSON.parse(payloadJson);
+  const payload: ProcessWagerDto = JSON.parse(payloadJson);
 
   const uow = new MikroOrmUnitOfWork();
   await uow.init();
@@ -27,7 +27,7 @@ async function main() {
   const ledgerRepo = new MikroOrmWalletLedgerRepository(uow);
   const outboxRepo = new MikroOrmOutboxRepository(uow);
 
-  const processBetUseCase = new ProcessBetUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
+  const processWagerUseCase = new ProcessWagerUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
 
   try {
     // If a synchronization barrier file is provided, announce READY and wait until released
@@ -44,7 +44,7 @@ async function main() {
       }
     }
 
-    const result = await processBetUseCase.execute(idempotencyKey, payload);
+    const result = await processWagerUseCase.execute(idempotencyKey, payload);
     console.log(JSON.stringify({ ok: true, data: result }));
   } catch (err: any) {
     console.log(JSON.stringify({ ok: false, error: err.message, code: err.code }));

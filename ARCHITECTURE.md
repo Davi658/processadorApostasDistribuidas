@@ -362,4 +362,75 @@ O `MikroOrmUnitOfWork` rastreia a profundidade de execução (`depth`) e o estad
 > **Tabela Inbox e integração SQS ainda não existem no modelo atual.** A atomicidade entre Inbox e SQS pertence ao marco **M15** e permanece explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**.
 > Da mesma forma, workers concorrentes distribuídos e filas SQS (M10) e replay completo de PENDING_REFERENCE (M09) permanecem como **NÃO VALIDADOS**.
 
+---
+
+## 11. REFUND e ROLLBACK Imediatos (M07)
+
+A estabilização do marco M07 consolida as operações imediatas de estorno e reversão financeira executadas pelo fluxo transacional síncrono (`ProcessWagerUseCase`), apoiado pelo serviço compartilhado `ReversalProcessor` e pelo índice de banco `004_restrict_reversal_unique_index.sql`:
+
+### 11.1 Operações Contábeis e Tipos Suportados
+1. **REFUND de BET (Crédito Integral):**
+   - Reverte integralmente o valor debitado por uma transação `BET` previamente no estado `PROCESSED`.
+   - Credita a carteira (`wallet.credit`), incrementa a versão em exatamente 1 e emite lançamento `CREDIT` em `wallet_ledger_entries`.
+   - Publica os eventos `WagerTransactionProcessedEvent` e `WalletBalanceChangedEvent` (`payload.triggerTransactionId` apontando para a transação de reversão).
+2. **ROLLBACK de BET (Crédito Integral):**
+   - Suporta cancelamento de uma `BET` processada via operação `ROLLBACK`.
+   - Aplica crédito integral na carteira, incrementa versão em 1 e registra lançamento contábil `CREDIT`.
+3. **ROLLBACK de WIN (Débito Integral):**
+   - Reverte o ganho creditado por uma transação `WIN`.
+   - Debita a carteira (`wallet.debit`), incrementa versão em 1 e registra lançamento contábil `DEBIT`.
+   - Se o saldo da carteira for insuficiente para cobrir o débito, a reversão é rejeitada com código específico `REVERSAL_INSUFFICIENT_FUNDS`.
+4. **ROLLBACK de REFUND (Débito Integral):**
+   - Reverte o crédito concedido por uma operação `REFUND` anterior.
+   - Aplica débito integral na carteira (`wallet.debit`), incrementa versão em 1 e registra lançamento contábil `DEBIT`.
+   - Se o saldo for insuficiente, rejeita com `REVERSAL_INSUFFICIENT_FUNDS`.
+
+### 11.2 Validações Pré-Movimento e Invariantes de Rejeição Auditável
+Antes de qualquer alteração de saldo ou ledger, o processador valida rigorosamente a transação referenciada:
+1. **Status Terminal `PROCESSED` Obrigatório:** A referência deve existir e estar no estado `PROCESSED`. Se estiver em `REJECTED` ou `FAILED`, a reversão é terminalmente rejeitada com código estável `REFERENCE_NOT_PROCESSED`.
+2. **Compatibilidade Rigorosa:**
+   - Mesmo provedor (`providerId`).
+   - Mesmo jogador (`playerId`).
+   - Mesma carteira (`walletId`).
+   - Mesma moeda (`currency`).
+   - Mesma rodada (`roundId`).
+   - Valor integral idêntico (`amount` exato).
+   - Tipos permitidos: `REFUND` referencia exclusivamente `BET`; `ROLLBACK` referencia `BET`, `WIN` ou `REFUND`.
+   - Divergências de compatibilidade resultam em status `REJECTED` com código estável `REFERENCE_INCOMPATIBLE`.
+3. **Regra de Uma Reversão por Referência e Tipo:**
+   - O índice parcial `uq_processed_reversal_per_reference` (`kind IN ('REFUND', 'ROLLBACK')` e `status = 'PROCESSED'`) garante que não pode haver duas reversões do mesmo tipo para a mesma referência.
+   - Se já existir reversão processada do mesmo tipo para aquela referência, novas tentativas são rejeitadas auditavelmente com código `REVERSAL_ALREADY_PROCESSED`.
+   - Preserva a interpretação documentada: uma `BET` pode ter legitimamente um `REFUND` e um `ROLLBACK` se documentado, e suporta múltiplas operações `WIN` simultâneas garantidas pela migration 004.
+4. **Política de Overflow Monetário:**
+   - Se uma reversão de crédito fizer o saldo exceder a capacidade `NUMERIC(18,2)` (`9999999999999999.99`), o Value Object `Money` lança `MoneyOverflowError`, abortando a transação integralmente sem efeitos parciais no banco.
+5. **Invariantes em Rejeições Auditáveis:**
+   - Saldo e versão da carteira permanecem intactos.
+   - Nenhum lançamento é criado em `wallet_ledger_entries`.
+   - Emite exclusivamente `WagerTransactionRejectedEvent` na tabela `outbox_messages`.
+   - Persiste snapshot terminal completo (`response_snapshot`) com `status: 'REJECTED'`, `failureCode` e `balance`.
+   - No HTTP, retorna código `422 Unprocessable Entity` com payload auditável.
+
+### 11.3 Replay Terminal Histórico
+1. **Replay de Reversão Processada:** Retorna `transactionId` original, status `PROCESSED`, saldo histórico registrado no snapshot e `idempotentReplay: true`. Caso o saldo da carteira tenha sido alterado posteriormente por outras transações, o saldo atual no banco é preservado e nenhum movimento contábil ou evento novo é emitido.
+2. **Replay de Reversão Rejeitada (Saldo Insuficiente):** Se uma reversão for rejeitada com `REVERSAL_INSUFFICIENT_FUNDS` e a carteira for subsequentemente creditada, a repetição da mesma chave de idempotência retorna o snapshot original rejeitado com `idempotentReplay: true`, sem debitar a carteira tardiamente.
+3. **Conflitos de Idempotência:**
+   - Mesma chave com payload divergente (verificado por SHA-256 canônico recursivo) retorna HTTP `409 Conflict` (`IDEMPOTENCY_CONFLICT`).
+   - Mesmo par `(providerId, externalTransactionId)` reenviado sob outra chave retorna HTTP `409 Conflict`.
+
+### 11.4 Concorrência Real e Multi-Processos
+1. **50 Duplicatas Paralelas:** Disparadas simultaneamente sob a mesma chave de idempotência produzem exatamente uma execução financeira real (`idempotentReplay: false`) e 49 replays (`idempotentReplay: true`), mantendo saldo e reconciliação perfeitamente íntegros.
+2. **Reversões Concorrentes para a Mesma Referência:** Disputas simultâneas de reversões distintas do mesmo tipo sobre a mesma referência resultam em exatamente uma processada e nas demais rejeitadas sem mutação contábil (`REVERSAL_ALREADY_PROCESSED` ou proteção de constraint).
+3. **Disputa de Saldo entre ROLLBACKs Distintos:** Quando duas reversões de débito concorrem por um saldo que só comporta uma delas, o lock pessimista na carteira garante que o saldo nunca se torna negativo: uma processa com sucesso e a outra é rejeitada com `REVERSAL_INSUFFICIENT_FUNDS`.
+4. **Disputa com Múltiplos Processos OS Independentes:** Pelo menos três processos de sistema operacional independentes (executando via `worker.ts` com anúncio `READY` e barreira de sincronização por arquivo) entram diretamente pelo fluxo imediato (`ProcessWagerUseCase.execute`), comprovando coordenação segura sem depender do worker de pendências.
+5. **Classificação Estrita de Unicidade:** O processador inspeciona a causa raiz exata de erros `23505`. Violações de outras restrições (como `uq_wallets_player_currency`) nunca são malclassificadas como erros de idempotência ou de reversão.
+
+### 11.5 Atomicidade e Injeção de Falhas
+- Quatro pontos de falha auditados (`after_wallet_save`, `after_tx_save`, `after_ledger_save`, `after_outbox_save`) comprovam via consultas diretas no PostgreSQL que qualquer erro intermediário provoca rollback total, desfazendo todas as mutações e permitindo reenvio único subsequente com sucesso integral.
+
+### 11.6 Delimitação Estrita de Escopo
+> [!IMPORTANT]
+> O marco M07 consolida exclusivamente o processamento de **REFUND e ROLLBACK imediatos** sob o ciclo transacional síncrono.
+> O agendamento contínuo em background, a mensageria e filas SQS (M10, M15) e o reprocessamento periódico distribuído (M09, M10) pertencem a marcos futuros e permanecem explicitamente como **NÃO VALIDADOS / NÃO IMPLEMENTADOS**.
+
+
 

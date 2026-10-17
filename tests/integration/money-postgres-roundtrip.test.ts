@@ -42,7 +42,7 @@ describe('PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Inva
 
     createWalletUseCase = new CreateWalletUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
     processWagerUseCase = new ProcessWagerUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
-  });
+  }, 30000);
 
   afterAll(async () => {
     if (uow) {
@@ -54,7 +54,7 @@ describe('PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Inva
     if (isolatedDb) {
       await isolatedDb.closeAndDrop();
     }
-  });
+  }, 30000);
 
   describe('4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip', () => {
     const roundTripValues = [

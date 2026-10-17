@@ -31,10 +31,11 @@ describe('Reversible Migrations on Disposable Database', () => {
 
       // 2. Run UP migrations
       const applied = await migrator.up();
-      expect(applied.length).toBe(3);
+      expect(applied.length).toBe(4);
       expect(applied).toContain('001_initial_schema');
       expect(applied).toContain('002_reinforce_schema_and_outbox');
       expect(applied).toContain('003_protect_terminals_and_composite_fk');
+      expect(applied).toContain('004_restrict_reversal_unique_index');
 
       // Verify tables and constraints exist
       const client = new pg.Client(disposableConfig);
@@ -57,7 +58,11 @@ describe('Reversible Migrations on Disposable Database', () => {
       `);
       expect(triggerRes.rows.length).toBe(1);
 
-      // 3. Run DOWN migration 003
+      // 3. Run DOWN migration 004
+      const reverted004 = await migrator.down();
+      expect(reverted004).toBe('004_restrict_reversal_unique_index');
+
+      // 4. Run DOWN migration 003
       const reverted003 = await migrator.down();
       expect(reverted003).toBe('003_protect_terminals_and_composite_fk');
 
