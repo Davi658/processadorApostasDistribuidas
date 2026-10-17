@@ -38,6 +38,9 @@ Ambiente: Windows, Bun e PostgreSQL 16.8 real em cluster exclusivo descartável,
 | **Frente M06** | 17. Estabilização e Finalização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado, Migration 004 permitindo múltiplas WINs na mesma BET sequencial e concorrentemente com down seguro, WIN fora de ordem via PENDING_REFERENCE e 202, WinProcessor dedicado, resolução determinística e replays) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (38 testes passando) |
 | **Frente M10** | 18. Worker de Referências Pendentes e Concorrência Distribuída (Reserva com relógio PostgreSQL NOW(), lease persistente imune a drift de Date.now(), operações atômicas com RETURNING id sem ressuscitar lease expirado nem permitir bloqueio por worker antigo, shutdown coordenado NestJS impedindo novos claims e drenando antes de fechar o ORM, timeout de drenagem cancelando com rollback, contadores e logs estritamente pós-commit, classificação de erros transitório / stale lease / snapshot inválido / defeito inesperado sem rejeição falsa, crash recovery com processos OS reais via SIGKILL e handshakes, 3 processos concorrentes com barreira) | **CONCLUÍDO** | `tests/integration/pending-reference-worker-m10.test.ts` (21 testes passando) |
 | **Frente M17** | Consultas por UUID e identidade externa, ledger keyset por microssegundos, integração AppModule/UoW única e validação independente de transporte | **CONCLUÍDO** | `tests/integration/m17-read-endpoints.test.ts` (21 testes) |
+| **Frente M12** | Ledger e Constraints (reconciliação bigint exata, checks incrementais de finitude reversíveis) | **CONCLUÍDO** | `tests/integration/ledger-constraints-m12.test.ts` (21 testes) |
+| **Frente M13** | Outbox Financeira (auditoria e contrato, matriz de eventos, envelope canônico sem float, correlationId até 255 chars, atomicidade real PostgreSQL com barreira MVCC pré/pós-commit, rollback integral de falhas após 1ª e última gravação de outbox com reenvio íntegro e concorrência sem multiplicação) | **CONCLUÍDO** | `tests/integration/financial-outbox-m13.test.ts` (27 testes) |
+
 
 ---
 
@@ -334,3 +337,52 @@ Execução real em Windows x64, Bun 1.4.3 e PostgreSQL 16.8 exclusivo na porta 5
 Não houve correção de código, alteração de migrations, refatoração, remoção de testes, redução de assertions ou ampliação de timeouts. Dois runs anteriores falharam e estão registrados separadamente: indisponibilidade do cluster compartilhado e, no primeiro run exclusivo, timeout HTTP e asserção de duração do shutdown M10. O run final completo passou com os mesmos testes e parâmetros. DOWN continua restaurando a implementação histórica defeituosa; a operação normal exige 006 aplicada.
 
 Base, ambiente, comandos, exit codes, resultados de cada arquivo, hashes de logs, falhas intermediárias e limites: [evidências da validação integrada M11](docs/evidence/m11-integrated-validation.md) e [resultados estruturados](docs/evidence/m11-integrated-validation-results.json). Esta entrega contém apenas documentação e evidências, concluída com commit local, sem push, merge ou publicação.
+
+---
+
+### 2.9 Frente M13 — Outbox Financeira e Persistência Transacional de Eventos
+
+Em 17/10/2026, com base em `4f6ab2d88ccc01fa27f3d7b0d4ef09c3001d515b` (HEAD de `origin/main`), na branch `feat/m13-financial-outbox` e worktree `D:\processadorApostasDistribuidas\.worktrees\m13-financial-outbox`, foi finalizada e comprovada a meta **M13 — Outbox Financeira**.
+
+#### 1. Auditoria e Contrato Formal de Eventos
+Comprovou-se via auditoria rigorosa de repositórios, processadores e banco de dados a emissão atômica exata:
+- **Abertura Positiva:** 2 eventos (`WagerTransactionProcessed` com `kind: 'OPENING'` + `WalletBalanceChanged`).
+- **Abertura Zero:** 0 eventos na outbox (sem transação, sem ledger, sem outbox).
+- **BET Processado:** 2 eventos (`WagerTransactionProcessed` + `WalletBalanceChanged`).
+- **BET Rejeitado (`INSUFFICIENT_FUNDS`):** 1 evento (`WagerTransactionRejected`), sem evento de saldo.
+- **LOSS Processado:** 1 evento (`WagerTransactionProcessed`), saldo e versão inalterados, sem `WalletBalanceChanged`.
+- **WIN Processado:** 2 eventos (`WagerTransactionProcessed` + `WalletBalanceChanged`).
+- **WIN Pendente (`PENDING_REFERENCE`):** 1 evento (`WagerTransactionPendingReference`).
+- **WIN Reagendado via Worker (`RESCHEDULED`):** 0 eventos adicionais emitidos (sem duplicação de eventos).
+- **WIN Resolução Posterior:** 2 eventos terminais (`WagerTransactionProcessed` + `WalletBalanceChanged`).
+- **WIN Rejeitado:** 1 evento (`WagerTransactionRejected`).
+- **REFUND Processado:** 2 eventos (`WagerTransactionProcessed` + `WalletBalanceChanged`).
+- **REFUND Pendente (`PENDING_REFERENCE`):** 1 evento (`WagerTransactionPendingReference`).
+- **REFUND Rejeitado:** 1 evento (`WagerTransactionRejected`).
+- **ROLLBACK de BET (crédito):** 2 eventos (`WagerTransactionProcessed` + `WalletBalanceChanged`).
+- **ROLLBACK de WIN (débito):** 2 eventos (`WagerTransactionProcessed` + `WalletBalanceChanged`).
+- **ROLLBACK Rejeitado (`REVERSAL_INSUFFICIENT_FUNDS`):** 1 evento (`WagerTransactionRejected`).
+- **Replay Idempotente:** 0 eventos adicionais (resposta servida do snapshot imutável).
+- **Conflito de Idempotência:** 0 eventos adicionais (`IdempotencyConflictError` aborta transação).
+- **Falha Técnica com Rollback:** 0 eventos confirmados no PostgreSQL.
+
+#### 2. Envelope, Tipagem Monetária e Reconstrução
+- `eventId`: UUID v4 estável, único e gravado como chave primária em `outbox_messages.id`.
+- `correlationId`: suporta UUIDs e strings arbitrárias de negócio de até 255 caracteres sem truncamento (`VARCHAR(255)`).
+- `causationId`: armazena com fidelidade a `Idempotency-Key` ou `null`/`undefined`.
+- Tipagem monetária estrita: campos monetários (`amount`, `balance`, `previousBalance`, `currentBalance`) são objetos `{ amount: string, currency: string }`, sem uso de `number`.
+- Reconstrução via `IntegrationEvent.reconstruct(envelope)` preserva identidade, timestamp e dados sem regeneração de UUIDs.
+- Estado inicial: todo evento nasce com `published_at IS NULL`. Métodos `listUnpublished()` e `findById()` operam fielmente.
+
+#### 3. Atomicidade Real no PostgreSQL e Barreiras de Isolamento MVCC
+Comprovado em PostgreSQL 16.8 real descartável com conexão externa independente (`m13_external_observer`):
+- **Barreira Pré-Commit:** Antes do commit SQL (no hook `before_commit`), nenhuma alteração financeira (saldo, versão, transação, ledger) nem mensagens de outbox são visíveis para observadores externos. Após o commit, todas tornam-se visíveis instantânea e atomicamente.
+- **Rollback em Falhas Injetadas:** Falhas simuladas após a primeira gravação de outbox (`after_outbox_save` #1) e após a última gravação de outbox (`after_outbox_save` #2) desfazem 100% das mutações: saldo, versão, transação, ledger e ambos eventos de outbox são revertidos sem deixar registros órfãos. Reenvios subsequentes geram exatamente o conjunto de eventos esperado.
+- **Concorrência:** Requisições concorrentes idênticas não multiplicam eventos na outbox.
+
+#### 4. Validação e Execução
+- `bun run typecheck`: **Exit 0**.
+- `bun test tests/integration/financial-outbox-m13.test.ts --timeout 30000`: **27 aprovados, 0 falhas, 229 assertions**.
+- `bun run test` (suite combinada): **381 aprovados, 0 falhas em 23 arquivos, Exit 0**.
+- Evidências versionadas em `docs/evidence/m13-financial-outbox.md` e `docs/evidence/m13-financial-outbox-results.json`.
+- Publisher externo (M14), publicação SQS (M15), consumidor e inbox (M15-M16) permanecem estritamente fora de escopo.
