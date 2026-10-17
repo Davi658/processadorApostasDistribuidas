@@ -3,11 +3,34 @@ import { join } from 'node:path';
 import pg from 'pg';
 import { getMigrationDatabaseConfig } from '../config/database.config';
 
+export interface MigratorOptions {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  connectionTimeoutMillis?: number;
+}
+
 export class DatabaseMigrator {
   private readonly pool: pg.Pool;
+  private readonly maxRetries: number;
+  private readonly initialDelayMs: number;
 
-  constructor(customConfig?: pg.PoolConfig) {
-    this.pool = new pg.Pool(customConfig ?? getMigrationDatabaseConfig());
+  constructor(customConfig?: pg.PoolConfig & MigratorOptions) {
+    const baseConfig = customConfig ?? getMigrationDatabaseConfig();
+    const timeoutMs =
+      customConfig?.connectionTimeoutMillis ??
+      (Number(process.env.MIGRATION_CONNECT_TIMEOUT_MS) || 3000);
+
+    this.maxRetries =
+      customConfig?.maxRetries ??
+      (Number(process.env.MIGRATION_MAX_RETRIES) || 10);
+    this.initialDelayMs =
+      customConfig?.initialDelayMs ??
+      (Number(process.env.MIGRATION_INITIAL_DELAY_MS) || 200);
+
+    this.pool = new pg.Pool({
+      connectionTimeoutMillis: timeoutMs,
+      ...baseConfig,
+    });
   }
 
   private async ensureMigrationTable(client: pg.PoolClient): Promise<void> {
@@ -36,10 +59,16 @@ export class DatabaseMigrator {
       return true;
     }
     const msg = String(err.message || '');
-    return msg.includes('ECONNREFUSED') || msg.includes('connection refused') || msg.includes('the database system is starting up');
+    return (
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('connection refused') ||
+      msg.includes('the database system is starting up') ||
+      msg.includes('timeout expired') ||
+      msg.includes('Connection terminated unexpectedly')
+    );
   }
 
-  private async connectWithRetry(maxRetries = 15, initialDelayMs = 200): Promise<pg.PoolClient> {
+  private async connectWithRetry(): Promise<pg.PoolClient> {
     let attempt = 0;
     while (true) {
       try {
@@ -47,11 +76,11 @@ export class DatabaseMigrator {
       } catch (err: any) {
         attempt++;
         const isTransient = this.isTransientConnectionError(err);
-        if (!isTransient || attempt >= maxRetries) {
+        if (!isTransient || attempt >= this.maxRetries) {
           throw err;
         }
-        const delay = Math.min(initialDelayMs * Math.pow(1.5, attempt - 1), 2000);
-        console.warn(`Transient connection error (${err.message || err.code}). Retrying in ${delay}ms (attempt ${attempt}/${maxRetries})...`);
+        const delay = Math.min(this.initialDelayMs * Math.pow(1.5, attempt - 1), 2000);
+        console.warn(`Transient connection error (${err.message || err.code}). Retrying in ${delay}ms (attempt ${attempt}/${this.maxRetries})...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -144,26 +173,31 @@ if (import.meta.main) {
   const migrator = new DatabaseMigrator();
   const command = process.argv[2] ?? 'up';
 
-  if (command === 'up') {
-    console.log('Running UP migrations...');
-    const applied = await migrator.up();
-    if (applied.length > 0) {
-      console.log(`Applied migrations: ${applied.join(', ')}`);
+  try {
+    if (command === 'up') {
+      console.log('Running UP migrations...');
+      const applied = await migrator.up();
+      if (applied.length > 0) {
+        console.log(`Applied migrations: ${applied.join(', ')}`);
+      } else {
+        console.log('No new migrations to apply.');
+      }
+    } else if (command === 'down') {
+      console.log('Running DOWN migration...');
+      const reverted = await migrator.down();
+      if (reverted) {
+        console.log(`Reverted migration: ${reverted}`);
+      } else {
+        console.log('No applied migrations to revert.');
+      }
     } else {
-      console.log('No new migrations to apply.');
+      console.error(`Unknown command: ${command}. Use "up" or "down".`);
+      process.exitCode = 1;
     }
-  } else if (command === 'down') {
-    console.log('Running DOWN migration...');
-    const reverted = await migrator.down();
-    if (reverted) {
-      console.log(`Reverted migration: ${reverted}`);
-    } else {
-      console.log('No applied migrations to revert.');
-    }
-  } else {
-    console.error(`Unknown command: ${command}. Use "up" or "down".`);
-    process.exit(1);
+  } catch (error) {
+    console.error('Migration execution failed:', error);
+    process.exitCode = 1;
+  } finally {
+    await migrator.close();
   }
-
-  await migrator.close();
 }

@@ -53,6 +53,12 @@ O `.dockerignore` usa lista de inclusão, excluindo Git, worktrees, segredos e d
 - `migrate` aguarda PostgreSQL saudável e executa o migrador SQL existente
   `bun run src/infrastructure/persistence/migrator.ts up`. Ele mantém
   `schema_migrations` e trava transacional advisory, aplicando somente versões novas.
+  O `DatabaseMigrator` possui robustez aprimorada:
+  - `connectionTimeoutMillis` finito no `pg.Pool` (padrão 3000ms), prevenindo travamento indefinido de socket.
+  - Retentativas com backoff restritas exclusivamente à aquisição inicial de conexão contra erros transitórios (`ECONNREFUSED`, `57P03`), preservando a causa original.
+  - Erros de execução SQL falham imediatamente na primeira tentativa, disparando `ROLLBACK` e abortando sem repetição.
+  - Execução CLI encapsulada em bloco `try / catch / finally` que garante o encerramento do pool via `migrator.close()` e propaga código de saída não-zero em caso de erro.
+  - Comprovado pela suíte automatizada `tests/unit/migrator-robustness.test.ts`.
 - `queues` aguarda LocalStack saudável. A API só inicia após ambos os jobs
   concluírem com sucesso. O healthcheck consulta uma carteira pela rota existente:
   aceita carteira encontrada ou erro de domínio `WALLET_NOT_FOUND` após acesso real ao banco.
