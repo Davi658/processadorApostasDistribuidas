@@ -19,8 +19,46 @@ export class DatabaseMigrator {
     `);
   }
 
+  private isTransientConnectionError(err: any): boolean {
+    if (!err) return false;
+    const transientCodes = new Set([
+      'ECONNREFUSED',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ENOTFOUND',
+      'EHOSTUNREACH',
+      '57P03', // cannot_connect_now
+      '08001', // sqlclient_unable_to_establish_sqlconnection
+      '08004', // sqlserver_rejected_establishment_of_sqlconnection
+      '08006', // connection_failure
+    ]);
+    if (err.code && transientCodes.has(String(err.code))) {
+      return true;
+    }
+    const msg = String(err.message || '');
+    return msg.includes('ECONNREFUSED') || msg.includes('connection refused') || msg.includes('the database system is starting up');
+  }
+
+  private async connectWithRetry(maxRetries = 15, initialDelayMs = 200): Promise<pg.PoolClient> {
+    let attempt = 0;
+    while (true) {
+      try {
+        return await this.pool.connect();
+      } catch (err: any) {
+        attempt++;
+        const isTransient = this.isTransientConnectionError(err);
+        if (!isTransient || attempt >= maxRetries) {
+          throw err;
+        }
+        const delay = Math.min(initialDelayMs * Math.pow(1.5, attempt - 1), 2000);
+        console.warn(`Transient connection error (${err.message || err.code}). Retrying in ${delay}ms (attempt ${attempt}/${maxRetries})...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
   public async up(): Promise<string[]> {
-    const client = await this.pool.connect();
+    const client = await this.connectWithRetry();
     const appliedVersions: string[] = [];
 
     try {
@@ -61,7 +99,7 @@ export class DatabaseMigrator {
   }
 
   public async down(): Promise<string | null> {
-    const client = await this.pool.connect();
+    const client = await this.connectWithRetry();
 
     try {
       await client.query('BEGIN');

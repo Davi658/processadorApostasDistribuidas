@@ -114,30 +114,23 @@ aleatório para inspeção. Pode ser repetido sem colidir com dados anteriores.
 Se a API não subir, examine primeiro os jobs `migrate` e `queues` com `ps -a`
 e `logs`; depois o log da API. Não há dependência de AWS real ou credenciais do host.
 
-Resultados nesta preparação (2026-10-17):
+Resultados validados com Docker Engine (2026-10-17):
 
-| Verificação | Resultado |
-| --- | --- |
-| Bun 1.4.3 + `bun install --frozen-lockfile --ignore-scripts` no host | OK: 243 pacotes, lockfile e package.json inalterados |
-| Parse YAML com `Bun.YAML.parse` | OK: cinco serviços; não substitui Compose config |
-| Sintaxe dos scripts TypeScript com Bun.Transpiler | OK |
-| `bash -n infra/bootstrap-sqs.sh` | OK |
-| `git diff --check` | OK |
-| `docker compose config` | NÃO VALIDADO: Docker ausente |
-| Build da imagem e instalação Linux | NÃO VALIDADO: Docker ausente |
-| Subida, prontidão e execução sem root | NÃO VALIDADO: Docker ausente |
-| Migrations aplicadas | NÃO VALIDADO: Docker ausente |
-| Consulta real ao PostgreSQL e privilégios | NÃO VALIDADO: Docker ausente |
-| Criação, inspeção AWS CLI e reexecução idempotente das filas | NÃO VALIDADO: Docker ausente |
-| API POST/GET | NÃO VALIDADO: Docker ausente |
+| Verificação | Comando | Resultado |
+| --- | --- | --- |
+| `docker compose config` | `docker compose -f docker-compose.local.yml config` | OK: exit 0, cinco serviços, redes e volumes válidos |
+| Build da imagem e instalação Linux | `docker compose -f docker-compose.local.yml build` | OK: exit 0, imagem `wagers-local-app:bun-1.4.3` gerada com Bun 1.4.3 |
+| Subida, prontidão e execução sem root | `docker compose -f docker-compose.local.yml up -d --wait` / `exec app id` | OK: exit 0, todos os serviços saudáveis, UID `1000(bun)` não-root |
+| Healthcheck TCP PostgreSQL | `pg_isready -h 127.0.0.1 -p 5432 -U migration_user -d betting_db` | OK: exit 0, valida conexão TCP antes de liberar migrador |
+| Migrations aplicadas e idempotência | `docker compose -f docker-compose.local.yml logs migrate` | OK: 5 migrations (001 a 005) aplicadas; "No new migrations to apply" no reenvio |
+| Consulta real ao PostgreSQL e privilégios | `psql -c ...` em roles e permissões | OK: `migration_user` admin; `app_user` sem superuser, DDL=false, ledger_update=false |
+| Filas FIFO e Redrive SQS LocalStack | `sqs list-queues` e `sqs get-queue-attributes` | OK: 3 filas FIFO criadas, `wager-transactions.fifo` com redrive para DLQ (maxReceiveCount 5) |
+| API POST/GET (smoke) | `docker compose -f docker-compose.local.yml exec app bun run infra/smoke-api.ts` | OK: exit 0, carteira criada (201) e consultada (200) com UUID válido |
+| Primeira subida isolada (volume novo) | Projeto `wagers-fresh-test`, portas 3990/5439/4599 | OK: exit 0 de primeira sem ECONNREFUSED; volume e containers descartados após prova |
 
 ## Dependências de integração
 
-Executar a validação acima em uma máquina com Docker e acesso às imagens fixadas.
-Instalação no host com scripts ignorados valida o lockfile, mas não prova build Linux.
-Não há integração SQS implementada na aplicação: confirmar os nomes propostos de
-variáveis com o responsável futuro por consumidor/publisher. Nenhum consumidor,
-inbox ou publisher foi adicionado. O trabalho M10 deve ser integrado separadamente
-pelo responsável, repetindo build, migrations e smoke com sua base final.
-Se essa integração exigir mudança em `src/`, testes, dependências ou migrations,
-ela pertence ao outro agente; nenhum desses arquivos foi alterado aqui.
+A validação foi executada nesta máquina com Docker Engine local.
+Não há integração SQS implementada na aplicação nesta etapa: os nomes propostos de
+variáveis foram validados na infraestrutura para futuro consumo pelos marcos M14–M16.
+Nenhum publisher, consumidor, inbox ou worker foi alterado fora do escopo desta infraestrutura.

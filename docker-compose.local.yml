@@ -13,7 +13,7 @@ services:
       - local_pgdata:/var/lib/postgresql/data
       - ./infra/init-db.sql:/docker-entrypoint-initdb.d/10-runtime.sql:ro
     healthcheck:
-      test: [CMD-SHELL, "pg_isready -U migration_user -d betting_db"]
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -p 5432 -U migration_user -d betting_db"]
       interval: 3s
       timeout: 3s
       retries: 30
