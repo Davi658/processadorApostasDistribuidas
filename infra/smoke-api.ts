@@ -1,4 +1,4 @@
-const base = process.env.API_BASE_URL || 'http://127.0.0.1:3000';
+const base = process.env.API_BASE_URL || `http://127.0.0.1:${process.env.LOCAL_API_PORT || '3000'}`;
 console.log(`[smoke-api] Running smoke tests against ${base}...`);
 
 // 1. Abertura com saldo positivo
@@ -113,28 +113,59 @@ const queryTx = (await queryTxRes.json()) as {
   id: string;
   kind: string;
   status: string;
-  amount: string;
-  currency: string;
+  money: {
+    amount: string;
+    currency: string;
+  };
 };
-if (queryTx.id !== betResult.transactionId || queryTx.kind !== 'BET' || queryTx.status !== 'PROCESSED') {
+if (
+  queryTx.id !== betResult.transactionId ||
+  queryTx.kind !== 'BET' ||
+  queryTx.status !== 'PROCESSED' ||
+  queryTx.money?.amount !== '25.00' ||
+  queryTx.money?.currency !== 'BRL'
+) {
   throw new Error(`Unexpected transaction query result: ${JSON.stringify(queryTx)}`);
 }
-console.log(`[smoke-api] 4.1 Consulta Transação OK: id=${queryTx.id}, kind=${queryTx.kind}, status=${queryTx.status}`);
+console.log(`[smoke-api] 4.1 Consulta Transação OK: id=${queryTx.id}, kind=${queryTx.kind}, status=${queryTx.status}, amount=${queryTx.money.amount} ${queryTx.money.currency}`);
 
 const queryLedgerRes = await fetch(`${base}/wallets/${wallet.id}/ledger`);
 if (queryLedgerRes.status !== 200) {
   throw new Error(`GET /wallets/${wallet.id}/ledger failed: ${queryLedgerRes.status} ${await queryLedgerRes.text()}`);
 }
 const ledgerPage = (await queryLedgerRes.json()) as {
-  items: Array<{ entryType: string; amount: { amount: string } }>;
+  items: Array<{
+    id: string;
+    entryType: 'CREDIT' | 'DEBIT';
+    amount: { amount: string; currency: string };
+  }>;
   nextCursor: string | null;
   hasMore: boolean;
   limit: number;
 };
-if (!Array.isArray(ledgerPage.items) || ledgerPage.items.length < 2) {
+if (
+  !Array.isArray(ledgerPage.items) ||
+  ledgerPage.items.length !== 2 ||
+  ledgerPage.hasMore !== false ||
+  ledgerPage.nextCursor !== null
+) {
   throw new Error(`Unexpected ledger page result: ${JSON.stringify(ledgerPage)}`);
 }
-console.log(`[smoke-api] 4.2 Consulta Ledger OK: items=${ledgerPage.items.length}, hasMore=${ledgerPage.hasMore}`);
+
+const creditEntry = ledgerPage.items.find((item) => item.entryType === 'CREDIT');
+const debitEntry = ledgerPage.items.find((item) => item.entryType === 'DEBIT');
+
+if (
+  !creditEntry ||
+  !debitEntry ||
+  creditEntry.amount.amount !== '100.00' ||
+  debitEntry.amount.amount !== '25.00'
+) {
+  throw new Error(`Unexpected ledger entries composition: ${JSON.stringify(ledgerPage.items)}`);
+}
+console.log(
+  `[smoke-api] 4.2 Consulta Ledger OK: items=${ledgerPage.items.length} (CREDIT=${creditEntry.amount.amount}, DEBIT=${debitEntry.amount.amount}), hasMore=${ledgerPage.hasMore}, nextCursor=${ledgerPage.nextCursor}`
+);
 
 // 5. Reconciliação
 const reconRes = await fetch(`${base}/wallets/${wallet.id}/reconciliation`, {
