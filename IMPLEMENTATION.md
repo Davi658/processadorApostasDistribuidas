@@ -20,6 +20,7 @@
 | **Frente M03** | 14. Estabilização da Abertura de Carteira (Contrato, atomicidade SQL, 20 concorrentes, rollback em falhas injetadas, reconciliação, limite Money) | **CONCLUÍDO** | `tests/integration/wallet-opening.test.ts` |
 | **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
 | **Frente M06** | 17. Estabilização e Finalização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado, Migration 004 permitindo múltiplas WINs na mesma BET sequencial e concorrentemente com down seguro, WIN fora de ordem via PENDING_REFERENCE e 202, WinProcessor dedicado, resolução determinística e replays) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (38 testes passando) |
+| **Frente M10** | 18. Worker de Referências Pendentes e Concorrência Distribuída (Ciclo NestJS, claim transacional curto com FOR UPDATE SKIP LOCKED, lease persistente com PostgreSQL NOW(), proteção contra finalização por lease expirado/stale, ordenação canônica de locks wallet antes de tx, refresh no Identity Map, isolamento de falhas transitórias sem queima de retries de domínio, bloqueio operacional fail-closed para snapshots corrompidos sem contaminação do lote, crash recovery após expiração, shutdown gracioso com drenagem, esgotamento gerando 1 rejeição e 1 evento na outbox, disputa entre 3 processos OS reais com barreira READY) | **CONCLUÍDO** | `tests/integration/pending-reference-worker-m10.test.ts` (11 testes passando) |
 
 
 ---
@@ -206,18 +207,43 @@
 - **Comprovação com PostgreSQL Real Descartável:**
   - Suíte `tests/integration/wager-pending-replay-m09.test.ts` (22 testes passando, 100% de sucesso) cobre todos os critérios A a I e a remoção completa de fallbacks inseguros.
 
+### 2.13 Frente M10 Estabilizada (Worker de Referências Pendentes e Concorrência Distribuída)
+- **Migration 005 (`005_pending_reference_worker_lease.sql` & `.down.sql`):**
+  - Adição de colunas `lease_token VARCHAR(64)`, `lease_owner VARCHAR(255)`, `lease_expires_at TIMESTAMPTZ`, `is_operationally_blocked BOOLEAN DEFAULT FALSE` e `operational_block_reason VARCHAR(255)` na tabela `wager_transactions`.
+  - Índices dedicados para seleção eficiente: `idx_wager_tx_pending_claim` em `(status, is_operationally_blocked, next_attempt_at, lease_expires_at, created_at)` e `idx_wager_tx_lease_expires` em `(lease_expires_at)`.
+  - Reversibilidade total comprovada (`migrator.down()` e `migrator.up()`).
+- **Reserva Persistente Curta com `FOR UPDATE SKIP LOCKED`:**
+  - Consulta atômica isolada de seleção e marcação do lease (`claimPendingReferences`) sem nenhuma movimentação financeira.
+  - O relógio do PostgreSQL (`NOW()`) determina a elegibilidade e expiração dos leases, neutralizando qualquer clock drift entre nós.
+- **Proteção Contra Lease Estrita (Stale Lease Guard):**
+  - O processamento valida a posse do lease sob lock pessimista. Se outro worker assumir a pendência após expiração do lease, o worker antigo detecta a divergência do token (`tx.leaseToken !== claimedToken`), abortando com `StaleLeaseError` sem cometer efeitos no banco.
+- **Ordenação Canônica de Locks e Isolamento de Memória:**
+  - Locks adquiridos rigorosamente em `wallets` antes de `wager_transactions`.
+  - Uso de transações com `em.fork()` e `{ refresh: true, lockMode: LockMode.PESSIMISTIC_WRITE }` impedindo o uso de entidades desatualizadas do Identity Map do MikroORM.
+- **Isolamento Fail-Closed de Registros com Snapshot Inválido:**
+  - Quando um snapshot é inválido ou corrompido, o worker persiste `is_operationally_blocked = TRUE` e `operational_block_reason`, liberando o lease sem alterar transação financeira nem gerar lançamentos no ledger.
+  - A query de claim exclui automaticamente registros bloqueados (`is_operationally_blocked = FALSE`), permitindo que os demais itens do lote avancem normalmente sem contaminação.
+- **Tratamento de Falhas Transitórias e Crash Recovery:**
+  - Falhas de infraestrutura transitórias liberam o lease sem queimar tentativas de domínio (`attempts`).
+  - Morte de processo antes do processamento permite retomada automática por outro worker após o vencimento do lease.
+  - Morte de processo após commit financeiro não reaplica efeitos contábeis ao ser reprocessado.
+- **Ciclo de Vida NestJS e Graceful Shutdown:**
+  - Inicialização automática via `OnApplicationBootstrap` (`start()`).
+  - Prevenção de overlap de ticks na mesma instância via flag `isTickRunning`.
+  - Drenagem graciosa no shutdown via `BeforeApplicationShutdown`: bloqueia novas reservas e aguarda tarefas in-flight concluírem antes de encerrar o ORM.
+- **Comprovação com PostgreSQL Real Descartável:**
+  - Suíte `tests/integration/pending-reference-worker-m10.test.ts` (11 testes passando, 100% de sucesso) cobrindo todos os cenários de A a K com múltiplos processos OS reais coordenados via barreira `READY`.
+
 ---
 
-## 3. Próxima Rodada (Fatia de Mensageria e Concorrência Distribuída — M10, M15)
+## 3. Próxima Rodada (Fatia de Mensageria e Concorrência Externa — M14, M15, M16)
 
 > [!IMPORTANT]
-> **Delimitação de Escopo (M05/M06/M07/M08/M09 vs M10/M15):**
-> A presente base comprova integralmente os fluxos síncronos de apostas, reversões imediatas, créditos de ganhos, referências tardias com reprocessamento manual e o replay completo de `PENDING_REFERENCE` com preservação de snapshots históricos (M09).
-> Os seguintes componentes pertencem aos marcos M10 e M15 e permanecem explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**:
-> 1. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
-> 2. **Concorrência entre Múltiplos Workers com `FOR UPDATE SKIP LOCKED` (M10):** **NÃO VALIDADO**
-> 3. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída (M10):** **NÃO VALIDADO**
-> 4. **Tabela Inbox e Atomicidade Inbox / SQS (M15):** **NÃO VALIDADO / NÃO IMPLEMENTADO**
-> 5. **Publisher Concorrente da Outbox com Broker:** **NÃO VALIDADO**
-> 6. **Mecanismo de Retries Distribuído e Dead Letter Queue (DLQ):** **NÃO VALIDADO**
-> 7. **Crash Recovery de Instâncias:** **NÃO VALIDADO**
+> **Delimitação de Escopo (M02 a M10 vs M14/M15/M16):**
+> A presente base comprova integralmente os fluxos síncronos e assíncronos de apostas, reversões imediatas e pendentes, créditos de ganhos, snapshots históricos (M09) e o worker distribuído com lease persistente e ciclo de vida NestJS (M10).
+> Os seguintes componentes pertencem aos marcos M14, M15 e M16 e permanecem explicitamente como **NÃO VALIDADOS / FORA DE ESCOPO**:
+> 1. **Filas SQS / LocalStack e Mensageria Assíncrona Externa (M14):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 2. **Tabela Inbox e Deduplicação Inbox / SQS (M15):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 3. **Publisher Concorrente da Outbox para Broker Externo (M16):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 4. **Dead Letter Queue (DLQ) Externa de Mensageria:** **NÃO VALIDADO / FORA DE ESCOPO**
+

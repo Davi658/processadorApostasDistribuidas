@@ -9,12 +9,24 @@ export interface WalletRepositoryPort {
   save(wallet: Wallet): Promise<void>;
 }
 
+export interface ClaimedPendingReference {
+  id: string;
+  walletId: string;
+  leaseToken: string;
+  leaseOwner: string;
+  leaseExpiresAt: string;
+}
+
 export interface WagerTransactionRepositoryPort {
-  findById(id: string): Promise<WagerTransaction | null>;
+  findById(id: string, lockForUpdate?: boolean): Promise<WagerTransaction | null>;
   findByIdempotencyKey(key: string): Promise<WagerTransaction | null>;
   findByProviderAndExternalId(providerId: string, externalTransactionId: string): Promise<WagerTransaction | null>;
   findByProviderAndReference(providerId: string, referenceExternalTransactionId: string, kind?: string): Promise<WagerTransaction | null>;
   listPendingReferences(limit?: number): Promise<WagerTransaction[]>;
+  claimPendingReferences(limit: number, leaseDurationMs: number, owner: string): Promise<ClaimedPendingReference[]>;
+  releaseLease(id: string, token: string): Promise<boolean>;
+  renewLease(id: string, token: string, leaseDurationMs: number): Promise<boolean>;
+  markOperationallyBlocked(id: string, token: string, reason: string): Promise<boolean>;
   save(transaction: WagerTransaction): Promise<void>;
 }
 

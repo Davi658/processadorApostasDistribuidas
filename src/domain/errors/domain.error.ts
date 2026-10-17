@@ -103,5 +103,13 @@ export class ReplaySnapshotUnavailableError extends DomainError {
   }
 }
 
+export class StaleLeaseError extends DomainError {
+  public readonly code = 'STALE_LEASE';
+
+  constructor(message = 'Lease token mismatch or lease expired') {
+    super(message);
+  }
+}
+
 
 

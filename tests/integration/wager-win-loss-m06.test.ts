@@ -2380,6 +2380,12 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
         expect(check004.rows.length).toBe(1);
 
         // 2. Testar down da 004 (reverte para 003 sem dados conflitantes)
+        const check005 = await migPool.query<{ version: string }>(
+          "SELECT version FROM schema_migrations WHERE version = '005_pending_reference_worker_lease';"
+        );
+        if (check005.rows.length > 0) {
+          await migrator.down();
+        }
         const revertedVersion = await migrator.down();
         expect(revertedVersion).toBe('004_restrict_reversal_unique_index');
 
@@ -2435,6 +2441,14 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
         );
 
         // 5. Tentar executar o DOWN da 004
+        // Se 005 foi reaplicada no up, reverta 005 primeiro
+        const check005Again = await migPool.query<{ version: string }>(
+          "SELECT version FROM schema_migrations WHERE version = '005_pending_reference_worker_lease';"
+        );
+        if (check005Again.rows.length > 0) {
+          await migrator.down();
+        }
+
         // A recusa segura deve disparar a exceção customizada (ERRCODE 23505)
         let downFailed = false;
         try {

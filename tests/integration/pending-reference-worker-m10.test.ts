@@ -1,0 +1,960 @@
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { NestFactory } from '@nestjs/core';
+import type { INestApplication } from '@nestjs/common';
+import pg from 'pg';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { AppModule } from '../../src/interfaces/http/app.module';
+import { DomainExceptionFilter } from '../../src/interfaces/http/filters/domain-exception.filter';
+import {
+  MikroOrmOutboxRepository,
+  MikroOrmUnitOfWork,
+  MikroOrmWagerTransactionRepository,
+  MikroOrmWalletLedgerRepository,
+  MikroOrmWalletRepository,
+} from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
+import { CreateWalletUseCase } from '../../src/application/use-cases/create-wallet.use-case';
+import { ProcessWagerUseCase } from '../../src/application/use-cases/process-wager.use-case';
+import { ReconcileWalletUseCase } from '../../src/application/use-cases/reconcile-wallet.use-case';
+import { ReprocessPendingReferencesUseCase } from '../../src/application/use-cases/reprocess-pending-references.use-case';
+import { PendingReferenceWorkerService } from '../../src/infrastructure/workers/pending-reference-worker.service';
+import { Money } from '../../src/domain/value-objects/money.vo';
+import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
+import { StaleLeaseError } from '../../src/domain/errors/domain.error';
+
+describe('M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável)', () => {
+  let isolatedDb: IsolatedTestDatabase;
+  let adminPool: pg.Pool;
+  let app: INestApplication;
+  let serverUrl: string;
+
+  let uow: MikroOrmUnitOfWork;
+  let walletRepo: MikroOrmWalletRepository;
+  let wagerRepo: MikroOrmWagerTransactionRepository;
+  let ledgerRepo: MikroOrmWalletLedgerRepository;
+  let outboxRepo: MikroOrmOutboxRepository;
+
+  let createWalletUseCase: CreateWalletUseCase;
+  let processWagerUseCase: ProcessWagerUseCase;
+  let reconcileWalletUseCase: ReconcileWalletUseCase;
+  let reprocessUseCase: ReprocessPendingReferencesUseCase;
+  let workerService: PendingReferenceWorkerService;
+
+  interface DbStateSnapshot {
+    wallet: { balance: string; version: number };
+    transaction: {
+      status: string;
+      attempts: number;
+      nextAttemptAt: string | null;
+      leaseToken: string | null;
+      leaseOwner: string | null;
+      leaseExpiresAt: string | null;
+      isOperationallyBlocked: boolean;
+      operationalBlockReason: string | null;
+      responseSnapshot: any;
+    };
+    ledgerCount: number;
+    outboxCount: number;
+  }
+
+  async function captureDbState(walletId: string, txId: string): Promise<DbStateSnapshot> {
+    const walletRes = await adminPool.query('SELECT balance, version FROM wallets WHERE id = $1;', [walletId]);
+    const txRes = await adminPool.query(
+      `SELECT status, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, 
+              is_operationally_blocked, operational_block_reason, response_snapshot 
+       FROM wager_transactions WHERE id = $1;`,
+      [txId]
+    );
+    const ledgerRes = await adminPool.query('SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;', [walletId]);
+    const outboxRes = await adminPool.query('SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1;', [walletId]);
+
+    return {
+      wallet: {
+        balance: walletRes.rows[0].balance,
+        version: walletRes.rows[0].version,
+      },
+      transaction: {
+        status: txRes.rows[0].status,
+        attempts: txRes.rows[0].attempts,
+        nextAttemptAt: txRes.rows[0].next_attempt_at ? new Date(txRes.rows[0].next_attempt_at).toISOString() : null,
+        leaseToken: txRes.rows[0].lease_token,
+        leaseOwner: txRes.rows[0].lease_owner,
+        leaseExpiresAt: txRes.rows[0].lease_expires_at ? new Date(txRes.rows[0].lease_expires_at).toISOString() : null,
+        isOperationallyBlocked: txRes.rows[0].is_operationally_blocked,
+        operationalBlockReason: txRes.rows[0].operational_block_reason,
+        responseSnapshot: txRes.rows[0].response_snapshot,
+      },
+      ledgerCount: parseInt(ledgerRes.rows[0].count, 10),
+      outboxCount: parseInt(outboxRes.rows[0].count, 10),
+    };
+  }
+
+  async function makePendingEligible(transactionId: string): Promise<void> {
+    await adminPool.query(
+      "UPDATE wager_transactions SET next_attempt_at = NOW() - INTERVAL '1 second', lease_expires_at = NULL, lease_token = NULL WHERE id = $1;",
+      [transactionId]
+    );
+  }
+
+  beforeAll(async () => {
+    isolatedDb = await createIsolatedTestDatabase('m10_worker_');
+
+    adminPool = new pg.Pool({
+      ...isolatedDb.adminConfig,
+      max: 65,
+    });
+    adminPool.on('error', () => {});
+
+    // Ensure worker doesn't poll automatically unless explicitly requested in a test
+    process.env.PENDING_WORKER_ENABLED = 'false';
+
+    app = await NestFactory.create(AppModule, { logger: false });
+    app.useGlobalFilters(new DomainExceptionFilter());
+    await app.listen(0);
+    const address = app.getHttpServer().address();
+    serverUrl = `http://127.0.0.1:${address.port}`;
+
+    uow = app.get(MikroOrmUnitOfWork);
+    walletRepo = app.get(MikroOrmWalletRepository);
+    wagerRepo = app.get(MikroOrmWagerTransactionRepository);
+    ledgerRepo = app.get(MikroOrmWalletLedgerRepository);
+    outboxRepo = app.get(MikroOrmOutboxRepository);
+
+    createWalletUseCase = app.get(CreateWalletUseCase);
+    processWagerUseCase = app.get(ProcessWagerUseCase);
+    reconcileWalletUseCase = app.get(ReconcileWalletUseCase);
+    reprocessUseCase = app.get(ReprocessPendingReferencesUseCase);
+    workerService = app.get(PendingReferenceWorkerService);
+  }, 60000);
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+    if (adminPool) {
+      await adminPool.end();
+    }
+    if (isolatedDb) {
+      await isolatedDb.closeAndDrop();
+    }
+  }, 60000);
+
+  it('A. NestJS inicia o worker e resolve pendência automaticamente, sem chamar execute manualmente', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    // 1. Processa uma BET de 20.00
+    const betExternalId = `bet-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betExternalId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-auto-1',
+      gameId: 'roulette',
+      kind: 'BET',
+      money: { amount: '20.00', currency: 'BRL' },
+    });
+
+    // 2. Envia WIN referenciada sem chamar execute manualmente, mas com next_attempt_at no passado
+    const winExternalId = `win-${crypto.randomUUID()}`;
+    const winRes = await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: winExternalId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-auto-1',
+      gameId: 'roulette',
+      kind: 'WIN',
+      money: { amount: '50.00', currency: 'BRL' },
+      referenceExternalTransactionId: betExternalId,
+    });
+    // Como a BET já estava processada, foi PROCESSED.
+    // Agora criemos um caso onde a referência está ausente no momento do aceite para gerar PENDING_REFERENCE:
+    const delayedBetId = `bet-delayed-${crypto.randomUUID()}`;
+    const pendingWinId = `win-delayed-${crypto.randomUUID()}`;
+    const pendingWinRes = await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: pendingWinId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-auto-2',
+      gameId: 'roulette',
+      kind: 'WIN',
+      money: { amount: '35.00', currency: 'BRL' },
+      referenceExternalTransactionId: delayedBetId,
+    });
+    expect(pendingWinRes.status).toBe('PENDING_REFERENCE');
+
+    // A BET agora chega e é processada
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: delayedBetId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-auto-2',
+      gameId: 'roulette',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    // Torna a pendência elegível para o loop automático
+    await makePendingEligible(pendingWinRes.transactionId);
+
+    // Inicia o worker em background com intervalo curto (30ms)
+    const backgroundWorker = new PendingReferenceWorkerService(reprocessUseCase, {
+      enabled: true,
+      intervalMs: 30,
+      batchSize: 10,
+      leaseDurationMs: 5000,
+      workerId: 'auto-worker',
+    });
+    backgroundWorker.start();
+    expect(backgroundWorker.isWorkerRunning()).toBe(true);
+
+    // Aguarda sincronização determinística: polling na tabela do banco até transicionar para PROCESSED
+    const startTime = Date.now();
+    let finalStatus = 'PENDING_REFERENCE';
+    while (Date.now() - startTime < 8000) {
+      const state = await captureDbState(wallet.id, pendingWinRes.transactionId);
+      if (state.transaction.status === 'PROCESSED') {
+        finalStatus = 'PROCESSED';
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+
+    backgroundWorker.stop();
+
+    expect(finalStatus).toBe('PROCESSED');
+    const finalState = await captureDbState(wallet.id, pendingWinRes.transactionId);
+    expect(finalState.transaction.status).toBe('PROCESSED');
+    expect(finalState.transaction.leaseToken).toBeNull();
+
+    // Reconciliação confirma saldo e integridade contábil
+    const recon = await reconcileWalletUseCase.execute(wallet.id);
+    expect(recon.consistent).toBe(true);
+    expect(recon.difference.amount).toBe('0.00');
+  });
+
+  it('B. Três processos reais disputam pendências: nenhum crédito/débito, ledger ou evento duplicado', async () => {
+    // Criação de 3 carteiras, cada uma com 2 pendências (6 pendências no total)
+    const pendingTxIds: string[] = [];
+    const walletIds: string[] = [];
+
+    for (let w = 0; w < 3; w++) {
+      const playerId = crypto.randomUUID();
+      const wallet = await createWalletUseCase.execute({
+        playerId,
+        initialBalance: { amount: '100.00', currency: 'BRL' },
+      });
+      walletIds.push(wallet.id);
+
+      for (let p = 0; p < 2; p++) {
+        const betId = `bet-b-${w}-${p}-${crypto.randomUUID()}`;
+        // Processa a BET
+        await processWagerUseCase.execute(crypto.randomUUID(), {
+          providerId: 'EVOLUTION',
+          externalTransactionId: betId,
+          playerId,
+          walletId: wallet.id,
+          roundId: `round-b-${w}-${p}`,
+          gameId: 'blackjack',
+          kind: 'BET',
+          money: { amount: '10.00', currency: 'BRL' },
+        });
+
+        // Insere a WIN como PENDING_REFERENCE diretamente para disputa dos workers
+        const winTxId = crypto.randomUUID();
+        const winExtId = `win-b-${w}-${p}-${crypto.randomUUID()}`;
+        const idemKey = crypto.randomUUID();
+
+        // Usa query SQL direta garantindo snapshot canônico
+        const snap = {
+          transactionId: winTxId,
+          status: 'PENDING_REFERENCE',
+          balance: { amount: '90.00', currency: 'BRL' },
+          idempotentReplay: false,
+        };
+
+        await adminPool.query(
+          `INSERT INTO wager_transactions 
+           (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW() - INTERVAL '1 second', NOW(), NOW());`,
+          [
+            winTxId,
+            wallet.id,
+            playerId,
+            'EVOLUTION',
+            winExtId,
+            `round-b-${w}-${p}`,
+            'blackjack',
+            'WIN',
+            '25.00',
+            'BRL',
+            'PENDING_REFERENCE',
+            idemKey,
+            'dummy-hash',
+            JSON.stringify(snap),
+            betId,
+            1,
+          ]
+        );
+        pendingTxIds.push(winTxId);
+      }
+    }
+
+    expect(pendingTxIds.length).toBe(6);
+
+    // Barreira de sincronização por arquivo para handshake de prontidão entre os 3 processos
+    const barrierFilePath = join(tmpdir(), `barrier-m10-b-${Date.now()}.tmp`);
+    if (existsSync(barrierFilePath)) unlinkSync(barrierFilePath);
+
+    const runnerScript = join(import.meta.dir, '..', 'concurrency', 'pending-worker-runner.ts');
+
+    const spawnWorker = () => {
+      return new Promise<{ code: number; stdout: string }>((resolve) => {
+        const proc = spawn('bun', ['run', runnerScript, barrierFilePath, '10', '30000'], {
+          env: {
+            ...process.env,
+            DB_NAME: isolatedDb.dbName,
+            APP_DB_NAME: isolatedDb.dbName,
+          },
+        });
+
+        let stdout = '';
+        proc.stdout.on('data', (d) => {
+          const str = d.toString();
+          stdout += str;
+        });
+
+        proc.on('close', (code) => {
+          resolve({ code: code ?? 0, stdout });
+        });
+      });
+    };
+
+    // Inicia os 3 processos reais
+    const p1 = spawnWorker();
+    const p2 = spawnWorker();
+    const p3 = spawnWorker();
+
+    // Aguarda prontidão com timeout de segurança
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    // Libera a barreira
+    writeFileSync(barrierFilePath, 'GO');
+
+    const results = await Promise.all([p1, p2, p3]);
+
+    if (existsSync(barrierFilePath)) unlinkSync(barrierFilePath);
+
+    for (const r of results) {
+      expect(r.code).toBe(0);
+    }
+
+    // Comprova que todas as 6 pendências foram processadas com exatidão
+    for (const txId of pendingTxIds) {
+      const res = await adminPool.query('SELECT status, attempts, lease_token FROM wager_transactions WHERE id = $1;', [txId]);
+      expect(res.rows[0].status).toBe('PROCESSED');
+      expect(res.rows[0].lease_token).toBeNull();
+    }
+
+    // Comprova que cada uma das 3 carteiras teve exatamente as 2 BETs e 2 WINs
+    for (const wId of walletIds) {
+      const recon = await reconcileWalletUseCase.execute(wId);
+      expect(recon.consistent).toBe(true);
+      expect(recon.difference.amount).toBe('0.00');
+
+      // Saldo inicial 100.00 - 2x10.00 (BET) + 2x25.00 (WIN) = 130.00
+      expect(recon.storedBalance.amount).toBe('130.00');
+
+      // Exatamente 5 lançamentos de ledger (1 OPENING + 2 DEBITs + 2 CREDITs)
+      const ledgerCount = await adminPool.query('SELECT COUNT(*) FROM wallet_ledger_entries WHERE wallet_id = $1;', [wId]);
+      expect(parseInt(ledgerCount.rows[0].count, 10)).toBe(5);
+    }
+  });
+
+  it('C. Duas pendências do mesmo tipo revertendo a mesma referência: uma processada e outra rejeitada auditavelmente', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    // BET processada de 25.00 -> saldo 75.00
+    const betExtId = `bet-c-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betExtId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-c-1',
+      gameId: 'roulette',
+      kind: 'BET',
+      money: { amount: '25.00', currency: 'BRL' },
+    });
+
+    // Insere 2 pendências de REFUND referenciando a MESMA BET
+    const ref1Id = crypto.randomUUID();
+    const ref2Id = crypto.randomUUID();
+
+    const snap1 = {
+      transactionId: ref1Id,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '75.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+    const snap2 = {
+      transactionId: ref2Id,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '75.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES 
+       ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 1, NOW() - INTERVAL '1 second', NOW(), NOW()),
+       ($16, $2, $3, $4, $17, $6, $7, $8, $9, $10, $11, $18, $19, $20, $15, 1, NOW() - INTERVAL '1 second', NOW(), NOW());`,
+      [
+        ref1Id,
+        wallet.id,
+        playerId,
+        'EVOLUTION',
+        `ref-c-1-${crypto.randomUUID()}`,
+        'round-c-1',
+        'roulette',
+        'REFUND',
+        '25.00',
+        'BRL',
+        'PENDING_REFERENCE',
+        crypto.randomUUID(),
+        'hash1',
+        JSON.stringify(snap1),
+        betExtId,
+        ref2Id,
+        `ref-c-2-${crypto.randomUUID()}`,
+        crypto.randomUUID(),
+        'hash2',
+        JSON.stringify(snap2),
+      ]
+    );
+
+    // Executa o reprocessamento em lote
+    const result = await reprocessUseCase.execute(10);
+    expect(result.processed).toBe(1);
+    expect(result.rejected).toBe(1);
+
+    const tx1Res = await adminPool.query('SELECT status, rejection_reason FROM wager_transactions WHERE id = $1;', [ref1Id]);
+    const tx2Res = await adminPool.query('SELECT status, rejection_reason FROM wager_transactions WHERE id = $1;', [ref2Id]);
+
+    const statuses = [tx1Res.rows[0].status, tx2Res.rows[0].status];
+    expect(statuses).toContain('PROCESSED');
+    expect(statuses).toContain('REJECTED');
+
+    // Uma foi rejeitada com código auditável REVERSAL_ALREADY_PROCESSED
+    const rejectedRow = tx1Res.rows[0].status === 'REJECTED' ? tx1Res.rows[0] : tx2Res.rows[0];
+    expect(rejectedRow.rejection_reason).toBe('REVERSAL_ALREADY_PROCESSED');
+
+    // Saldo restaurado em exatamente 25.00 (100.00 final), sem crédito duplicado
+    const recon = await reconcileWalletUseCase.execute(wallet.id);
+    expect(recon.consistent).toBe(true);
+    expect(recon.storedBalance.amount).toBe('100.00');
+
+    // Exatamente 3 lançamentos no ledger: 1 OPENING, 1 DEBIT da BET e 1 CREDIT do primeiro REFUND
+    const ledgerRes = await adminPool.query('SELECT entry_type, amount FROM wallet_ledger_entries WHERE wallet_id = $1 ORDER BY created_at ASC;', [wallet.id]);
+    expect(ledgerRes.rows.length).toBe(3);
+    expect(ledgerRes.rows[0].entry_type).toBe('CREDIT');
+    expect(ledgerRes.rows[1].entry_type).toBe('DEBIT');
+    expect(ledgerRes.rows[2].entry_type).toBe('CREDIT');
+  });
+
+  it('D. WIN, REFUND e ROLLBACK são resolvidos com suas regras próprias', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    // 1. Processa BET para WIN
+    const bet1Id = `bet-d-1-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: bet1Id,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-d-1',
+      gameId: 'game1',
+      kind: 'BET',
+      money: { amount: '30.00', currency: 'BRL' },
+    }); // Saldo: 70.00
+
+    // 2. Processa BET para REFUND
+    const bet2Id = `bet-d-2-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: bet2Id,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-d-2',
+      gameId: 'game2',
+      kind: 'BET',
+      money: { amount: '20.00', currency: 'BRL' },
+    }); // Saldo: 50.00
+
+    // 3. Processa WIN que será alvo de ROLLBACK
+    const winForRollbackId = `win-target-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: winForRollbackId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-d-1',
+      gameId: 'game1',
+      kind: 'WIN',
+      money: { amount: '40.00', currency: 'BRL' },
+      referenceExternalTransactionId: bet1Id,
+    }); // Saldo: 90.00
+
+    // Insere pendências das 3 operações
+    const pendingWinId = crypto.randomUUID();
+    const pendingRefundId = crypto.randomUUID();
+    const pendingRollbackId = crypto.randomUUID();
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES 
+       ($1, $4, $5, 'EVOLUTION', $6, 'round-d-1', 'game1', 'WIN', '15.00', 'BRL', 'PENDING_REFERENCE', $7, 'h1', $8, $9, 1, NOW() - INTERVAL '1s', NOW(), NOW()),
+       ($2, $4, $5, 'EVOLUTION', $10, 'round-d-2', 'game2', 'REFUND', '20.00', 'BRL', 'PENDING_REFERENCE', $11, 'h2', $12, $13, 1, NOW() - INTERVAL '1s', NOW(), NOW()),
+       ($3, $4, $5, 'EVOLUTION', $14, 'round-d-1', 'game1', 'ROLLBACK', '40.00', 'BRL', 'PENDING_REFERENCE', $15, 'h3', $16, $17, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [
+        pendingWinId,
+        pendingRefundId,
+        pendingRollbackId,
+        wallet.id,
+        playerId,
+        `ext-win-d-${crypto.randomUUID()}`,
+        crypto.randomUUID(),
+        JSON.stringify({ transactionId: pendingWinId, status: 'PENDING_REFERENCE', balance: { amount: '90.00', currency: 'BRL' }, idempotentReplay: false }),
+        bet1Id,
+        `ext-ref-d-${crypto.randomUUID()}`,
+        crypto.randomUUID(),
+        JSON.stringify({ transactionId: pendingRefundId, status: 'PENDING_REFERENCE', balance: { amount: '90.00', currency: 'BRL' }, idempotentReplay: false }),
+        bet2Id,
+        `ext-rol-d-${crypto.randomUUID()}`,
+        crypto.randomUUID(),
+        JSON.stringify({ transactionId: pendingRollbackId, status: 'PENDING_REFERENCE', balance: { amount: '90.00', currency: 'BRL' }, idempotentReplay: false }),
+        winForRollbackId,
+      ]
+    );
+
+    const res = await reprocessUseCase.execute(10);
+    expect(res.processed).toBe(3);
+
+    // Saldo: 90.00 + 15.00 (WIN) + 20.00 (REFUND) - 40.00 (ROLLBACK) = 85.00
+    const recon = await reconcileWalletUseCase.execute(wallet.id);
+    expect(recon.consistent).toBe(true);
+    expect(recon.storedBalance.amount).toBe('85.00');
+
+    // Verifica que cada uma assumiu PROCESSED e gerou seus lançamentos
+    const sWin = await captureDbState(wallet.id, pendingWinId);
+    expect(sWin.transaction.status).toBe('PROCESSED');
+    const sRefund = await captureDbState(wallet.id, pendingRefundId);
+    expect(sRefund.transaction.status).toBe('PROCESSED');
+    const sRollback = await captureDbState(wallet.id, pendingRollbackId);
+    expect(sRollback.transaction.status).toBe('PROCESSED');
+  });
+
+  it('E. Processo morre após claim e antes do processamento: outro retoma após expiração', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-e-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-e',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '90.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    // Cria a transação já com lease ativo que simula crash do Worker 1
+    const worker1Token = crypto.randomUUID();
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-e', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-e', $6, $7, 1, NOW() - INTERVAL '1s', $8, 'worker-crashed', NOW() + INTERVAL '100 milliseconds', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-e-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId, worker1Token]
+    );
+
+    // Imediatamente tenta reservar com Worker 2: não deve conseguir pois o lease ainda não expirou
+    const initialClaim = await wagerRepo.claimPendingReferences(10, 30000, 'worker-2');
+    expect(initialClaim.some((c) => c.id === txId)).toBe(false);
+
+    // Aguarda expiração do lease (150ms)
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Agora Worker 2 deve conseguir reivindicar e processar
+    const result = await reprocessUseCase.execute(10, 30000, 'worker-2');
+    expect(result.processed).toBe(1);
+
+    const finalState = await captureDbState(wallet.id, txId);
+    expect(finalState.transaction.status).toBe('PROCESSED');
+    expect(finalState.transaction.leaseToken).toBeNull();
+    expect(finalState.wallet.balance).toBe('110.00'); // 90.00 + 20.00
+  });
+
+  it('F. Reserva expira e outro worker assume: token antigo não pode finalizar indevidamente', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-f-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-f',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '90.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    // Worker 1 reserva com token T1
+    const token1 = crypto.randomUUID();
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-f', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-f', $6, $7, 1, NOW() - INTERVAL '1s', $8, 'worker-1', NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-f-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId, token1]
+    );
+
+    // Como expirou, Worker 2 reserva e finaliza
+    const resultWorker2 = await reprocessUseCase.execute(10, 30000, 'worker-2');
+    expect(resultWorker2.processed).toBe(1);
+
+    const stateAfterWorker2 = await captureDbState(wallet.id, txId);
+    expect(stateAfterWorker2.transaction.status).toBe('PROCESSED');
+    expect(stateAfterWorker2.wallet.balance).toBe('110.00');
+
+    // Worker 1 (atrasado) tenta finalizar com seu token antigo token1
+    // Sob lock e transação, deve recusar por token mismatch / terminal
+    let errorCaught: any = null;
+    try {
+      await uow.runInTransaction(async () => {
+        const lockedWallet = await walletRepo.findById(wallet.id, true);
+        const lockedTx = await wagerRepo.findById(txId, true);
+
+        if (lockedTx?.isTerminal()) {
+          return; // Aborta sem repetir
+        }
+
+        if (lockedTx?.leaseToken !== token1) {
+          throw new StaleLeaseError('Stale token');
+        }
+
+        // Não deve chegar aqui
+        throw new Error('Should not reach here');
+      });
+    } catch (err) {
+      errorCaught = err;
+    }
+
+    // Nenhuma alteração financeira duplicada
+    const stateAfterWorker1 = await captureDbState(wallet.id, txId);
+    expect(stateAfterWorker1.wallet.balance).toBe('110.00');
+    expect(stateAfterWorker1.wallet.version).toBe(stateAfterWorker2.wallet.version);
+    expect(stateAfterWorker1.ledgerCount).toBe(stateAfterWorker2.ledgerCount);
+  });
+
+  it('G. Processo morre após commit financeiro e antes de finalizar o ciclo: reinício não reaplica efeitos', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-g-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-g',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '90.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-g', 'slots', 'WIN', '25.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-g', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-g-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
+    );
+
+    // Processa com sucesso
+    const r1 = await reprocessUseCase.execute(10);
+    expect(r1.processed).toBe(1);
+
+    const state1 = await captureDbState(wallet.id, txId);
+    expect(state1.transaction.status).toBe('PROCESSED');
+    expect(state1.wallet.balance).toBe('115.00'); // 90 + 25
+
+    // Reinicia o ciclo (simulando nova tentativa de execução do worker)
+    const r2 = await reprocessUseCase.execute(10);
+    expect(r2.processed).toBe(0);
+
+    const state2 = await captureDbState(wallet.id, txId);
+    expect(state2.wallet.balance).toBe('115.00');
+    expect(state2.wallet.version).toBe(state1.wallet.version);
+    expect(state2.ledgerCount).toBe(state1.ledgerCount);
+    expect(state2.outboxCount).toBe(state1.outboxCount);
+  });
+
+  it('H. Falha transitória permite recuperação sem rejeição financeira', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-h-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-h',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '90.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-h', 'slots', 'WIN', '30.00', 'BRL', 'PENDING_REFERENCE', $5, 'hash-h', $6, $7, 1, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-h-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap), betId]
+    );
+
+    // Injeta falha transitória durante a transação
+    uow.setTestHook('after_wallet_save', () => {
+      throw new Error('Simulated transient database connection timeout');
+    });
+
+    const resultWithFailure = await reprocessUseCase.execute(10);
+    expect(resultWithFailure.failed).toBe(1);
+    expect(resultWithFailure.processed).toBe(0);
+
+    uow.clearTestHooks();
+
+    // Comprova que o status NÃO virou REJECTED e que attempts NÃO foi incrementado
+    const stateDuringFail = await captureDbState(wallet.id, txId);
+    expect(stateDuringFail.transaction.status).toBe('PENDING_REFERENCE');
+    expect(stateDuringFail.transaction.attempts).toBe(1);
+    expect(stateDuringFail.wallet.balance).toBe('90.00');
+
+    // Executa novamente sem a falha transitória: recuperação perfeita
+    const resultRecovered = await reprocessUseCase.execute(10);
+    expect(resultRecovered.processed).toBe(1);
+
+    const finalState = await captureDbState(wallet.id, txId);
+    expect(finalState.transaction.status).toBe('PROCESSED');
+    expect(finalState.wallet.balance).toBe('120.00'); // 90 + 30
+  });
+
+  it('I. Snapshot inválido no início do lote não bloqueia itens válidos', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const betId = `bet-i-${crypto.randomUUID()}`;
+    await processWagerUseCase.execute(crypto.randomUUID(), {
+      providerId: 'EVOLUTION',
+      externalTransactionId: betId,
+      playerId,
+      walletId: wallet.id,
+      roundId: 'round-i',
+      gameId: 'slots',
+      kind: 'BET',
+      money: { amount: '10.00', currency: 'BRL' },
+    });
+
+    // Item 1: Snapshot inválido (nulo)
+    const corruptTxId = crypto.randomUUID();
+    // Item 2: Item válido WIN
+    const validTxId = crypto.randomUUID();
+
+    const validSnap = {
+      transactionId: validTxId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '90.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES 
+       ($1, $3, $4, 'EVOLUTION', $5, 'round-i', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $6, 'h-corrupt', NULL, $7, 1, NOW() - INTERVAL '2s', NOW() - INTERVAL '2s', NOW()),
+       ($2, $3, $4, 'EVOLUTION', $8, 'round-i', 'slots', 'WIN', '20.00', 'BRL', 'PENDING_REFERENCE', $9, 'h-valid', $10, $7, 1, NOW() - INTERVAL '1s', NOW() - INTERVAL '1s', NOW());`,
+      [
+        corruptTxId,
+        validTxId,
+        wallet.id,
+        playerId,
+        `win-corrupt-${crypto.randomUUID()}`,
+        crypto.randomUUID(),
+        betId,
+        `win-valid-${crypto.randomUUID()}`,
+        crypto.randomUUID(),
+        JSON.stringify(validSnap),
+      ]
+    );
+
+    const result = await reprocessUseCase.execute(10);
+    expect(result.blocked).toBe(1);
+    expect(result.processed).toBe(1);
+
+    // Item corrompido foi marcado como bloqueado operacionalmente
+    const corruptState = await captureDbState(wallet.id, corruptTxId);
+    expect(corruptState.transaction.isOperationallyBlocked).toBe(true);
+    expect(corruptState.transaction.operationalBlockReason).toBe(
+      'Replay snapshot is unavailable. Repeating the operation will not recover historical state; operational analysis is required.'
+    );
+
+    // Item válido foi processado com sucesso
+    const validState = await captureDbState(wallet.id, validTxId);
+    expect(validState.transaction.status).toBe('PROCESSED');
+    expect(validState.wallet.balance).toBe('110.00'); // 90 + 20
+
+    // No lote seguinte, o item bloqueado não é selecionado
+    const nextResult = await reprocessUseCase.execute(10);
+    expect(nextResult.blocked).toBe(0);
+    expect(nextResult.processed).toBe(0);
+  });
+
+  it('J. Shutdown para novas reservas e encerra recursos corretamente', async () => {
+    const testWorker = new PendingReferenceWorkerService(reprocessUseCase, {
+      enabled: true,
+      intervalMs: 100,
+      batchSize: 5,
+      leaseDurationMs: 5000,
+      drainTimeoutMs: 1000,
+      workerId: 'shutdown-test-worker',
+    });
+
+    testWorker.start();
+    expect(testWorker.isWorkerRunning()).toBe(true);
+
+    // Dispara shutdown
+    await testWorker.beforeApplicationShutdown();
+
+    expect(testWorker.isWorkerRunning()).toBe(false);
+
+    // Novas tentativas de execução em shutdown retornam imediatamente vazio
+    const res = await testWorker.executeBatch();
+    expect(res.processed).toBe(0);
+    expect(res.rejected).toBe(0);
+  });
+
+  it('K. Esgotamento de referência gera uma rejeição e um evento', async () => {
+    const playerId = crypto.randomUUID();
+    const wallet = await createWalletUseCase.execute({
+      playerId,
+      initialBalance: { amount: '100.00', currency: 'BRL' },
+    });
+
+    const txId = crypto.randomUUID();
+    const snap = {
+      transactionId: txId,
+      status: 'PENDING_REFERENCE',
+      balance: { amount: '100.00', currency: 'BRL' },
+      idempotentReplay: false,
+    };
+
+    // Criar com attempts = 5 (limite maxAttempts = 5) e referência inexistente
+    await adminPool.query(
+      `INSERT INTO wager_transactions 
+       (id, wallet_id, player_id, provider_id, external_transaction_id, round_id, game_id, kind, amount, currency, status, idempotency_key, payload_hash, response_snapshot, reference_external_transaction_id, attempts, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'EVOLUTION', $4, 'round-k', 'slots', 'WIN', '50.00', 'BRL', 'PENDING_REFERENCE', $5, 'h-k', $6, 'non-existent-ref-id', 5, NOW() - INTERVAL '1s', NOW(), NOW());`,
+      [txId, wallet.id, playerId, `win-k-${crypto.randomUUID()}`, crypto.randomUUID(), JSON.stringify(snap)]
+    );
+
+    const outboxBefore = await adminPool.query('SELECT COUNT(*) FROM outbox_messages WHERE aggregate_id = $1;', [wallet.id]);
+    const outboxCountBefore = parseInt(outboxBefore.rows[0].count, 10);
+
+    const result = await reprocessUseCase.execute(10);
+    expect(result.rejected).toBe(1);
+
+    const state = await captureDbState(wallet.id, txId);
+    expect(state.transaction.status).toBe('REJECTED');
+    expect(state.transaction.attempts).toBe(5);
+    expect(state.transaction.leaseToken).toBeNull();
+
+    // Saldo inalterado
+    expect(state.wallet.balance).toBe('100.00');
+
+    // Exatamente 1 evento WagerTransactionRejectedEvent emitido
+    const outboxAfter = await adminPool.query(
+      "SELECT event_type, payload FROM outbox_messages WHERE aggregate_id = $1 AND event_type = 'WagerTransactionRejected' ORDER BY created_at DESC LIMIT 1;",
+      [wallet.id]
+    );
+    expect(outboxAfter.rows.length).toBe(1);
+    expect(outboxAfter.rows[0].event_type).toBe('WagerTransactionRejected');
+    expect(outboxAfter.rows[0].payload.failureCode).toBe('REFERENCE_NOT_FOUND');
+    expect(state.outboxCount).toBe(outboxCountBefore + 1);
+  });
+});

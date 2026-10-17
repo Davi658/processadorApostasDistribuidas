@@ -57,7 +57,7 @@ docker-compose up -d
 O projeto possui um runner autônomo de migrações que suporta operações UP e DOWN incrementais com rastreamento na tabela `schema_migrations` e proteção contra execução concorrente via PostgreSQL Advisory Lock (`pg_advisory_xact_lock`):
 
 ```bash
-# Aplicar todas as migrações (001, 002 e 003)
+# Aplicar todas as migrações (001 a 005)
 bun run src/infrastructure/persistence/migrator.ts up
 
 # Reverter migrações de forma limpa
@@ -74,7 +74,7 @@ Todas as suítes utilizam **Bun Test**, executam com isolamento de processos e b
 # Executar verificação de tipos estritos TypeScript (0 erros)
 bun run typecheck
 
-# Executar TODOS os testes unitários e de integração (79 testes)
+# Executar TODOS os testes unitários e de integração
 bun test
 
 # Executar testes unitários de domínio (Money, Wallet, Ledger)
@@ -85,6 +85,9 @@ bun run test:integration
 
 # Executar testes de alta concorrência (50 requests paralelas, corrida de saldo, chave disputada em paralelo e barreira de sincronização entre 3 processos)
 bun run test:concurrency
+
+# Executar suíte M10 — Worker de referências pendentes com PostgreSQL real e processos OS reais
+bun test tests/integration/pending-reference-worker-m10.test.ts
 ```
 
 ---

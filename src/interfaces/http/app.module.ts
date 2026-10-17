@@ -12,6 +12,7 @@ import { ProcessWagerUseCase } from '../../application/use-cases/process-wager.u
 import { ProcessBetUseCase } from '../../application/use-cases/process-bet.use-case';
 import { ReconcileWalletUseCase } from '../../application/use-cases/reconcile-wallet.use-case';
 import { ReprocessPendingReferencesUseCase } from '../../application/use-cases/reprocess-pending-references.use-case';
+import { PendingReferenceWorkerService } from '../../infrastructure/workers/pending-reference-worker.service';
 import { WalletController } from './controllers/wallet.controller';
 import { WageringController } from './controllers/wagering.controller';
 
@@ -123,6 +124,13 @@ import { WageringController } from './controllers/wagering.controller';
         MikroOrmOutboxRepository,
         MikroOrmUnitOfWork,
       ],
+    },
+    {
+      provide: PendingReferenceWorkerService,
+      useFactory: (reprocessUseCase: ReprocessPendingReferencesUseCase) => {
+        return new PendingReferenceWorkerService(reprocessUseCase);
+      },
+      inject: [ReprocessPendingReferencesUseCase],
     },
   ],
 })

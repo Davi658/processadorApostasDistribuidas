@@ -487,12 +487,118 @@ A estabilização do marco M09 garante respostas completas, determinísticas e a
 ### 12.5 Delimitação Estrita de Escopo (M09 vs M10 / M15)
 > [!IMPORTANT]
 > O marco M09 comprova exclusivamente o determinismo das respostas, a atomicidade dos snapshots de aceitação e terminais, a política de replay e a estabilização de pendências em PostgreSQL real descartável sob acionamento manual do reprocessador.
-> Os seguintes componentes pertencem aos marcos M10 e M15 e permanecem expressamente como **NÃO VALIDADOS / NÃO IMPLEMENTADOS**:
-> 1. **Agendamento Automático em Background (Cron/Timer):** **NÃO VALIDADO**
-> 2. **Concorrência entre Múltiplos Workers com `FOR UPDATE SKIP LOCKED` (M10):** **NÃO VALIDADO**
-> 3. **Filas SQS / LocalStack e Mensageria Assíncrona Distribuída (M10):** **NÃO VALIDADO**
-> 4. **Tabela Inbox e Atomicidade Inbox / SQS (M15):** **NÃO VALIDADO / NÃO IMPLEMENTADO**
-> 5. **Mecanismo de Retries Distribuído e Dead Letter Queue (DLQ):** **NÃO VALIDADO**
+> Componentes de mensageria assíncrona (SQS/LocalStack), tabelas inbox e publishers da outbox pertencem a marcos posteriores (M14, M15, M16) e permanecem expressamente como **NÃO VALIDADOS / NÃO IMPLEMENTADOS**.
+
+---
+
+## 13. Worker de Referências Pendentes e Concorrência Distribuída (M10)
+
+O marco M10 consolida o processamento automático, assíncrono e concorrente de transações no estado `PENDING_REFERENCE` (`WIN`, `REFUND` e `ROLLBACK`), com garantias estritas de reserva persistente, tolerância a falhas transitórias, recuperação pós-crash e isolamento fail-closed de registros problemáticos.
+
+### 13.1 Ciclo de Vida e Agendamento NestJS
+1. **Inicialização Automatizada (`OnApplicationBootstrap`):**
+   - O worker `PendingReferenceWorkerService` é inicializado no ciclo de vida do NestJS através do hook `onApplicationBootstrap()`.
+   - Permite ativação/desativação dinâmica e parametrização via variáveis de ambiente:
+     - `PENDING_WORKER_ENABLED` (padrão: `true`): liga/desliga o agendamento em background.
+     - `PENDING_WORKER_INTERVAL_MS` (padrão: `1000` ms): intervalo entre varreduras periódicas.
+     - `PENDING_WORKER_BATCH_SIZE` (padrão: `20` itens): limite máximo de pendências por lote.
+     - `PENDING_WORKER_LEASE_MS` (padrão: `30000` ms): duração de expiração do lease de reserva.
+     - `PENDING_WORKER_DRAIN_TIMEOUT_MS` (padrão: `10000` ms): tempo limite de drenagem no shutdown.
+2. **Prevenção de Sobreposição de Ciclos (Overlap Guard):**
+   - Na mesma instância de aplicação, um ciclo de tick em execução ativa a flag booleana interna `isTickRunning`. Se o intervalo periódico disparar enquanto o lote anterior ainda estiver em processamento, a nova execução é ignorada de imediato sem sobreposição ou concorrência interna.
+3. **Graceful Shutdown com Drenagem de Recursos (`BeforeApplicationShutdown`):**
+   - Implementa a interface `BeforeApplicationShutdown` do NestJS, disparada antes do encerramento dos módulos de persistência e do ORM (`MikroORM`).
+   - Ao receber o sinal de parada (`SIGTERM`, `SIGINT`, etc.), o worker ativa `isDraining = true` e cancela os timers ativos, impedindo qualquer nova reserva (`claim`).
+   - O encerramento aguarda ativamente a conclusão de todas as operações e transações financeiras in-flight até o prazo de tolerância configurado (`drainTimeoutMs`).
+   - O fechamento das conexões do banco de dados e do MikroORM só é permitido após o término seguro de todas as operações pendentes em andamento.
+4. **Preservação de Ponto de Entrada para Testes Manuais:**
+   - O método `reprocessBatch({ batchSize, leaseDurationMs, workerOwner })` permanece exposto para acionamento determinístico e manual pelas suítes de testes, executando rigorosamente o mesmo caso de uso e a mesma lógica do agendador automático.
+
+### 13.2 Reserva Concorrente com Lease Persistente e `FOR UPDATE SKIP LOCKED`
+Para coordenar múltiplos processos e nós de aplicação independentes disputando a mesma base de dados sem duplicações ou deadlocks, foi adotada a estratégia de lease persistente com transação curta de reserva:
+
+1. **Campos Persistidos de Controle (Migration 005):**
+   - `lease_token VARCHAR(64)`: token único criptograficamente seguro (UUID v4) gerado a cada reserva.
+   - `lease_owner VARCHAR(255)`: identificador do worker ou processo que detém o lease (hostname, PID ou identificador lógico).
+   - `lease_expires_at TIMESTAMPTZ`: carimbo de tempo no horário do PostgreSQL determinando a validade da reserva.
+   - `is_operationally_blocked BOOLEAN DEFAULT FALSE`: sinalizador de bloqueio operacional para registros com snapshot corrompido.
+   - `operational_block_reason VARCHAR(255)`: diagnóstico auditável sem payload financeiro.
+2. **Transação Curta de Reserva (`claimPendingReferences`):**
+   - A reserva é executada em uma transação SQL rápida e isolada, **sem nenhuma movimentação financeira**:
+     ```sql
+     WITH eligible AS (
+       SELECT id
+       FROM wager_transactions
+       WHERE status = 'PENDING_REFERENCE'
+         AND is_operationally_blocked = FALSE
+         AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+         AND (lease_expires_at IS NULL OR lease_expires_at < NOW())
+       ORDER BY created_at ASC
+       LIMIT $1
+       FOR UPDATE SKIP LOCKED
+     )
+     UPDATE wager_transactions
+     SET lease_token = $2,
+         lease_owner = $3,
+         lease_expires_at = NOW() + ($4 || ' milliseconds')::INTERVAL,
+         updated_at = NOW()
+     FROM eligible
+     WHERE wager_transactions.id = eligible.id
+     RETURNING wager_transactions.id, wager_transactions.lease_token, wager_transactions.lease_expires_at;
+     ```
+   - O uso de `FOR UPDATE SKIP LOCKED` faz com que linhas sob disputa concorrente sejam ignoradas instantaneamente pelas demais instâncias, eliminando contenção e esperas bloqueantes.
+   - O relógio do PostgreSQL (`NOW()`) é a única fonte de verdade para elegibilidade e expiração de leases, eliminando riscos decorrentes de desvios de relógio (clock drift) entre servidores.
+3. **Proteção Contra Finalização Indevida por Worker Antigo (Stale Lease Protection):**
+   - Durante a resolução financeira de um item reservado, o processador valida sob lock pessimista se a transação ainda pertence ao worker atual (`tx.leaseToken === claimedToken` e `tx.leaseExpiresAt > now`).
+   - Se um worker sofrer um atraso prolongado ou pausa GC e seu lease expirar, outro worker pode assumir a pendência gerando um novo `lease_token`. Caso o worker antigo retome, ele detecta a divergência do token e aborta imediatamente com erro tipado `StaleLeaseError` (`code: 'STALE_LEASE'`), impedindo que finalize ou cometa alterações indevidas em uma reserva já assumida por outro.
+4. **Recuperação Pós-Crash:**
+   - Se um worker falhar ou morrer inesperadamente após efetuar o claim e antes de concluir o processamento, a condição `(lease_expires_at IS NULL OR lease_expires_at < NOW())` permite que qualquer outro worker elegível reassuma automaticamente a pendência assim que a validade do lease expirar, sem necessidade de intervenção humana.
+5. **Liberação e Renovação Condicionadas:**
+   - Métodos `releaseLease` e `renewLease` utilizam cláusulas `WHERE id = $1 AND lease_token = $2`, garantindo que apenas o detentor legítimo do token consiga liberar ou prorrogar o lease. Ao concluir ou rejeitar a transação, os campos de lease são automaticamente limpos (`NULL`).
+
+### 13.3 Ordem Canônica de Locks e Isolamento de Memória
+1. **Ordem Estrita de Locks Anti-Deadlock:**
+   - Durante o processamento de cada item do lote, o worker adquire os locks pessimistas na seguinte ordem estrita:
+     1. `wallets` (`SELECT ... FOR UPDATE`).
+     2. `wager_transactions` (`SELECT ... FOR UPDATE` com releitura direta).
+   - Essa ordem espelha fielmente a ordem adotada no endpoint HTTP imediato (`ProcessWagerUseCase`), prevenindo deadlocks cruzados no PostgreSQL (`40P01 dead lock detected`).
+2. **Releitura Limpa do Identity Map (MikroORM):**
+   - Para evitar inconsistências causadas por entidades em cache de memória (Identity Map do ORM), o processamento utiliza transações isoladas (`em.fork().transactional(...)`) e releitura explícita com `{ refresh: true, lockMode: LockMode.PESSIMISTIC_WRITE }`.
+3. **Idempotência e Estado Terminal Reavaliado sob Lock:**
+   - O status da transação é inspecionado imediatamente após a obtenção dos locks. Se a transação já tiver atingido um estado terminal (`PROCESSED` ou `REJECTED`), a execução retorna sem aplicar novas mutações de saldo, sem criar lançamentos adicionais no ledger e sem emitir eventos repetidos na outbox.
+4. **Reutilização Integral de Motores de Negócio:**
+   - O worker reutiliza integralmente os serviços consolidados `WinProcessor` (para `WIN`) e `ReversalProcessor` (para `REFUND` e `ROLLBACK`), garantindo 100% de paridade de regras contábeis, reconciliação e validações de referência entre o fluxo síncrono e assíncrono.
+5. **Nenhum Lock Retido Durante Polling ou Backoff:**
+   - As transações de banco de dados são estritamente delimitadas a cada item individual do lote. Nenhum lock relacional permanece aberto durante as pausas de agendamento, polling ou backoff.
+
+### 13.4 Tratamento de Erros, Retries e Bloqueio Operacional Fail-Closed
+1. **Classificação Rigorosa entre Falhas Transitórias e de Negócio:**
+   - Falhas transitórias de infraestrutura (como quedas temporárias de rede, timeouts ou deadlocks transitórios) são capturadas e logadas sem incrementar a contagem de tentativas de domínio (`attempts`) e sem transicionar a transação para `REJECTED`. O lease é liberado (ou expira naturalmente), permitindo que a transação seja reprocessada normalmente após a recuperação da infraestrutura.
+2. **Backoff e Esgotamento de Tentativas de Referência:**
+   - Quando a referência legítima ainda não se encontra disponível, o sistema incrementa `attempts` e agenda a próxima tentativa com backoff exponencial determinístico (`Math.min(500 * 2^attempts, 10000)` ms).
+   - Ao atingir o limite máximo de tentativas (`MAX_ATTEMPTS = 5`), a transação é transicionada para `REJECTED` com código `REFERENCE_NOT_FOUND`, gerando exatamente 1 snapshot terminal rejeitado e 1 evento `WagerTransactionRejected` na outbox.
+3. **Isolamento de Snapshots Inválidos (Bloqueio Operacional Fail-Closed):**
+   - Caso um registro pendente possua snapshot inválido ou corrompido (`validateReplaySnapshot` lança erro), o worker:
+     - Não altera o saldo nem gera registros no ledger contábil.
+     - Não comete alterações financeiras indevidas.
+     - Isola o registro persistindo `is_operationally_blocked = TRUE` e `operational_block_reason = ...` no banco de dados, liberando o lease.
+     - Emite log estruturado de advertência com diagnóstico seguro, sem expor montantes ou payloads financeiros.
+     - Como a query de claim filtra `is_operationally_blocked = FALSE`, o item corrompido é automaticamente excluído de todas as seleções subsequentes, impedindo que ocupe continuamente o lote ou bloqueie os demais itens saudáveis da fila.
+4. **Isolamento de Itens no Lote:**
+   - O processamento de cada item do lote ocorre em bloco `try/catch` individual com transação própria. A falha de um registro nunca aborta nem bloqueia o processamento dos demais itens do lote.
+5. **Observabilidade e Logs Estruturados:**
+   - Logs em formato JSON registram eventos do ciclo de vida: `worker_claim_batch`, `worker_process_success`, `worker_process_rejected`, `worker_process_transient_error`, `worker_operational_block` e `worker_stale_lease`.
+   - Nenhuma informação financeira confidencial, dados de payload ou valores monetários (`amount`, `balance`) são emitidos nos logs.
+
+### 13.5 Delimitação Estrita de Escopo (M10 vs M14 / M15 / M16)
+> [!IMPORTANT]
+> O marco M10 estabiliza exclusivamente o **worker de referências pendentes baseado em lease persistente no PostgreSQL e ciclo de vida NestJS**.
+> Os seguintes componentes pertencem a marcos posteriores e permanecem explicitamente como **NÃO VALIDADOS / FORA DE ESCOPO**:
+> 1. **Filas SQS / LocalStack e Mensageria Assíncrona Externa (M14):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 2. **Tabela Inbox e Deduplicação Inbox / SQS (M15):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 3. **Publisher Concorrente da Outbox para Broker Externo (M16):** **NÃO VALIDADO / FORA DE ESCOPO**
+> 4. **Dead Letter Queue (DLQ) Externa de Mensageria:** **NÃO VALIDADO / FORA DE ESCOPO**
+
 
 
 

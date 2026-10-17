@@ -22,6 +22,11 @@ export interface WagerTransactionProps {
   referenceExternalTransactionId?: string | null;
   attempts?: number;
   nextAttemptAt?: string | null;
+  leaseToken?: string | null;
+  leaseOwner?: string | null;
+  leaseExpiresAt?: string | null;
+  isOperationallyBlocked?: boolean;
+  operationalBlockReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +49,11 @@ export class WagerTransaction {
   public readonly referenceExternalTransactionId: string | null;
   public readonly attempts: number;
   public readonly nextAttemptAt: string | null;
+  public readonly leaseToken: string | null;
+  public readonly leaseOwner: string | null;
+  public readonly leaseExpiresAt: string | null;
+  public readonly isOperationallyBlocked: boolean;
+  public readonly operationalBlockReason: string | null;
   public readonly createdAt: string;
   public readonly updatedAt: string;
 
@@ -69,6 +79,11 @@ export class WagerTransaction {
     this.referenceExternalTransactionId = props.referenceExternalTransactionId ?? null;
     this.attempts = props.attempts ?? 0;
     this.nextAttemptAt = props.nextAttemptAt ?? null;
+    this.leaseToken = props.leaseToken ?? null;
+    this.leaseOwner = props.leaseOwner ?? null;
+    this.leaseExpiresAt = props.leaseExpiresAt ?? null;
+    this.isOperationallyBlocked = props.isOperationallyBlocked ?? false;
+    this.operationalBlockReason = props.operationalBlockReason ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
 
@@ -88,6 +103,9 @@ export class WagerTransaction {
       ...this,
       status: 'PROCESSED',
       responseSnapshot: responseSnapshot ?? this.responseSnapshot,
+      leaseToken: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -102,6 +120,9 @@ export class WagerTransaction {
       status: 'REJECTED',
       rejectionReason: failureCode,
       responseSnapshot: responseSnapshot ?? this.responseSnapshot,
+      leaseToken: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -115,6 +136,9 @@ export class WagerTransaction {
       ...this,
       status: 'FAILED',
       rejectionReason: reason,
+      leaseToken: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -129,6 +153,45 @@ export class WagerTransaction {
       status: 'PENDING_REFERENCE',
       attempts: this.attempts + 1,
       nextAttemptAt,
+      leaseToken: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public claimLease(token: string, owner: string, expiresAt: string): WagerTransaction {
+    if (this.isTerminal()) {
+      throw new InvalidWagerOperationError(`Cannot claim lease on terminal transaction "${this.status}"`);
+    }
+
+    return new WagerTransaction({
+      ...this,
+      leaseToken: token,
+      leaseOwner: owner,
+      leaseExpiresAt: expiresAt,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public releaseLease(): WagerTransaction {
+    return new WagerTransaction({
+      ...this,
+      leaseToken: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public markOperationallyBlocked(reason: string): WagerTransaction {
+    return new WagerTransaction({
+      ...this,
+      isOperationallyBlocked: true,
+      operationalBlockReason: reason,
+      leaseToken: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
       updatedAt: new Date().toISOString(),
     });
   }

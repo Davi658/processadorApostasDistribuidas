@@ -273,9 +273,13 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
     return this.uow.getEntityManager();
   }
 
-  public async findById(id: string): Promise<WagerTransaction | null> {
+  public async findById(id: string, lockForUpdate = false): Promise<WagerTransaction | null> {
     const em = this.em;
-    const ormEntity = await em.findOne(WagerTransactionOrmEntity, { id });
+    const ormEntity = await em.findOne(
+      WagerTransactionOrmEntity,
+      { id },
+      lockForUpdate ? { lockMode: LockMode.PESSIMISTIC_WRITE, refresh: true } : undefined
+    );
     if (!ormEntity) {
       return null;
     }
@@ -333,11 +337,104 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
       WagerTransactionOrmEntity,
       {
         status: 'PENDING_REFERENCE',
+        isOperationallyBlocked: false,
         nextAttemptAt: { $lte: new Date() },
       },
       { limit, orderBy: { nextAttemptAt: 'ASC' } }
     );
     return entities.map((e) => this.toDomain(e));
+  }
+
+  public async claimPendingReferences(
+    limit = 20,
+    leaseDurationMs = 30000,
+    owner = 'worker'
+  ): Promise<Array<{ id: string; walletId: string; leaseToken: string; leaseOwner: string; leaseExpiresAt: string }>> {
+    const em = this.em;
+    const query = `
+      WITH eligible AS (
+        SELECT id
+        FROM wager_transactions
+        WHERE status = 'PENDING_REFERENCE'
+          AND is_operationally_blocked = FALSE
+          AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+          AND (lease_expires_at IS NULL OR lease_expires_at < NOW())
+        ORDER BY next_attempt_at ASC NULLS FIRST, created_at ASC
+        LIMIT ?
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE wager_transactions wt
+      SET lease_token = gen_random_uuid()::text,
+          lease_owner = ?,
+          lease_expires_at = NOW() + (? * INTERVAL '1 millisecond'),
+          updated_at = NOW()
+      FROM eligible
+      WHERE wt.id = eligible.id
+      RETURNING wt.id, wt.wallet_id, wt.lease_token, wt.lease_owner, wt.lease_expires_at;
+    `;
+
+    const results = await em.execute<
+      Array<{
+        id: string;
+        wallet_id: string;
+        lease_token: string;
+        lease_owner: string;
+        lease_expires_at: Date | string;
+      }>
+    >(query, [limit, owner, leaseDurationMs]);
+
+    return (results || []).map((row) => ({
+      id: row.id,
+      walletId: row.wallet_id,
+      leaseToken: row.lease_token,
+      leaseOwner: row.lease_owner,
+      leaseExpiresAt:
+        row.lease_expires_at instanceof Date
+          ? row.lease_expires_at.toISOString()
+          : new Date(row.lease_expires_at).toISOString(),
+    }));
+  }
+
+  public async releaseLease(id: string, token: string): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      UPDATE wager_transactions
+      SET lease_token = NULL,
+          lease_owner = NULL,
+          lease_expires_at = NULL,
+          updated_at = NOW()
+      WHERE id = ? AND lease_token = ?;
+    `;
+    const res = await em.execute<any>(query, [id, token]);
+    return (res?.rowCount ?? (Array.isArray(res) ? res.length : 1)) > 0;
+  }
+
+  public async renewLease(id: string, token: string, leaseDurationMs: number): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      UPDATE wager_transactions
+      SET lease_expires_at = NOW() + (? * INTERVAL '1 millisecond'),
+          updated_at = NOW()
+      WHERE id = ? AND lease_token = ?;
+    `;
+    const res = await em.execute<any>(query, [leaseDurationMs, id, token]);
+    return (res?.rowCount ?? (Array.isArray(res) ? res.length : 1)) > 0;
+  }
+
+  public async markOperationallyBlocked(id: string, token: string, reason: string): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      UPDATE wager_transactions
+      SET is_operationally_blocked = TRUE,
+          operational_block_reason = ?,
+          lease_token = NULL,
+          lease_owner = NULL,
+          lease_expires_at = NULL,
+          updated_at = NOW()
+      WHERE id = ? AND (lease_token = ? OR lease_token IS NULL);
+    `;
+    await em.execute<any>(query, [reason, id, token]);
+    return true;
   }
 
   public async save(transaction: WagerTransaction): Promise<void> {
@@ -372,6 +469,11 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
     ormEntity.referenceExternalTransactionId = transaction.referenceExternalTransactionId;
     ormEntity.attempts = transaction.attempts;
     ormEntity.nextAttemptAt = transaction.nextAttemptAt ? new Date(transaction.nextAttemptAt) : null;
+    ormEntity.leaseToken = transaction.leaseToken;
+    ormEntity.leaseOwner = transaction.leaseOwner;
+    ormEntity.leaseExpiresAt = transaction.leaseExpiresAt ? new Date(transaction.leaseExpiresAt) : null;
+    ormEntity.isOperationallyBlocked = transaction.isOperationallyBlocked;
+    ormEntity.operationalBlockReason = transaction.operationalBlockReason;
     ormEntity.updatedAt = new Date(transaction.updatedAt);
 
     await em.persistAndFlush(ormEntity);
@@ -397,6 +499,11 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
       referenceExternalTransactionId: orm.referenceExternalTransactionId ?? null,
       attempts: orm.attempts ?? 0,
       nextAttemptAt: orm.nextAttemptAt ? orm.nextAttemptAt.toISOString() : null,
+      leaseToken: orm.leaseToken ?? null,
+      leaseOwner: orm.leaseOwner ?? null,
+      leaseExpiresAt: orm.leaseExpiresAt ? orm.leaseExpiresAt.toISOString() : null,
+      isOperationallyBlocked: orm.isOperationallyBlocked ?? false,
+      operationalBlockReason: orm.operationalBlockReason ?? null,
       createdAt: orm.createdAt.toISOString(),
       updatedAt: orm.updatedAt.toISOString(),
     });
