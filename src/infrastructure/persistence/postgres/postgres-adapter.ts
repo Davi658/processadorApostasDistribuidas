@@ -10,4 +10,6 @@ export {
   MikroOrmWalletLedgerRepository as PostgresWalletLedgerRepository,
   MikroOrmOutboxRepository as PostgresOutboxRepository,
   type FailureHookPoint,
+  type TransactionContext,
 } from '../mikro-orm/mikro-orm-adapter';
+

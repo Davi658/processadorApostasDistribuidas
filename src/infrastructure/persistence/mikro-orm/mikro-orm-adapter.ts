@@ -8,6 +8,10 @@ import { WalletLedgerEntry } from '../../../domain/entities/wallet-ledger-entry.
 import { Money } from '../../../domain/value-objects/money.vo';
 import { IntegrationEvent, IntegrationEventEnvelope } from '../../../domain/events/events';
 import {
+  TransactionRequiredError,
+  TransactionRollbackOnlyError,
+} from '../../../domain/errors/domain.error';
+import {
   OutboxRepositoryPort,
   UnitOfWorkPort,
   WalletLedgerRepositoryPort,
@@ -28,10 +32,17 @@ export type FailureHookPoint =
   | 'after_ledger_save'
   | 'after_outbox_save';
 
+export interface TransactionContext {
+  em: EntityManager;
+  depth: number;
+  rollbackOnly: boolean;
+  rollbackReason?: Error;
+}
+
 @Injectable()
 export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModuleDestroy {
-  private orm!: MikroORM;
-  private readonly asyncLocalStorage = new AsyncLocalStorage<EntityManager>();
+  private orm?: MikroORM;
+  private readonly asyncLocalStorage = new AsyncLocalStorage<TransactionContext>();
   private readonly testHooks = new Map<FailureHookPoint, (entity?: any) => void>();
 
   constructor(@Optional() private readonly customConfig?: Options) {}
@@ -43,9 +54,7 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
   }
 
   public async onModuleDestroy(): Promise<void> {
-    if (this.orm) {
-      await this.orm.close(true);
-    }
+    await this.close();
   }
 
   public async init(config?: Options): Promise<void> {
@@ -56,21 +65,34 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
 
   public async close(): Promise<void> {
     if (this.orm) {
-      await this.orm.close(true);
+      const ormInstance = this.orm;
+      this.orm = undefined;
+      await ormInstance.close(true);
     }
   }
 
   public getOrm(): MikroORM {
+    if (!this.orm) {
+      throw new Error('MikroORM has not been initialized. Call init() or onModuleInit() first.');
+    }
     return this.orm;
+  }
+
+  public isTransactionActive(): boolean {
+    return this.asyncLocalStorage.getStore() !== undefined;
+  }
+
+  public getTransactionContext(): TransactionContext | undefined {
+    return this.asyncLocalStorage.getStore();
   }
 
   public getEntityManager(): EntityManager {
     const store = this.asyncLocalStorage.getStore();
     if (store) {
-      return store;
+      return store.em;
     }
     // Fork a request-isolated EntityManager if called outside an explicit transaction
-    return this.orm.em.fork();
+    return this.getOrm().em.fork();
   }
 
   public setTestFailurePoint(point: FailureHookPoint, callback?: (entity?: any) => void): void {
@@ -103,17 +125,63 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnModul
   }
 
   public async runInTransaction<T>(work: () => Promise<T>): Promise<T> {
-    // If already in a transactional context, continue inside it
+    if (!this.orm) {
+      await this.init();
+    }
+    const orm = this.getOrm();
     const existingStore = this.asyncLocalStorage.getStore();
+
     if (existingStore) {
-      return await work();
+      // Nested transaction: reuse outer transaction without committing independently
+      existingStore.depth++;
+      try {
+        if (existingStore.rollbackOnly) {
+          throw (
+            existingStore.rollbackReason ??
+            new TransactionRollbackOnlyError(
+              'Cannot execute work in nested transaction marked as rollback-only'
+            )
+          );
+        }
+        return await work();
+      } catch (innerErr) {
+        // Internal failure marks outer transaction as rollback-only to prevent partial commits
+        existingStore.rollbackOnly = true;
+        if (!existingStore.rollbackReason) {
+          existingStore.rollbackReason =
+            innerErr instanceof Error ? innerErr : new Error(String(innerErr));
+        }
+        throw innerErr;
+      } finally {
+        existingStore.depth--;
+      }
     }
 
-    return await this.orm.em.transactional(async (forkedEm) => {
-      return await this.asyncLocalStorage.run(forkedEm, async () => {
-        const result = await work();
-        await forkedEm.flush();
-        return result;
+    // Outermost transaction (depth 0)
+    return await orm.em.transactional(async (forkedEm) => {
+      const context: TransactionContext = {
+        em: forkedEm,
+        depth: 0,
+        rollbackOnly: false,
+      };
+
+      return await this.asyncLocalStorage.run(context, async () => {
+        try {
+          const result = await work();
+          if (context.rollbackOnly) {
+            throw (
+              context.rollbackReason ??
+              new TransactionRollbackOnlyError(
+                'Transaction cannot be committed because it has been marked as rollback-only'
+              )
+            );
+          }
+          await forkedEm.flush();
+          return result;
+        } catch (error) {
+          // Re-throwing causes MikroORM transactional() to execute ROLLBACK on the DB connection
+          throw error;
+        }
       });
     });
   }
@@ -128,12 +196,18 @@ export class MikroOrmWalletRepository implements WalletRepositoryPort {
   }
 
   public async findById(id: string, lockForUpdate = false): Promise<Wallet | null> {
+    if (lockForUpdate && !this.uow.isTransactionActive()) {
+      throw new TransactionRequiredError(
+        'Pessimistic lock requires an active UnitOfWork transaction'
+      );
+    }
     const em = this.em;
     const ormEntity = await em.findOne(
       WalletOrmEntity,
       { id },
       lockForUpdate ? { lockMode: LockMode.PESSIMISTIC_WRITE } : undefined
     );
+
 
     if (!ormEntity) {
       return null;
@@ -170,6 +244,11 @@ export class MikroOrmWalletRepository implements WalletRepositoryPort {
   }
 
   public async save(wallet: Wallet): Promise<void> {
+    if (!this.uow.isTransactionActive()) {
+      throw new TransactionRequiredError(
+        'Write operation on WalletRepository requires an active UnitOfWork transaction'
+      );
+    }
     const em = this.em;
     let ormEntity = await em.findOne(WalletOrmEntity, { id: wallet.id });
 
@@ -266,6 +345,11 @@ export class MikroOrmWagerTransactionRepository implements WagerTransactionRepos
   }
 
   public async save(transaction: WagerTransaction): Promise<void> {
+    if (!this.uow.isTransactionActive()) {
+      throw new TransactionRequiredError(
+        'Write operation on WagerTransactionRepository requires an active UnitOfWork transaction'
+      );
+    }
     const em = this.em;
     let ormEntity = await em.findOne(WagerTransactionOrmEntity, { id: transaction.id });
 
@@ -332,6 +416,11 @@ export class MikroOrmWalletLedgerRepository implements WalletLedgerRepositoryPor
   }
 
   public async save(entry: WalletLedgerEntry): Promise<void> {
+    if (!this.uow.isTransactionActive()) {
+      throw new TransactionRequiredError(
+        'Write operation on WalletLedgerRepository requires an active UnitOfWork transaction'
+      );
+    }
     const em = this.em;
     const ormEntity = new WalletLedgerOrmEntity();
     ormEntity.id = entry.id;
@@ -381,6 +470,11 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
   }
 
   public async save(event: IntegrationEvent<unknown>): Promise<void> {
+    if (!this.uow.isTransactionActive()) {
+      throw new TransactionRequiredError(
+        'Write operation on OutboxRepository requires an active UnitOfWork transaction'
+      );
+    }
     const em = this.em;
     const ormEntity = new OutboxMessageOrmEntity();
     ormEntity.id = event.eventId;
@@ -393,6 +487,7 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
     ormEntity.occurredAt = new Date(event.occurredAt);
     ormEntity.payload = event.data;
     ormEntity.createdAt = new Date();
+
 
     await em.persistAndFlush(ormEntity);
     this.uow.triggerTestHook('after_outbox_save', ormEntity);

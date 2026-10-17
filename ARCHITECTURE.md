@@ -291,4 +291,41 @@ O processador inspeciona a causa raiz exata de erros com código `23505` (`uniqu
 - Todos os identificadores da tentativa são capturados e auditados diretamente no PostgreSQL, confirmando ausência total de registros órfãos após rollback.
 - O reenvio subsequente da operação confirma a conclusão bem-sucedida com um único efeito final consolidado.
 
+---
+
+## 10. Persistência MikroORM e Unidade de Trabalho (M05)
+
+### 10.1 Isolamento Transacional e Gestão de Contexto
+A unidade de trabalho `MikroOrmUnitOfWork` implementa a porta `UnitOfWorkPort` e gerencia a fronteira transacional utilizando o mecanismo nativo `AsyncLocalStorage` do Node.js:
+- **EntityManager Transacional Isolado:** Cada invocação de `uow.runInTransaction` gera um novo fork isolado do EntityManager via `orm.em.transactional(async (forkedEm) => ...)`.
+- **Zero Compartilhamento de Identity Map Global:** O root EntityManager da aplicação nunca é utilizado para consultas ou gravações de requisições. Dentro da transação, todas as operações usam exclusivamente o Identity Map privado do `forkedEm`. Fora de transação, consultas simples realizam seu próprio fork descartável, impedindo vazamento de entidades ou poluição cruzada entre requisições concorrentes.
+- **Identidade Transacional e Compartilhamento de Conexão:** Dentro de uma transação aberta, todos os repositórios (`MikroOrmWalletRepository`, `MikroOrmWagerTransactionRepository`, `MikroOrmWalletLedgerRepository`, `MikroOrmOutboxRepository`) obtêm o EntityManager ativo via `uow.getEntityManager()`. Testes com PostgreSQL real comprovam que todas as gravações dos 4 repositórios executam exatamente sob o mesmo PID de conexão física (`SELECT pg_backend_pid()`) e sob o mesmo identificador de transação (`SELECT txid_current()`).
+- **Locks Pessimistas Exclusivamente na Transação:** O método `walletRepo.findById(id, lockForUpdate = true)` exige explicitamente transação ativa. Qualquer tentativa de invocar lock pessimista fora da Unit of Work lança `TransactionRequiredError`, impedindo que locks de linha no PostgreSQL sejam imediatamente liberados por auto-commit.
+
+### 10.2 Proteção Contra Gravação Isolada Acidental (Escrita sem UoW Rejeitada)
+- Todos os repositórios de escrita (`walletRepo.save`, `wagerRepo.save`, `ledgerRepo.save`, `outboxRepo.save`) possuem guardas que verificam `this.uow.isTransactionActive()`.
+- Se uma operação de escrita for invocada fora de um bloco `runInTransaction`, o repositório lança imediatamente `TransactionRequiredError` (`code: 'TRANSACTION_REQUIRED'`), sem emitir comandos SQL nem alterar o banco de dados.
+- Consultas simples de leitura (`findById`, `findByPlayerIdAndCurrency`, `findByIdempotencyKey`, `listByWalletId`, `listUnpublished`) podem ser executadas fora de transação com isolamento de leitura via fork descartável.
+
+### 10.3 Semântica de Chamadas Aninhadas e Estratégia Rollback-Only
+O `MikroOrmUnitOfWork` rastreia a profundidade de execução (`depth`) e o estado de abortamento (`rollbackOnly`) no contexto transacional:
+1. **Reutilização da Transação Externa:** Chamadas aninhadas a `runInTransaction` reutilizam a transação externa e o mesmo `forkedEm`, incrementando o contador de profundidade.
+2. **Não-Confirmação Independente:** O bloco interno não emite `COMMIT` nem confirma dados independentemente. O commit no PostgreSQL é executado exclusivamente pelo bloco mais externo (profundidade 0).
+3. **Falha Externa Desfaz Trabalho Interno:** Caso o bloco interno execute com sucesso e ocorra uma falha subsequente no bloco externo, todo o trabalho — interno e externo — é revertido atomicamente no PostgreSQL.
+4. **Estratégia Rollback-Only para Falha Interna Capturada:**
+   - Se uma chamada aninhada falhar com erro e a camada externa capturar o erro em bloco `try/catch` para tentar commitar dados parciais, o Unit of Work marca o contexto com `rollbackOnly = true` e armazena `rollbackReason`.
+   - Ao finalizar o bloco raiz (depth 0), o Unit of Work inspeciona `context.rollbackOnly`. Se verdadeiro, impede a execução de `flush()` e lança `TransactionRollbackOnlyError` (ou o `rollbackReason` original).
+   - O wrapper transacional do MikroORM captura o erro e emite `ROLLBACK` ao PostgreSQL, garantindo que nenhum commit parcial ocorra no banco.
+
+### 10.4 Ciclo de Vida NestJS e Liberação de Recursos
+- `MikroOrmUnitOfWork` implementa `OnModuleInit` e `OnModuleDestroy`.
+- Na inicialização (`onModuleInit`), o pool MikroORM é provisionado sob demanda ou na inicialização do módulo NestJS.
+- No encerramento (`onModuleDestroy` / `close`), o pool e as conexões físicas são encerradas via `await this.orm.close(true)`. A suíte dedicada M05 atesta via `pg_stat_activity` que zero conexões ativas ou penduradas permanecem no PostgreSQL após o shutdown.
+
+### 10.5 Delimitação e Não-Validação de Escopos Futuros
+> [!IMPORTANT]
+> A presente estabilização de M05 comprova a atomicidade e isolamento de `wallet`, `wager_transactions`, `wallet_ledger_entries` e `outbox_messages`.
+> **Tabela Inbox ainda não existe no modelo atual.** A atomicidade entre Inbox e SQS pertence ao marco **M15** e permanece explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**.
+> Da mesma forma, workers concorrentes distribuídos e filas SQS (M10) e reconciliação assíncrona (M09) permanecem como **NÃO VALIDADOS**.
+
 

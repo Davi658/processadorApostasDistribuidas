@@ -70,3 +70,20 @@ export class IdempotencyConflictError extends DomainError {
     super(message);
   }
 }
+
+export class TransactionRequiredError extends DomainError {
+  public readonly code = 'TRANSACTION_REQUIRED';
+
+  constructor(message = 'Write operations require an active UnitOfWork transaction') {
+    super(message);
+  }
+}
+
+export class TransactionRollbackOnlyError extends DomainError {
+  public readonly code = 'TRANSACTION_ROLLBACK_ONLY';
+
+  constructor(message = 'Transaction cannot be committed because it has been marked as rollback-only') {
+    super(message);
+  }
+}
+

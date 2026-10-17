@@ -19,6 +19,8 @@
 | **Frente M02** | 13. Estabilização da Frente Money (NUMERIC 18,2, overflow no domínio, round-trip real) | **CONCLUÍDO** | `tests/unit/money.test.ts`, `tests/integration/money-postgres-roundtrip.test.ts` |
 | **Frente M03** | 14. Estabilização da Abertura de Carteira (Contrato, atomicidade SQL, 20 concorrentes, rollback em falhas injetadas, reconciliação, limite Money) | **CONCLUÍDO** | `tests/integration/wallet-opening.test.ts` |
 | **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
+| **Frente M05** | 16. Estabilização MikroORM e Unidade de Trabalho (Isolamento de EntityManager por execução via AsyncLocalStorage, zero Identity Map compartilhado, conexão e tx compartilhadas pelos 4 repositórios, locks pessimistas na tx, rollback integral, chamadas aninhadas com Rollback-Only, escrita sem UoW rejeitada com TransactionRequiredError, ciclo de vida NestJS sem conexões penduradas) | **CONCLUÍDO** | `tests/integration/mikro-orm-uow-m05.test.ts` (17 testes passando) |
+
 
 ---
 
@@ -122,9 +124,29 @@
   5. *Reconciliação Integral:*
      - Todas as carteiras envolvidas em todos os cenários (inclusive fixtures de moedas alternativas) passam por validação contábil via `ReconcileWalletUseCase` (`storedBalance == calculatedBalance`).
 
+### 2.8 Frente MikroORM e Unidade de Trabalho (M05)
+- **Isolamento de EntityManager e Conexão via `AsyncLocalStorage`:**
+  - `MikroOrmUnitOfWork` gerencia o contexto assíncrono via `AsyncLocalStorage<TransactionContext>`, garantindo que cada execução concorrente possua sua própria instância de `EntityManager`, conexão e transação física.
+  - Comprovação com PostgreSQL real em `tests/integration/mikro-orm-uow-m05.test.ts`:
+    - **Identidade Transacional (Teste A):** Durante a gravação dos 4 repositórios (`wallets`, `wager_transactions`, `wallet_ledger_entries`, `outbox_messages`), todos compartilham o mesmo `EntityManager` e executam exatamente sob o mesmo PID de conexão física (`SELECT pg_backend_pid()`) e mesmo ID de transação (`SELECT txid_current()`).
+    - **Isolamento e MVCC (Teste B):** Duas execuções concorrentes com sincronização explícita (sem esperas arbitrárias) usam PIDs e txids distintos. Enquanto não commitadas, dados inseridos por uma transação são 100% invisíveis na conexão externa do pool administrativo (`adminPool`).
+- **Rollback Integral Auditado por ID (Teste C):**
+  - Falhas injetadas após a gravação de cada um dos 4 repositórios (`after_wallet_save`, `after_tx_save`, `after_ledger_save`, `after_outbox_save`) executam `ROLLBACK` total. Todos os identificadores são auditados no PostgreSQL, garantindo ausência de linhas órfãs.
+- **Semântica de Aninhamento e Estratégia Rollback-Only (Teste D):**
+  - *D.1 (Não confirmação independente):* Bloco aninhado conclui sem confirmar no banco antes do bloco externo.
+  - *D.2 (Falha externa desfaz trabalho interno):* Erro no bloco externo aborta e reverte tanto o trabalho externo quanto o trabalho do bloco aninhado.
+  - *D.3 (Falha interna capturada / Rollback-Only):* Quando o bloco aninhado falha e a camada externa captura a exceção para tentar comitar parcialmente, o Unit of Work detecta `rollbackOnly = true`, rejeita com `TransactionRollbackOnlyError` e força `ROLLBACK` no PostgreSQL.
+- **Limpeza de Contexto e Ciclo de Vida NestJS (Testes E e G):**
+  - Após falhas, o contexto transacional é limpo e uma nova execução opera com novo contexto válido.
+  - `onModuleInit` e `onModuleDestroy` liberam os pools, e o encerramento do módulo NestJS resulta em 0 conexões penduradas no PostgreSQL (`pg_stat_activity`).
+- **Proteção Contra Escrita Acidental sem UoW (Teste F):**
+  - Chamadas de `.save()` em qualquer um dos 4 repositórios fora de transação lançam `TransactionRequiredError` sem persistir dados no banco.
+  - Locks pessimistas fora de transação são rejeitados com `TransactionRequiredError`. Consultas simples de leitura funcionam normalmente.
+
 ---
 
-## 3. Próxima Rodada (Fatia de Mensageria e Resiliência — M10)
+## 3. Próxima Rodada (Fatia de Mensageria e Resiliência — M10 e Integrações)
+
 
 > [!IMPORTANT]
 > **Delimitação de Escopo (M08 vs M10):**
