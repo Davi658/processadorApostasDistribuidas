@@ -35,7 +35,7 @@
   - Criação de índice único parcial `uq_processed_reversal_per_reference` em `(provider_id, reference_external_transaction_id, kind) WHERE status = 'PROCESSED' AND reference_external_transaction_id IS NOT NULL`.
   - Criação de constraint única composta `uq_wager_tx_id_wallet_currency` em `wager_transactions(id, wallet_id, currency)`.
   - Criação da foreign key composta `fk_ledger_wager_tx_wallet_currency` ligando `wallet_ledger_entries(transaction_id, wallet_id, currency)` a `wager_transactions(id, wallet_id, currency)`.
-  - Trigger `prevent_terminal_transaction_modification()` com comparação segura `IS DISTINCT FROM` para todos os campos que definem identidade, payload e resultado original.
+  - Trigger histórico `prevent_terminal_transaction_modification()`; a referência inválida a `observed_balance` desta versão é corrigida incrementalmente pela migration 006 (M11).
 - **Invariantes de Domínio e Envelope:**
   - `Money.create` com regex `/^(?:0|[1-9]\d*)\.\d{2}$/`, rejeitando representações não-canônicas (`"00.00"`, `"01.50"`).
   - `IntegrationEventEnvelope<T>` com serialização explícita e método estático `reconstruct()`.
@@ -274,3 +274,34 @@ Evidências finais, comandos, códigos de saída e limitações: [M10 shutdown](
 > 3. **Retry, Dead Letter Queue (DLQ) e Shutdown do Consumidor (M16):** **NÃO VALIDADO / FORA DE ESCOPO**
 
 
+
+
+## M11 — Proteção de Transações Terminais
+
+Base inspecionada: origin/main local a47d1e2039e3e6267a910fd9331e342a8c013cb2 (a main local estava em 6acc7c3). A base informada 7c2cf20 não existe neste clone; nenhum remoto foi acessado. Branch exclusiva codex/m11-terminal-protection, worktree .worktrees/m11-terminal-protection.
+
+Diagnóstico: a função histórica 003 referencia observed_balance, ausente do schema; não há correção posterior até 005. Uma atualização somente de attempts em registro terminal reproduz SQLSTATE 42703 no DOWN. O trigger histórico também não intercepta DELETE e não protege id ou created_at.
+
+A migration 006 substitui a função e registra BEFORE UPDATE OR DELETE. A comparação JSONB com IS DISTINCT FROM preserva todos os campos salvo updated_at, attempts, next_attempt_at, lease_token, lease_owner, lease_expires_at, is_operationally_blocked e operational_block_reason. São campos exclusivamente operacionais; atualizá-los junto de um campo financeiro continua proibido. O schema financeiro, domínio, publisher e mensageria não foram ampliados. Migrations históricas permanecem intactas.
+
+Provas reproduzíveis: tests/integration/terminal-protection-m11.test.ts usa PostgreSQL real descartável e triggers ativos. Para PROCESSED, REJECTED e FAILED, cada papel (app_user restrito e administrativo) tenta individualmente alterar 17 campos protegidos; cobre também NULL para valor e valor para NULL nas cinco colunas protegidas anuláveis, usando OPENING para permitir NULL em idempotency_key e payload_hash sem violar o contrato externo. Cada recusa verifica SQLSTATE 55000, motivo terminal_transaction_protected_fields e igualdade da linha completa antes/depois. UPDATE sem alteração é aceito.
+
+DELETE pelo app_user verifica 42501 e o identificador da tabela (mensagem localizada pelo PostgreSQL); DELETE administrativo verifica 55000 e terminal_transaction_delete_forbidden, sem depender de FK ou ledger. Os oito campos operacionais são atualizados separadamente; cada um também é combinado com alteração financeira recusada. Há limpeza de lease e seis transições legítimas das duas origens pendentes aos três estados terminais. UP/DOWN/UP preserva linhas completas dos três estados e restaura a proteção. DOWN restaura deliberadamente a função histórica defeituosa; não oferece as garantias M11.
+
+
+Validação final em 17/10/2026, PostgreSQL 16.8 exclusivo e descartável na porta 55411, com fsync=on e synchronous_commit=on:
+
+| Comando | Exit code | Resultado |
+| --- | --- | --- |
+| bun run typecheck | 0 | Sem erros TypeScript |
+| APP_DB_PORT=55411 MIGRATION_DB_PORT=55411 bun run test | 0 | 39 unitários + 282 integração + 6 concorrência = 327 testes, zero falhas; inclui M10, M17 e nove casos M11 |
+| APP_DB_PORT=55411 MIGRATION_DB_PORT=55411 bun test tests/integration/terminal-protection-m11.test.ts | 0 | Reforço final: nove casos, 672 assertions; transições diretas e via PENDING_REFERENCE |
+| git diff --check | 0 | Sem erros de whitespace |
+
+Em PowerShell, definir as portas com $env:APP_DB_PORT='55411' e $env:MIGRATION_DB_PORT='55411' antes do comando. O teste M06 de rollback da 004 recebeu somente a reversão explícita da nova 006 antes da 005, em seus dois ciclos. Não houve alteração de comportamento de M06, M10 ou M17.
+
+A matriz M11 verifica 217 recusas com linha intacta: 213 pela proteção terminal (55000), três por privilégio de DELETE (42501) e uma pela falha histórica reproduzida no DOWN (42703). Inclui seis transições diretas de PENDING/PENDING_REFERENCE aos três estados terminais e a transição PENDING para PENDING_REFERENCE. Triggers permanecem ativos; nenhuma prova altera session_replication_role.
+
+Histórico de execução e limitações: a primeira execução de bun run test na porta 5432 retornou 1 (39 unitários aprovados; 185 integrações aprovadas e oito falhas, incluindo timeouts de preparação/limpeza, timeout M04 e teardown após preparação incompleta). PostgreSQL mostrou esperas VersionFileSync e DataFileImmediateSync; a repetição isolada de M04 com --timeout 30000 retornou 1 ainda na preparação. bun run test:concurrency nessa porta retornou 1 por timeout do hook e teardown sem UoW. Não houve afrouxamento da durabilidade ou dos prazos das regressões existentes. No primeiro run do cluster exclusivo, 281 integrações passaram e uma falhou porque o teste M06 ainda supunha 005 como última migration; o ajuste acima eliminou essa falha no run final. As tentativas iniciais do teste novo também corrigiram uma inferência de parâmetro UUID/texto e a expectativa de mensagem de privilégio localizada, sem mudança na lógica do trigger.
+
+Logs locais ignorados pelo Git: m11-test.log (primeiro run), m11-test-isolated.log (diagnóstico do teste M06), m11-test-final.log (327 aprovações), m11-concurrency.log e m11-m04-recheck.log. O cluster exclusivo é encerrado após as provas. A main remota não foi consultada; a base é a referência local mais recente disponível. Nenhum push, merge, publicação ou operação remota foi realizado.

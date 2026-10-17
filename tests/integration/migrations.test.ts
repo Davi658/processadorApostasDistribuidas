@@ -31,7 +31,7 @@ describe('Reversible Migrations on Disposable Database', () => {
 
       // 2. Run UP migrations
       const applied = await migrator.up();
-      expect(applied.length).toBe(5);
+      expect(applied.length).toBe(6);
       expect(applied).toContain('001_initial_schema');
       expect(applied).toContain('002_reinforce_schema_and_outbox');
       expect(applied).toContain('003_protect_terminals_and_composite_fk');
@@ -58,6 +58,9 @@ describe('Reversible Migrations on Disposable Database', () => {
           AND trigger_name = 'trg_protect_wallet_ledger_entries';
       `);
       expect(triggerRes.rows.length).toBe(1);
+
+      expect(applied).toContain('006_terminal_transaction_protection');
+      expect(await migrator.down()).toBe('006_terminal_transaction_protection');
 
       // M10 lease migration must reverse before the older schema migrations.
       const leaseColumns = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'wager_transactions' AND column_name = 'lease_token'`);
