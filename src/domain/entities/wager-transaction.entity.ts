@@ -147,8 +147,8 @@ export class WagerTransaction {
     payloadHash: string;
     referenceExternalTransactionId?: string | null;
   }): WagerTransaction {
-    if (props.kind === 'BET' && !props.money.isPositive()) {
-      throw new InvalidWagerOperationError('BET amount must be strictly greater than zero');
+    if ((props.kind === 'BET' || props.kind === 'WIN') && !props.money.isPositive()) {
+      throw new InvalidWagerOperationError(`${props.kind} amount must be strictly greater than zero`);
     }
 
     const now = new Date().toISOString();

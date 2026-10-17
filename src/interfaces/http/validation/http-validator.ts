@@ -211,6 +211,21 @@ export class HttpValidator {
         1,
         128
       );
+    } else if (kind === 'WIN') {
+      if ('referenceExternalTransactionId' in obj && obj.referenceExternalTransactionId !== undefined && obj.referenceExternalTransactionId !== null) {
+        referenceExternalTransactionId = HttpValidator.validateString(
+          obj.referenceExternalTransactionId,
+          'referenceExternalTransactionId',
+          1,
+          128
+        );
+      }
+    } else if (kind === 'BET' || kind === 'LOSS') {
+      if ('referenceExternalTransactionId' in obj && obj.referenceExternalTransactionId !== undefined && obj.referenceExternalTransactionId !== null) {
+        throw new BadRequestException(
+          `referenceExternalTransactionId is not permitted for kind="${kind}"`
+        );
+      }
     }
 
     const allowZeroAmount = kind === 'LOSS';

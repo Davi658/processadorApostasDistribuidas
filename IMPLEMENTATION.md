@@ -19,7 +19,8 @@
 | **Frente M02** | 13. Estabilização da Frente Money (NUMERIC 18,2, overflow no domínio, round-trip real) | **CONCLUÍDO** | `tests/unit/money.test.ts`, `tests/integration/money-postgres-roundtrip.test.ts` |
 | **Frente M03** | 14. Estabilização da Abertura de Carteira (Contrato, atomicidade SQL, 20 concorrentes, rollback em falhas injetadas, reconciliação, limite Money) | **CONCLUÍDO** | `tests/integration/wallet-opening.test.ts` |
 | **Frente M08** | 15. Validações Financeiras de Reversões Fora de Ordem e Imediatas (ReversalProcessor unificado, cross-wallet fora de ordem, moeda divergente com fixture USD consistente, referência FAILED/REJECTED imediata e tardia, auditoria estrita outbox/ledger/snapshot e reconciliação) | **CONCLUÍDO** | `tests/integration/wager-reversals-m08.test.ts` |
-| **Frente M05** | 16. Estabilização MikroORM e Unidade de Trabalho (Isolamento de EntityManager por execução via AsyncLocalStorage, zero Identity Map compartilhado, conexão e tx compartilhadas pelos 4 repositórios, locks pessimistas na tx, rollback integral, chamadas aninhadas com Rollback-Only, escrita sem UoW rejeitada com TransactionRequiredError, ciclo de vida NestJS sem conexões penduradas) | **CONCLUÍDO** | `tests/integration/mikro-orm-uow-m05.test.ts` (17 testes passando) |
+| **Frente M05** | 16. Estabilização MikroORM e Unidade de Trabalho (Isolamento de EntityManager por execução via AsyncLocalStorage, zero Identity Map compartilhado, conexão e tx compartilhadas pelos 4 repositórios, locks pessimistas na tx, rollback integral, chamadas aninhadas com Rollback-Only, escrita sem UoW rejeitada com TransactionRequiredError, ciclo de vida NestJS sem conexões penduradas) | **CONCLUÍDO** | `tests/integration/mikro-orm-uow-m05.test.ts` (18 testes passando) |
+| **Frente M06** | 17. Estabilização de WIN e LOSS (Crédito exato e version+1, LOSS sem mutação/ledger/balance_changed, zero aceito, replay de snapshot histórico, 409 em conflitos, 50 WIN idênticas, 50 LOSS idênticas, WIN distintas concorrentes, limite Money e overflow, falhas injetadas com rollback auditado e referência opcional validando BET) | **CONCLUÍDO** | `tests/integration/wager-win-loss-m06.test.ts` (31 testes passando) |
 
 
 ---
@@ -144,12 +145,39 @@
   - Chamadas de `.save()` em qualquer um dos 4 repositórios fora de transação lançam `TransactionRequiredError` sem persistir dados no banco.
   - Locks pessimistas fora de transação são rejeitados com `TransactionRequiredError`. Consultas simples de leitura funcionam normalmente.
 
+### 2.6 Frente M06 — Estabilização de WIN e LOSS
+- **Garantias de WIN Comprovadas com PostgreSQL Real (`tests/integration/wager-win-loss-m06.test.ts`):**
+  - Crédito exato com incremento de `version` em 1.
+  - Gravação de transação `PROCESSED` e ledger `CREDIT` na mesma transação SQL.
+  - Emissão de exatamente 2 eventos na outbox: `WagerTransactionProcessed` e `WalletBalanceChanged`.
+  - Rejeição de valores zero e negativos, formatos não canônicos, moeda divergente (422) e jogador incompatível (400) sem efeitos parciais.
+  - Crédito no limite máximo (`9999999999999999.99`) processado com sucesso e overflow (`+ 0.01`) rejeitado com `MONEY_OVERFLOW` (400) sem alterações na carteira.
+- **Garantias de LOSS Comprovadas:**
+  - Status `PROCESSED` persistido com snapshot.
+  - Zero alteração em `balance`, `version` e `updated_at` da carteira.
+  - Zero entradas em `wallet_ledger_entries`.
+  - Emissão exclusiva de `WagerTransactionProcessed` (zero `WalletBalanceChanged`).
+  - Aceita valor zero (`0.00`) conforme documentado e nunca movimenta saldo mesmo com valores positivos.
+  - Proíbe `referenceExternalTransactionId` (400 Bad Request se fornecida).
+- **Replay Histórico e Resolução de Conflitos:**
+  - Replay retorna `transactionId`, status e saldo históricos da primeira execução (`idempotentReplay: true`), mesmo que o saldo atual da carteira tenha sido alterado posteriormente por outras transações.
+  - Replay não altera o banco nem emite novos eventos.
+  - Conflito de payload sob mesma chave retorna 409 `IDEMPOTENCY_CONFLICT`.
+  - Reutilização de `providerId/externalTransactionId` sob outra chave retorna 409 `IDEMPOTENCY_CONFLICT`.
+- **Concorrência Real e Falhas Injetadas:**
+  - 50 WIN idênticas simultâneas geram exatamente 1 crédito, version+1 e 1 registro no ledger.
+  - 50 LOSS idênticas simultâneas geram exatamente 1 transação, 1 evento e zero movimentos na carteira.
+  - 10 WIN distintas simultâneas na mesma carteira executam soma exata sem lost update e com version correta (ex: +100.00 e version+10).
+  - Falhas injetadas em `wallet_save`, `tx_save`, `ledger_save` e primeira `outbox_save` para WIN e `tx_save`, `outbox_save` para LOSS executam rollback integral auditado por IDs, com reenvio bem-sucedido e efeito único.
+- **Referência Opcional de WIN:**
+  - Se `referenceExternalTransactionId` for informada em WIN, valida existência e compatibilidade da BET (PROCESSED, mesma carteira/jogador/moeda/rodada). Se incompatível, não encontrada ou não processada, rejeita auditavelmente com 422 (`REFERENCE_INCOMPATIBLE`, `REFERENCE_NOT_FOUND` ou `REFERENCE_NOT_PROCESSED`). Se omitida, opera como ganho independente.
+
 ---
 
 ## 3. Próxima Rodada (Fatia de Mensageria e Resiliência — M09, M10, M15)
 
 > [!IMPORTANT]
-> **Delimitação de Escopo (M05/M08 vs M09/M10/M15):**
+> **Delimitação de Escopo (M05/M06/M08 vs M09/M10/M15):**
 > A presente suíte comprova a atomicidade e isolamento de `wallet`, `wager_transactions`, `wallet_ledger_entries` e `outbox_messages` via MikroORM e NestJS real.
 > O reprocessador manual (`ReprocessPendingReferencesUseCase.execute()`) comprova a consistência financeira sob referências fora de ordem.
 > Os seguintes componentes permanecem explicitamente como **NÃO VALIDADO / NÃO IMPLEMENTADO**:

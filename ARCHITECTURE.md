@@ -115,6 +115,26 @@ Quando uma reversão (`REFUND` ou `ROLLBACK`) chega antes da transação de refe
 5. Se a referência for posteriormente confirmada (ou rejeitada/falhada/incompatível), ambos os caminhos (referência prévia imediata ou referência tardia com reprocessador) produzem exatamente o mesmo resultado contábil, saldo, versão, ledger, outbox e reconciliação.
 6. **Delimitação Estrita de Escopo (M08 vs M10):** A validação de M08 abrange exclusivamente a integridade contábil, a compatibilidade de regras e o reprocessamento determinístico das pendências. O agendamento contínuo em background, a concorrência distribuída entre múltiplos workers e a integração com SQS pertencem à frente M10 e permanecem marcados como **NÃO VALIDADO** nesta etapa.
 
+### 3.4 Operações de Ganho e Perda: WIN e LOSS (M06)
+A estabilização de `WIN` e `LOSS` (M06) assegura a precisão contábil e a idempotência terminal para fechamento de apostas:
+1. **Garantias de WIN (Crédito):**
+   - **Movimentação Exata:** Credita exatamente o valor especificado na carteira.
+   - **Versão Incrementada:** Incrementa o `version` da carteira em exatamente 1 a cada crédito efetivo.
+   - **Registro Contábil:** Insere 1 registro em `wager_transactions` com status `PROCESSED` e 1 lançamento do tipo `CREDIT` em `wallet_ledger_entries`, vinculado via foreign key composta.
+   - **Eventos de Outbox:** Emite exatamente 2 eventos na mesma transação SQL: `WagerTransactionProcessed` e `WalletBalanceChanged`.
+   - **Limite Money e Overflow:** Suporta créditos que atinjam o limite máximo `NUMERIC(18,2)` (`9999999999999999.99`). Tentativas de crédito que resultem em overflow lançam `MoneyOverflowError` (`code: 'MONEY_OVERFLOW'`), abortando a transação integralmente sem efeitos parciais no banco.
+   - **Referência Opcional à BET:** A operação `WIN` aceita `referenceExternalTransactionId` opcional. Quando informada, valida obrigatoriamente se a BET de referência existe, está em status `PROCESSED` e é compatível em carteira, jogador, moeda e rodada. Se incompatível, não encontrada ou não processada, resulta em `REJECTED` auditável (`REFERENCE_INCOMPATIBLE`, `REFERENCE_NOT_FOUND` ou `REFERENCE_NOT_PROCESSED`) sem movimentação de saldo. Quando omitida, opera como ganho independente.
+2. **Garantias de LOSS (Sem Movimentação):**
+   - **Preservação Integral da Carteira:** Não altera saldo, versão nem `updated_at` da carteira (`wallets`).
+   - **Ausência de Ledger:** Não gera nenhum lançamento contábil em `wallet_ledger_entries`.
+   - **Evento Único:** Emite exclusivamente `WagerTransactionProcessed` na tabela `outbox_messages` (zero emissão de `WalletBalanceChanged`).
+   - **Valor Zero e Valores Positivos:** Aceita valor zero (`0.00`) conforme política documentada. Mesmo quando informada com valor positivo, nunca movimenta o saldo da carteira.
+   - **Proibição de Referência:** A operação `LOSS` não permite `referenceExternalTransactionId`, sendo rejeitada com 400 Bad Request se fornecida.
+3. **Replay Histórico e Resolução de Conflitos:**
+   - O reenvio da mesma `Idempotency-Key` com o mesmo payload retorna os dados originais (`transactionId`, status e saldo histórico) com `idempotentReplay: true`.
+   - Alterações de saldo posteriores por outras operações não afetam o saldo histórico registrado no snapshot do replay.
+   - Conflitos de payload sob a mesma chave ou reutilização do mesmo identificador externo sob chaves diferentes retornam HTTP 409 `IDEMPOTENCY_CONFLICT` sem qualquer alteração no PostgreSQL.
+
 ---
 
 ## 4. Garantias e Proteções no Banco de Dados (PostgreSQL)
