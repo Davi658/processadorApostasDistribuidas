@@ -13,7 +13,7 @@ export class ConsumeWagerCommand {
   static readonly consumerName = 'wager-command-v1';
   constructor(private readonly uow: UnitOfWorkPort, private readonly inbox: InboxPort,
     private readonly wagers: WagerTransactionRepositoryPort, private readonly process: ProcessWagerUseCase) {}
-  async execute(command: WagerCommand, messageId: string) {
+  async execute(command: WagerCommand, messageId: string, signal?: AbortSignal) {
     // Errors escape the external UoW. Redelivery reconciles in a healthy context,
     // including collisions and commits whose acknowledgement was lost.
     return this.uow.runInTransaction(async () => {
@@ -29,6 +29,6 @@ export class ConsumeWagerCommand {
       const result = await this.process.execute(command.idempotencyKey, command.dto, { externalTransaction: true });
       await this.inbox.accept(consumer, command, result.transactionId, messageId);
       return result;
-    });
+    }, signal);
   }
 }

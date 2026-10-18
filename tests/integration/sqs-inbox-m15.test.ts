@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, expect, test } from 'bun:test';
 import pg from 'pg';
-import { SQSClient, CreateQueueCommand, DeleteQueueCommand, SendMessageCommand, ReceiveMessageCommand, ChangeMessageVisibilityCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
+import { SQSClient, CreateQueueCommand, DeleteQueueCommand, SendMessageCommand, ReceiveMessageCommand, ChangeMessageVisibilityCommand, DeleteMessageCommand, GetQueueAttributesCommand } from '@aws-sdk/client-sqs';
 import { createIsolatedTestDatabase, type IsolatedTestDatabase } from '../test-db-helper';
 import { MikroOrmUnitOfWork, MikroOrmWalletRepository, MikroOrmWagerTransactionRepository, MikroOrmWalletLedgerRepository, MikroOrmOutboxRepository, type FailureHookPoint } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
 import { MikroOrmInboxRepository } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-inbox-repository';
@@ -20,7 +20,7 @@ async function financialState(walletId: string) {
   const events = (await sql.query('select * from outbox_messages where aggregate_id=$1 order by id', [walletId])).rows;
   return { wallet, transactions, ledger, events };
 }
-let sqs: SQSClient, queueUrl: string, consumer: SqsWagerConsumer;
+let sqs: SQSClient, queueUrl: string, dlqUrl: string, consumer: SqsWagerConsumer;
 beforeAll(async () => {
   db = await createIsolatedTestDatabase('m15_'); sql = new pg.Pool(db.adminConfig);
   uow = new MikroOrmUnitOfWork(); await uow.init();
@@ -29,7 +29,9 @@ beforeAll(async () => {
   createWallet = new CreateWalletUseCase(wallets, wagers, ledger, outbox, uow);
   consume = new ConsumeWagerCommand(uow, new MikroOrmInboxRepository(uow), wagers, processWager);
   sqs = new SQSClient({ endpoint: process.env.SQS_ENDPOINT ?? 'http://127.0.0.1:45615', region: 'us-east-1', credentials: { accessKeyId: 'test', secretAccessKey: 'test' } });
-  queueUrl = (await sqs.send(new CreateQueueCommand({ QueueName: `m15-${crypto.randomUUID()}.fifo`, Attributes: { FifoQueue: 'true', VisibilityTimeout: '1' } }))).QueueUrl!;
+  dlqUrl = (await sqs.send(new CreateQueueCommand({ QueueName: `m15-dlq-${crypto.randomUUID()}.fifo`, Attributes: { FifoQueue: 'true' } }))).QueueUrl!;
+  const dlqArn = (await sqs.send(new GetQueueAttributesCommand({ QueueUrl: dlqUrl, AttributeNames: ['QueueArn'] }))).Attributes!.QueueArn!;
+  queueUrl = (await sqs.send(new CreateQueueCommand({ QueueName: `m15-${crypto.randomUUID()}.fifo`, Attributes: { FifoQueue: 'true', VisibilityTimeout: '1', RedrivePolicy: JSON.stringify({ deadLetterTargetArn: dlqArn, maxReceiveCount: 5 }) } }))).QueueUrl!;
   consumer = new SqsWagerConsumer(consume, { client: sqs, queueUrl });
 });
 afterAll(async () => {
@@ -42,7 +44,7 @@ afterAll(async () => {
     }
     writeFileSync(join(import.meta.dir, '../../docs/evidence/m15/audit.json'), JSON.stringify(audit, null, 2) + '\n');
   }
-  await consumer?.beforeApplicationShutdown(); if (queueUrl) await sqs.send(new DeleteQueueCommand({ QueueUrl: queueUrl })); sqs?.destroy(); await uow?.close(); await sql?.end(); await db?.closeAndDrop();
+  await consumer?.beforeApplicationShutdown(); if (queueUrl) await sqs.send(new DeleteQueueCommand({ QueueUrl: queueUrl })); if (dlqUrl) await sqs.send(new DeleteQueueCommand({ QueueUrl: dlqUrl })); sqs?.destroy(); await uow?.close(); await sql?.end(); await db?.closeAndDrop();
 });
 async function command(kind = 'BET', amount = '10.00', reference?: string) {
   const playerId = crypto.randomUUID();
@@ -287,7 +289,7 @@ test('automatic enabled polling consumes, stops new receives and drains its loop
     return sqs.send(c, options);
   }, destroy: () => { throw new Error('BORROWED_CLIENT_DESTROYED'); } } as unknown as SQSClient;
   const automatic = new SqsWagerConsumer(consume, { client: borrowed, queueUrl, enabled: true });
-  automatic.onApplicationBootstrap();
+  await automatic.onApplicationBootstrap();
   try {
     const deadline = Date.now() + 10000;
     while (!(await audit(e.commandId))) {
