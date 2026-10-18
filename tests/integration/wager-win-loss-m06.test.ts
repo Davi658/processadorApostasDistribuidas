@@ -2380,7 +2380,8 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
         expect(check004.rows.length).toBe(1);
 
         // 2. Reverter M14, M12 e M11 antes de testar down da 004 (sem dados conflitantes)
-        expect(await migrator.down()).toBe('009_command_inbox');
+        expect(await migrator.down()).toBe('010_external_inbox_identity');
+      expect(await migrator.down()).toBe('009_command_inbox');
         expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
         expect(await migrator.down()).toBe('007_ledger_finite_values');
         expect(await migrator.down()).toBe('006_terminal_transaction_protection');
@@ -2446,7 +2447,8 @@ describe('M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco 
 
         // 5. Tentar executar o DOWN da 004
         // Reverter M14, M12, M11 e depois o lease M10 reaplicados no up
-        expect(await migrator.down()).toBe('009_command_inbox');
+        expect(await migrator.down()).toBe('010_external_inbox_identity');
+      expect(await migrator.down()).toBe('009_command_inbox');
         expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
         expect(await migrator.down()).toBe('007_ledger_finite_values');
         expect(await migrator.down()).toBe('006_terminal_transaction_protection');

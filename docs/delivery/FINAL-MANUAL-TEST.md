@@ -124,7 +124,9 @@ $beforeLedger = Invoke-RestMethod "$api/wallets/$($s.walletId)/ledger?limit=50"
 Invoke-RestMethod "$api/wallets/$($s.walletId)/reconciliation" -Method Post
 docker compose up -d --wait app
 if ($LASTEXITCODE -ne 0) { throw 'Second startup failed' }
-docker compose restart postgres app
+docker compose stop app
+docker compose restart postgres
+docker compose up -d --wait app
 if ($LASTEXITCODE -ne 0) { throw 'Restart failed' }
 $deadline=(Get-Date).AddSeconds(90)
 do {

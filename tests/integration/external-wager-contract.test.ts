@@ -96,5 +96,11 @@ test('external logical identity, financial replay, content conflict and rollback
     await expect(consume.execute(parse({ ...e, messageId: 'msg-rollback', data: { ...e.data, externalTransactionId: 'rollback', idempotencyKey: 'rollback' } }), 'transport-5')).rejects.toThrow('ROLLBACK');
   } finally { uow.clearTestHooks(); }
   expect(await snapshot()).toEqual(beforeRollback);
+  const { DatabaseMigrator } = await import('../../src/infrastructure/persistence/migrator');
+  const migrator = new DatabaseMigrator(db.adminConfig);
+  try { await expect(migrator.down()).rejects.toMatchObject({ code: '22P02' }); }
+  finally { await migrator.close(); }
+  expect(await snapshot()).toEqual(beforeRollback);
+  expect((await sql.query("select version from schema_migrations where version='010_external_inbox_identity'")).rowCount).toBe(1);
   expect((await sql.query('select balance::text from wallets where id=$1', [wallet.id])).rows[0].balance).toBe('75.00');
 });
