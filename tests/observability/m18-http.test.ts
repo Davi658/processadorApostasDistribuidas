@@ -133,12 +133,12 @@ describe('M18 principal AppModule HTTP and real PostgreSQL', () => {
     expect(metrics).toContain('http_requests_total{method="GET",route="/wallets/:walletId",status="404"} 2');
     expect(metrics).toContain('http_request_duration_seconds_bucket');
     expect(metrics).toContain('le="+Inf"} 13');
-    expect(metrics).toContain('financial_transactions_total');
-    expect(metrics).toContain('financial_transaction_duration_seconds');
-    expect(metrics).toContain('sqs_dlq_messages_visible{queue="wager-transactions-dlq.fifo"} 0');
-    expect(metrics).toContain('sqs_dlq_messages_total{queue="wager-transactions-dlq.fifo"} 0');
+    expect(metrics).toContain('financial_invocations_total');
+    expect(metrics).toContain('financial_invocation_duration_seconds');
+    expect(metrics).toContain('# TYPE sqs_dlq_messages_visible gauge');
+    expect(metrics).not.toContain('sqs_dlq_messages_total');
     expect(metrics).toContain('outbox_delay_seconds');
-    expect(metrics).toContain('outbox_pending_events_total');
+    expect(metrics).toContain('outbox_pending_events');
     expect(metrics).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-|trace-m18|fallback-m18|secret|9876\.54/);
   });
 

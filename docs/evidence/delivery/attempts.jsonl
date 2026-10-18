@@ -1,0 +1,12 @@
+{"ended":"2026-10-18T14:09:13.3630558Z","command":["bun","install","--frozen-lockfile"],"name":"install","exitCode":0,"started":"2026-10-18T14:09:13.2151930Z"}
+{"ended":"2026-10-18T14:09:13.5744731Z","command":["docker","compose","config","--quiet"],"name":"config","exitCode":0,"started":"2026-10-18T14:09:13.4163957Z"}
+{"ended":"2026-10-18T14:09:18.2695163Z","command":["docker","compose","build","app","test-runner"],"name":"build","exitCode":0,"started":"2026-10-18T14:09:13.5832036Z"}
+{"ended":"2026-10-18T14:09:35.8962805Z","command":["docker","compose","up","-d","--wait","postgres","localstack"],"name":"test-infra","exitCode":0,"started":"2026-10-18T14:09:18.2850488Z"}
+{"ended":"2026-10-18T14:09:42.6554121Z","command":["bun","run","typecheck"],"name":"typecheck","exitCode":0,"started":"2026-10-18T14:09:35.9132407Z"}
+{"ended":"2026-10-18T14:10:32.6446223Z","command":["bun","run","scripts/run-tests.ts","tests/unit/delivery-metrics.test.ts","tests/observability","tests/concurrency"],"name":"affected","exitCode":0,"started":"2026-10-18T14:09:42.6592539Z"}
+{"command":"docker compose -p delivery-final-20261018 up -d --wait app","name":"compose-first-up","exitCode":0}
+{"ended":"2026-10-18T14:14:13.8169644Z","command":["bun","run","test"],"name":"windows-official","exitCode":0,"started":"2026-10-18T14:10:32.6482558Z"}
+{"ended":"2026-10-18T14:17:50.8184086Z","command":["docker","compose","run","--rm","--no-deps","-e","APP_DB_HOST=postgres","-e","APP_DB_PORT=5432","-e","SQS_ENDPOINT=http://localstack:4566","test-runner","bun","run","test"],"name":"linux-official","exitCode":1,"started":"2026-10-18T14:14:13.8201244Z"}
+{"volumesDeleted":false,"name":"stop-intermediate-compose","exitCode":0,"command":"docker compose -p delivery-final-20261018 stop"}
+{"exitCode":0,"volumesDeleted":false,"name":"stop-previous-regression"}
+{"volumesDeleted":false,"command":["docker","compose","-p","delivery-regression-final-20261018","-f","docker-compose.yml","-f","infra/delivery-validation.compose.yml","stop"],"ended":"2026-10-18T15:10:49.2248997Z","exitCode":0,"testStorage":"disposable tmpfs","name":"stop-successful-regression"}

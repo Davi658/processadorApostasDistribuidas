@@ -18,6 +18,7 @@ import { ReconcileWalletUseCase } from '../../src/application/use-cases/reconcil
 import { ProcessBetDto } from '../../src/application/dto/wager.dto';
 import { IdempotencyConflictError } from '../../src/domain/errors/domain.error';
 import { createIsolatedTestDatabase, IsolatedTestDatabase } from '../test-db-helper';
+import ormConfig from '../../src/infrastructure/persistence/mikro-orm/mikro-orm.config';
 
 describe('High-Concurrency Invariants with Real PostgreSQL', () => {
   let isolatedDb: IsolatedTestDatabase;
@@ -41,7 +42,10 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
       max: 60, // Sized for 50 concurrent transactions
     });
 
-    uow = new MikroOrmUnitOfWork();
+    // The 50 submitted operations queue behind ten real connections. The old
+    // 1s acquisition budget made host scheduling a financial test assertion.
+    // Keep concurrency and all financial assertions; bound admission to 10s.
+    uow = new MikroOrmUnitOfWork({ ...ormConfig, pool: { min: 0, max: 10, acquireTimeoutMillis: 10000 } });
     await uow.init();
 
     walletRepo = new MikroOrmWalletRepository(uow);
@@ -401,7 +405,7 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
     }
   }, 30000);
 
-  it('Repeat duplicate submissions with at least THREE independent OS application processes using synchronization barrier', async () => {
+  it('50 duplicate submissions across THREE independent OS application processes using synchronization barrier', async () => {
     const wallet = await createWalletUseCase.execute({
       playerId: crypto.randomUUID(),
       initialBalance: { amount: '100.00', currency: 'BRL' },
@@ -411,7 +415,7 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
     const workerScript = join(import.meta.dir, 'worker.ts');
     const barrierPath = join(tmpdir(), `barrier_dup_${Date.now()}_${Math.random().toString(36).substring(7)}.tmp`);
 
-    const spawnWorker = (idempKey: string, payload: ProcessBetDto) => {
+    const spawnWorker = (idempKey: string, payload: ProcessBetDto, submissions: number) => {
       let markReady: () => void;
       const readyPromise = new Promise<void>((resolve) => {
         markReady = resolve;
@@ -424,6 +428,7 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
             env: {
               ...process.env,
               DB_NAME: isolatedDb.dbName,
+              WORKER_SUBMISSIONS: String(submissions),
             },
           });
         } catch (err) {
@@ -483,17 +488,23 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
       money: { amount: '25.00', currency: 'BRL' },
     };
 
-    const w1 = spawnWorker(sharedIdempKey, sharedPayload);
-    const w2 = spawnWorker(sharedIdempKey, sharedPayload);
-    const w3 = spawnWorker(sharedIdempKey, sharedPayload);
+    const w1 = spawnWorker(sharedIdempKey, sharedPayload, 17);
+    const w2 = spawnWorker(sharedIdempKey, sharedPayload, 17);
+    const w3 = spawnWorker(sharedIdempKey, sharedPayload, 16);
 
     await Promise.all([w1.readyPromise, w2.readyPromise, w3.readyPromise]);
 
     writeFileSync(barrierPath, 'RELEASE');
 
     try {
-      const results = await Promise.all([w1.resultPromise, w2.resultPromise, w3.resultPromise]);
-      expect(results.length).toBe(3);
+      const processes = await Promise.all([w1.resultPromise, w2.resultPromise, w3.resultPromise]);
+      for (const process of processes) {
+        if (!process.ok) throw new Error(`Worker failed: ${process.code}: ${process.error}`);
+      }
+      console.log(`M20 initialSubmissions=50 processes=3 transientRetries=${processes.reduce((n, p) => n + p.retries, 0)}`);
+      const results = processes.flatMap(r => r.results.map((data: any) => ({ ok: true, data })));
+      expect(results.length).toBe(50);
+      expect(new Set(results.map(r => r.data.transactionId)).size).toBe(1);
       for (const r of results) {
         if (!r.ok) {
           throw new Error(`Worker returned error: ${r.error} (code: ${r.code})`);
@@ -508,7 +519,7 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
       const firstProcessed = results.filter((r) => !r.data.idempotentReplay);
       const replays = results.filter((r) => r.data.idempotentReplay);
       expect(firstProcessed.length).toBe(1);
-      expect(replays.length).toBe(2);
+      expect(replays.length).toBe(49);
 
       const finalWallet = await getWalletUseCase.execute(wallet.id);
       expect(finalWallet.balance.amount).toBe('75.00');

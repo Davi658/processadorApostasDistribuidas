@@ -1,0 +1,26 @@
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"create_start","elapsedMs":0.29319999999995616}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"create_confirmed","elapsedMs":49.423400000000015}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"maintenance_closed","elapsedMs":49.852300000000014}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"migrations_start","elapsedMs":50.112100000000055}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"migrations_confirmed","elapsedMs":245.76889999999992}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"migrator_closed","elapsedMs":246.13739999999996}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"grants_confirmed","elapsedMs":268.822}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"ready","elapsedMs":269.2573000000001}
+[smoke-api] Running smoke tests against http://127.0.0.1:57677...
+[smoke-api] 1. Abertura OK: walletId=8a149921-e354-442e-be90-fa62bd08b1a2, balance=100.00
+{"component":"http","correlationId":null,"durationMs":106.53039999999987,"messageId":null,"method":"POST","operation":"request","providerId":null,"result":"success","route":"/wallets","status":201,"walletId":null}
+{"component":"http","correlationId":null,"durationMs":11.624699999999848,"messageId":null,"method":"GET","operation":"request","providerId":null,"result":"success","route":"/wallets/:walletId","status":200,"walletId":"8a149921-e354-442e-be90-fa62bd08b1a2"}
+[smoke-api] 1.1 GET Wallet OK: balance=100.00
+{"component":"http","correlationId":"09196fd3-8c55-48b0-8fb9-a21fda5efef6","durationMs":54.055900000000065,"messageId":null,"method":"POST","operation":"request","providerId":"SMOKE_PROVIDER","result":"success","route":"/wagering/transactions","status":200,"walletId":"8a149921-e354-442e-be90-fa62bd08b1a2"}
+[smoke-api] 2. BET OK: txId=afd4cb1a-0c6e-4a02-98d9-a471eaab5f11, newBalance=75.00
+{"component":"http","correlationId":"5e53addd-f940-4937-a3ba-f70f34f1ac4e","durationMs":23.592399999999998,"messageId":null,"method":"POST","operation":"request","providerId":"SMOKE_PROVIDER","result":"success","route":"/wagering/transactions","status":200,"walletId":"8a149921-e354-442e-be90-fa62bd08b1a2"}
+[smoke-api] 3. Replay OK: idempotentReplay=true, balance=75.00
+[smoke-api] 4.1 Consulta Transação OK: id=afd4cb1a-0c6e-4a02-98d9-a471eaab5f11, kind=BET, status=PROCESSED, amount=25.00 BRL
+{"component":"http","correlationId":null,"durationMs":6.510899999999992,"messageId":null,"method":"GET","operation":"request","providerId":null,"result":"success","route":"/wagering/transactions/:transactionId","status":200,"walletId":null}
+{"component":"http","correlationId":null,"durationMs":12.20750000000021,"messageId":null,"method":"GET","operation":"request","providerId":null,"result":"success","route":"/wallets/:walletId/ledger","status":200,"walletId":"8a149921-e354-442e-be90-fa62bd08b1a2"}
+[smoke-api] 4.2 Consulta Ledger OK: items=2 (CREDIT=100.00, DEBIT=25.00), hasMore=false, nextCursor=null
+{"component":"http","correlationId":null,"durationMs":20.54860000000008,"messageId":null,"method":"POST","operation":"request","providerId":null,"result":"success","route":"/wallets/:walletId/reconciliation","status":200,"walletId":"8a149921-e354-442e-be90-fa62bd08b1a2"}
+[smoke-api] 5. Reconciliação OK: consistent=true, diff=0.00, checkedEntries=2
+[smoke-api] All smoke operations passed successfully!
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"drop_start","elapsedMs":947.0366}
+{"component":"test_database","database":"m15_smoke_1792335773869_iozozs","phase":"drop_finished","elapsedMs":983.9312000000001}

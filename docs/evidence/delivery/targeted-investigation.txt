@@ -1,0 +1,49 @@
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\concurrency.test.ts:
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation [1406.87ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Two concurrent BETs of 80.00 on 100.00 balance: exactly ONE processed, ONE rejected, final balance 20.00 [123.36ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected [151.33ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier [1239.43ms]
+M20 initialSubmissions=50 processes=3 transientRetries=0
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 duplicate submissions across THREE independent OS application processes using synchronization barrier [3755.68ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409 [103.05ms]
+
+ 6 pass
+ 0 fail
+ 313 expect() calls
+Ran 6 tests across 1 file. [11.46s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\delivery-independent-wallets.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\delivery-independent-wallets.test.ts:
+(pass) three independent wallets hold financial locks concurrently in three OS processes, reconcile and match transaction IDs [6012.68ms]
+
+ 1 pass
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [6.62s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\external-wager-contract.test.ts:
+{"component":"consumer","correlationId":"49374a81-81ed-4e9a-b814-969c4f761a39","durationMs":0,"messageId":"ea6a1402-00d7-4114-b5d0-5463aa3d5ca6","operation":"renewal","providerId":"delivery-crash","result":"confirmed","walletId":"af1bc5ad-fa1a-4893-b274-7249d5deb19c"}
+{"component":"consumer","correlationId":"49374a81-81ed-4e9a-b814-969c4f761a39","durationMs":683.7453999999998,"messageId":"ea6a1402-00d7-4114-b5d0-5463aa3d5ca6","operation":"inbox","providerId":"delivery-crash","result":"duplicate","walletId":"af1bc5ad-fa1a-4893-b274-7249d5deb19c","commandId":"external-crash-2f9bf455-ec7f-4ee4-9ef7-0f0faa55e696"}
+{"component":"consumer","correlationId":"49374a81-81ed-4e9a-b814-969c4f761a39","durationMs":683.7933999999987,"messageId":"ea6a1402-00d7-4114-b5d0-5463aa3d5ca6","operation":"transaction","providerId":"delivery-crash","result":"durable","walletId":"af1bc5ad-fa1a-4893-b274-7249d5deb19c","commandId":"external-crash-2f9bf455-ec7f-4ee4-9ef7-0f0faa55e696"}
+{"component":"consumer","correlationId":"49374a81-81ed-4e9a-b814-969c4f761a39","durationMs":691.5928999999996,"messageId":"ea6a1402-00d7-4114-b5d0-5463aa3d5ca6","operation":"delete","providerId":"delivery-crash","result":"confirmed","walletId":"af1bc5ad-fa1a-4893-b274-7249d5deb19c","commandId":"external-crash-2f9bf455-ec7f-4ee4-9ef7-0f0faa55e696"}
+(pass) real SQS redelivery after process death at committed external inbox barrier preserves exact records [6123.60ms]
+(pass) external logical identity, financial replay, content conflict and rollback preserve exact records [226.19ms]
+delivery external cleanup: UoW
+delivery external cleanup: SQL
+delivery external cleanup: database
+delivery external cleanup: complete
+
+ 2 pass
+ 0 fail
+ 19 expect() calls
+Ran 2 tests across 1 file. [11.18s]
+[test-runner] 3 files; 0 failed

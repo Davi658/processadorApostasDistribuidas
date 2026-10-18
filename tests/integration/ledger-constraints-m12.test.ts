@@ -117,12 +117,21 @@ describe('M12 ledger constraints and exact reconciliation on disposable PostgreS
     await pool.query(insert,[crypto.randomUUID(),w,tx,'CREDIT','1.00','BRL','0.00','1.00']);
     const before = await snapshot(pool), migrator = new DatabaseMigrator(migrationDb.adminConfig);
     try {
+      await pool.query('insert into command_inbox(consumer_name,command_id,fingerprint,transaction_id,message_id) values ($1,$2,$3,$4,$5)',
+        ['wager-command-v1',crypto.randomUUID(),'a'.repeat(64),tx,'migration-transport']);
+      const inboxBefore = (await pool.query('select to_jsonb(i) row from command_inbox i')).rows;
+      expect(await migrator.down()).toBe('010_external_inbox_identity');
+      expect((await pool.query('select to_jsonb(i) row from command_inbox i')).rows).toEqual(inboxBefore);
+      expect(await migrator.up()).toEqual(['010_external_inbox_identity']);
+      expect((await pool.query('select to_jsonb(i) row from command_inbox i')).rows).toEqual(inboxBefore);
+      expect(await migrator.down()).toBe('010_external_inbox_identity');
       expect(await migrator.down()).toBe('009_command_inbox');
       expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
       expect(await migrator.down()).toBe('007_ledger_finite_values');
       expect(await snapshot(pool)).toEqual(before);
-      expect(await migrator.up()).toEqual(['007_ledger_finite_values', '008_outbox_publisher_lease_and_retry', '009_command_inbox']);
+      expect(await migrator.up()).toEqual(['007_ledger_finite_values', '008_outbox_publisher_lease_and_retry', '009_command_inbox', '010_external_inbox_identity']);
       expect(await snapshot(pool)).toEqual(before);
+      expect(await migrator.down()).toBe('010_external_inbox_identity');
       expect(await migrator.down()).toBe('009_command_inbox');
       expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
       expect(await migrator.down()).toBe('007_ledger_finite_values');

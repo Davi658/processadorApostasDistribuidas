@@ -1,0 +1,11 @@
+# Disposable regression infrastructure only. Never use this override for the
+# delivery composition or for a candidate's persistent data.
+services:
+  postgres:
+    volumes: !override
+      - ./infra/init-db.sql:/docker-entrypoint-initdb.d/10-runtime.sql:ro
+    tmpfs:
+      - /var/lib/postgresql/data
+# PostgreSQL fsync/synchronous_commit remain enabled. Process-crash proofs keep
+# the database service alive; persistent PostgreSQL restart is proved separately
+# against the unmodified final Compose and a fresh named volume.

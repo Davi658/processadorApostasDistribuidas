@@ -1,0 +1,18 @@
+{
+  "deployedSourceHashesMatched": 6,
+  "jsonRecordsChecked": 113,
+  "violations": 0,
+  "forbiddenFields": [
+    "amount",
+    "money",
+    "balance",
+    "payload",
+    "MessageBody",
+    "ReceiptHandle",
+    "accessKeyId",
+    "secretAccessKey",
+    "password",
+    "authorization"
+  ],
+  "snapshotSha256": "7e914d13096b7a2d025d243c9eb1d1e9e13d3a047fd0c833598ce7488d532039"
+}

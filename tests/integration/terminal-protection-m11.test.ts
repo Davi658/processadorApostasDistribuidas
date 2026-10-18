@@ -54,6 +54,7 @@ describe('M11 terminal protection on disposable PostgreSQL with enabled triggers
     try {
       const ids = await Promise.all(states.map(s => seed(s)));
       const before = await Promise.all(ids.map(snapshot));
+      expect(await migrator.down()).toBe('010_external_inbox_identity');
       expect(await migrator.down()).toBe('009_command_inbox');
       expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
       expect(await migrator.down()).toBe('007_ledger_finite_values');
@@ -63,7 +64,7 @@ describe('M11 terminal protection on disposable PostgreSQL with enabled triggers
       // An operational-only update evaluates the broken historical expression in full.
       await refusal(admin, ids[0], 'UPDATE wager_transactions SET attempts=attempts+1 WHERE id=$1', [ids[0]],
         '42703', 'observed_balance');
-      expect(await migrator.up()).toEqual([version, '007_ledger_finite_values', '008_outbox_publisher_lease_and_retry', '009_command_inbox']);
+      expect(await migrator.up()).toEqual([version, '007_ledger_finite_values', '008_outbox_publisher_lease_and_retry', '009_command_inbox', '010_external_inbox_identity']);
       expect(await Promise.all(ids.map(snapshot))).toEqual(before);
     } finally { await migrator.close(); }
   });

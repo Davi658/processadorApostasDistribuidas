@@ -18,7 +18,7 @@ export class ConsumeWagerCommand {
     // Errors escape the external UoW. Redelivery reconciles in a healthy context,
     // including collisions and commits whose acknowledgement was lost.
     const committed = await this.uow.runInTransaction(async () => {
-      const consumer = ConsumeWagerCommand.consumerName;
+      const consumer = command.consumerName ?? ConsumeWagerCommand.consumerName;
       await this.inbox.lock(consumer, command.commandId);
       const accepted = await this.inbox.find(consumer, command.commandId);
       if (accepted) {

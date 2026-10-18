@@ -109,9 +109,6 @@ export class PublishOutboxEventsUseCase {
       return result;
     }
 
-    const oldestOccurredAt = Math.min(...claimedEvents.map(e => new Date(e.occurredAt).getTime()));
-    const delaySeconds = Math.max(0, (Date.now() - oldestOccurredAt) / 1000);
-    this.telemetry?.recordOutboxLag?.(delaySeconds, claimedEvents.length);
 
     await this.triggerHook('after_claim', { claimedEvents, workerId });
 
@@ -178,7 +175,7 @@ export class PublishOutboxEventsUseCase {
           result.published++;
           const occurredAtMs = new Date(event.occurredAt).getTime();
           const publishLagSeconds = Math.max(0, (Date.now() - occurredAtMs) / 1000);
-          this.telemetry?.recordOutboxLag?.(publishLagSeconds, undefined, publishLagSeconds);
+          this.telemetry?.recordOutboxPublishLag?.(publishLagSeconds);
 
           this.telemetry?.event('publisher', 'mark', 'local_confirmed', { ...context, durationMs: performance.now() - markStarted });
           await this.triggerHook('after_mark_published', { event, envelope, workerId });

@@ -1,3 +1,6 @@
+
+Entrega atual: consulte [contrato externo confirmado](EXTERNAL-CONTRACT.md). A proposta abaixo é histórica; o consumidor aceita também WagerTransactionRequested e a migration 010 preserva identidades textuais.
+
 # M16 — retry, visibility, DLQ and shutdown
 
 Base: `ce23c14cd8a277b1e2308c3ff85fc1562c0f701d` (`origin/main`, fetched before creating `codex/m16-sqs-reliability`). M15: `cba6b6c`. No schema change.

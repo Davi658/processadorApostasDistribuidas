@@ -1,0 +1,4 @@
+ Container delivery-regression-20261018-postgres-1 Stopping 
+ Container delivery-regression-20261018-localstack-1 Stopping 
+ Container delivery-regression-20261018-postgres-1 Stopped 
+ Container delivery-regression-20261018-localstack-1 Stopped 

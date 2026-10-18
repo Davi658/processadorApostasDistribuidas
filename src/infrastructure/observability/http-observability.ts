@@ -16,9 +16,9 @@ export class HttpObservability implements OperationalObservabilityPort {
   private readonly series = new Map<string, { count: number; sum: number; buckets: number[] }>();
   private readonly financialCounters = new Map<string, number>();
   private readonly financialSeries = new Map<string, { count: number; sum: number; buckets: number[] }>();
+  private persistedFinancial = new Map<string, number>();
   private readonly counters = new Map<string, number>();
   private readonly dlqGauges = new Map<string, number>();
-  private readonly dlqCounters = new Map<string, number>();
   private outboxDelay = 0;
   private outboxPending = 0;
   private readonly outboxLagSeries = new Map<string, { count: number; sum: number; buckets: number[] }>();
@@ -26,8 +26,6 @@ export class HttpObservability implements OperationalObservabilityPort {
 
   constructor(private readonly write: (line: string) => void = line => console.log(line)) {
     // Default series initialized so scrapers and test probes always find them
-    this.dlqGauges.set('wager-transactions-dlq.fifo', 0);
-    this.dlqCounters.set('wager-transactions-dlq.fifo', 0);
   }
 
   public registerCollector(collector: () => Promise<void>): void {
@@ -135,7 +133,9 @@ export class HttpObservability implements OperationalObservabilityPort {
     durationSeconds: number,
     context?: TelemetryContext
   ): void {
-    // 1. Dedicated counter for financial transactions by status and kind
+    // Invocation outcomes include replays and may precede an external commit.
+    kind = ['BET', 'WIN', 'LOSS', 'REFUND', 'ROLLBACK'].includes(kind) ? kind : 'UNKNOWN';
+    status = ['PROCESSED', 'REJECTED', 'PENDING_REFERENCE', 'FAILED'].includes(status) ? status : 'UNKNOWN';
     const counterKey = `status="${escape(status)}",kind="${escape(kind)}"`;
     this.financialCounters.set(counterKey, (this.financialCounters.get(counterKey) ?? 0) + 1);
 
@@ -153,24 +153,29 @@ export class HttpObservability implements OperationalObservabilityPort {
     });
   }
 
-  recordDlqStats(queueName: string, visibleCount: number, totalMovedCount?: number): void {
+  recordDlqStats(queueName: string, visibleCount: number): void {
     this.dlqGauges.set(queueName, Math.max(0, visibleCount));
-    if (typeof totalMovedCount === 'number') {
-      this.dlqCounters.set(queueName, Math.max(0, totalMovedCount));
+  }
+
+  recordPersistedFinancial(rows: Array<{ kind: string; status: string; count: number }>): void {
+    const snapshot = new Map<string, number>();
+    for (const row of rows) {
+      const kind = ['OPENING', 'BET', 'WIN', 'LOSS', 'REFUND', 'ROLLBACK'].includes(row.kind) ? row.kind : 'UNKNOWN';
+      const status = ['PENDING', 'PROCESSED', 'REJECTED', 'PENDING_REFERENCE', 'FAILED'].includes(row.status) ? row.status : 'UNKNOWN';
+      const key = `status="${status}",kind="${kind}"`;
+      snapshot.set(key, (snapshot.get(key) ?? 0) + row.count);
     }
+    this.persistedFinancial = snapshot;
   }
 
-  incrementDlqMessages(queueName: string, count = 1): void {
-    const current = this.dlqCounters.get(queueName) ?? 0;
-    this.dlqCounters.set(queueName, current + count);
-  }
-
-  recordOutboxLag(delaySeconds: number, pendingCount?: number, publishLagSeconds?: number): void {
+  recordOutboxLag(delaySeconds: number, pendingCount?: number): void {
     this.outboxDelay = Math.max(0, delaySeconds);
     if (typeof pendingCount === 'number') {
       this.outboxPending = Math.max(0, pendingCount);
     }
-    if (typeof publishLagSeconds === 'number') {
+  }
+
+  recordOutboxPublishLag(publishLagSeconds: number): void {
       const key = 'outbox_lag';
       let item = this.outboxLagSeries.get(key);
       if (!item) {
@@ -182,7 +187,6 @@ export class HttpObservability implements OperationalObservabilityPort {
       outboxBuckets.forEach((bound, index) => {
         if (publishLagSeconds <= bound) item!.buckets[index]++;
       });
-    }
   }
 
   async render(): Promise<string> {
@@ -209,27 +213,30 @@ export class HttpObservability implements OperationalObservabilityPort {
     }
 
     // Dedicated Financial Transactions by status and kind
+    lines.push('# HELP financial_transactions Persisted transaction rows by current status at scrape time; database-wide gauge including OPENING',
+      '# TYPE financial_transactions gauge');
+    for (const [labels, count] of this.persistedFinancial) lines.push(`financial_transactions{${labels}} ${count}`);
     lines.push(
-      '# HELP financial_transactions_total Total financial transactions processed by status and kind',
-      '# TYPE financial_transactions_total counter'
+      '# HELP financial_invocations_total ProcessWager invocations including replay and failures; returned status may precede external commit',
+      '# TYPE financial_invocations_total counter'
     );
     for (const [labels, count] of this.financialCounters) {
-      lines.push(`financial_transactions_total{${labels}} ${count}`);
+      lines.push(`financial_invocations_total{${labels}} ${count}`);
     }
 
     // Dedicated Financial Processing Latency histogram
     lines.push(
-      '# HELP financial_transaction_duration_seconds Latency of financial transaction processing in seconds',
-      '# TYPE financial_transaction_duration_seconds histogram'
+      '# HELP financial_invocation_duration_seconds ProcessWager entry to finally, including validation, locks and retries; excludes external commit and SQS delete',
+      '# TYPE financial_invocation_duration_seconds histogram'
     );
     for (const [labels, item] of this.financialSeries) {
       buckets.forEach((bound, index) =>
-        lines.push(`financial_transaction_duration_seconds_bucket{${labels},le="${bound}"} ${item.buckets[index]}`)
+        lines.push(`financial_invocation_duration_seconds_bucket{${labels},le="${bound}"} ${item.buckets[index]}`)
       );
       lines.push(
-        `financial_transaction_duration_seconds_bucket{${labels},le="+Inf"} ${item.count}`,
-        `financial_transaction_duration_seconds_sum{${labels}} ${item.sum}`,
-        `financial_transaction_duration_seconds_count{${labels}} ${item.count}`
+        `financial_invocation_duration_seconds_bucket{${labels},le="+Inf"} ${item.count}`,
+        `financial_invocation_duration_seconds_sum{${labels}} ${item.sum}`,
+        `financial_invocation_duration_seconds_count{${labels}} ${item.count}`
       );
     }
 
@@ -241,26 +248,19 @@ export class HttpObservability implements OperationalObservabilityPort {
     for (const [queue, visible] of this.dlqGauges) {
       lines.push(`sqs_dlq_messages_visible{queue="${escape(queue)}"} ${visible}`);
     }
-    lines.push(
-      '# HELP sqs_dlq_messages_total Total messages observed in the dead-letter queue',
-      '# TYPE sqs_dlq_messages_total counter'
-    );
-    for (const [queue, count] of this.dlqCounters) {
-      lines.push(`sqs_dlq_messages_total{queue="${escape(queue)}"} ${count}`);
-    }
 
     // Dedicated Outbox delay and lag metrics
     lines.push(
-      '# HELP outbox_delay_seconds Age in seconds of the oldest unpublished outbox event',
+      '# HELP outbox_delay_seconds Scrape-time age of oldest unpublished nonblocked event, including leased and backoff events',
       '# TYPE outbox_delay_seconds gauge',
       `outbox_delay_seconds ${this.outboxDelay.toFixed(3)}`,
-      '# HELP outbox_pending_events_total Number of unpublished outbox events pending delivery',
-      '# TYPE outbox_pending_events_total gauge',
-      `outbox_pending_events_total ${this.outboxPending}`
+      '# HELP outbox_pending_events Scrape-time count of unpublished nonblocked events, including leased and backoff events',
+      '# TYPE outbox_pending_events gauge',
+      `outbox_pending_events ${this.outboxPending}`
     );
     const outboxLagItem = this.outboxLagSeries.get('outbox_lag');
     lines.push(
-      '# HELP outbox_publish_lag_seconds Time in seconds between event creation and broker publish confirmation',
+      '# HELP outbox_publish_lag_seconds Event age sampled after successful local publication mark; includes send and mark latency',
       '# TYPE outbox_publish_lag_seconds histogram'
     );
     if (outboxLagItem) {

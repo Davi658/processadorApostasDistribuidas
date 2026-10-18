@@ -1,0 +1,70 @@
+ Image delivery-final-app:20261018 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.17kB 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 878B done
+#2 DONE 0.8s
+
+#3 [auth] oven/bun:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/oven/bun:1.4.3
+#4 DONE 4.0s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 200B done
+#5 DONE 0.4s
+
+#6 [internal] load build context
+#6 transferring context: 8.37kB 0.0s done
+#6 DONE 1.7s
+
+#7 [dependencies 1/4] FROM docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#7 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#7 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 1.7s done
+#7 DONE 2.1s
+
+#8 [dependencies 3/4] COPY package.json bun.lock ./
+#8 CACHED
+
+#9 [dependencies 4/4] RUN bun install --frozen-lockfile
+#9 CACHED
+
+#10 [base 3/6] COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
+#10 CACHED
+
+#11 [base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#11 CACHED
+
+#12 [base 5/6] COPY --chown=bun:bun src ./src
+#12 CACHED
+
+#13 [dependencies 2/4] WORKDIR /app
+#13 CACHED
+
+#14 [base 6/6] COPY --chown=bun:bun infra ./infra
+#14 CACHED
+
+#15 exporting to image
+#15 exporting layers
+#15 exporting layers done
+#15 exporting manifest sha256:63cd03c4eaf506aec43e171ce564e5c64b37c83d4efffbe72e0f6eabd1f2a950
+#15 exporting manifest sha256:63cd03c4eaf506aec43e171ce564e5c64b37c83d4efffbe72e0f6eabd1f2a950 1.6s done
+#15 exporting config sha256:40d7ee14ce6149d9a5a153e589c810f0fb912370688bc1d47f3c97655be3e4e9
+#15 exporting config sha256:40d7ee14ce6149d9a5a153e589c810f0fb912370688bc1d47f3c97655be3e4e9 0.8s done
+#15 exporting attestation manifest sha256:652760e3d8f6250422db539ffda8fb3c57fffc9f2d9ec0ea5b02263914a1fe24
+#15 exporting attestation manifest sha256:652760e3d8f6250422db539ffda8fb3c57fffc9f2d9ec0ea5b02263914a1fe24 1.2s done
+#15 exporting manifest list sha256:f1d60a1f05e1f027f385fa293c88d85158f3b6ebb95f39f85f28831d77fd7b90
+#15 exporting manifest list sha256:f1d60a1f05e1f027f385fa293c88d85158f3b6ebb95f39f85f28831d77fd7b90 0.8s done
+#15 naming to docker.io/library/delivery-final-app:20261018
+#15 naming to docker.io/library/delivery-final-app:20261018 0.4s done
+#15 unpacking to docker.io/library/delivery-final-app:20261018
+#15 unpacking to docker.io/library/delivery-final-app:20261018 0.0s done
+#15 DONE 6.5s
+
+#16 resolving provenance for metadata file
+#16 DONE 0.4s
+ Image delivery-final-app:20261018 Built 

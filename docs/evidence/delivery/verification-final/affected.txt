@@ -1,0 +1,593 @@
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\concurrency.test.ts:
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"create_start","elapsedMs":0.2580000000000382}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"create_confirmed","elapsedMs":113.81240000000003}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"maintenance_closed","elapsedMs":114.26530000000002}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"migrations_start","elapsedMs":114.52530000000002}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"migrations_confirmed","elapsedMs":371.54369999999994}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"migrator_closed","elapsedMs":371.9008000000001}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"grants_confirmed","elapsedMs":391.01559999999995}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"ready","elapsedMs":391.41560000000004}
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation [571.50ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Two concurrent BETs of 80.00 on 100.00 balance: exactly ONE processed, ONE rejected, final balance 20.00 [79.88ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected [116.38ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier [932.81ms]
+M20 initialSubmissions=50 processes=3 transientRetries=0
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 duplicate submissions across THREE independent OS application processes using synchronization barrier [1415.59ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409 [70.23ms]
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"drop_start","elapsedMs":3658.0761}
+{"component":"test_database","database":"concurr_1792335364002_1949xg","phase":"drop_finished","elapsedMs":3684.4170000000004}
+
+ 6 pass
+ 0 fail
+ 313 expect() calls
+Ran 6 tests across 1 file. [4.50s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\delivery-independent-wallets.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\delivery-independent-wallets.test.ts:
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"create_start","elapsedMs":0.35580000000004475}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"create_confirmed","elapsedMs":52.18130000000008}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"maintenance_closed","elapsedMs":52.62290000000007}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"migrations_start","elapsedMs":52.879099999999994}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"migrations_confirmed","elapsedMs":199.0082}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"migrator_closed","elapsedMs":199.39650000000006}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"grants_confirmed","elapsedMs":215.0616}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"ready","elapsedMs":215.41920000000005}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"drop_start","elapsedMs":1254.8369000000002}
+{"component":"test_database","database":"delivery_parallel_1792335368340_xmrkh1","phase":"drop_finished","elapsedMs":1273.5176999999999}
+(pass) three independent wallets hold financial locks concurrently in three OS processes, reconcile and match transaction IDs [1274.96ms]
+
+ 1 pass
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [1.90s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\external-wager-contract.test.ts:
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"create_start","elapsedMs":0.289100000000019}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"create_confirmed","elapsedMs":44.46900000000005}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"maintenance_closed","elapsedMs":44.905399999999986}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"migrations_start","elapsedMs":45.25810000000001}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"migrations_confirmed","elapsedMs":180.72910000000002}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"migrator_closed","elapsedMs":181.06690000000003}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"grants_confirmed","elapsedMs":195.66639999999995}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"ready","elapsedMs":196.0317}
+{"component":"consumer","correlationId":"12862536-13fc-4fee-9359-6748edace39d","durationMs":23.67780000000039,"messageId":"89c81653-eafc-460f-9434-8c2016d1ee93","operation":"inbox","providerId":"delivery-crash","result":"duplicate","walletId":"894948da-4319-42a4-bfe2-7705fa1aa1ff","commandId":"external-crash-6343f86f-072a-4957-aca6-6e025bd2a85e"}
+{"component":"consumer","correlationId":"12862536-13fc-4fee-9359-6748edace39d","durationMs":23.84940000000006,"messageId":"89c81653-eafc-460f-9434-8c2016d1ee93","operation":"transaction","providerId":"delivery-crash","result":"durable","walletId":"894948da-4319-42a4-bfe2-7705fa1aa1ff","commandId":"external-crash-6343f86f-072a-4957-aca6-6e025bd2a85e"}
+{"component":"consumer","correlationId":"12862536-13fc-4fee-9359-6748edace39d","durationMs":30.952400000000125,"messageId":"89c81653-eafc-460f-9434-8c2016d1ee93","operation":"delete","providerId":"delivery-crash","result":"confirmed","walletId":"894948da-4319-42a4-bfe2-7705fa1aa1ff","commandId":"external-crash-6343f86f-072a-4957-aca6-6e025bd2a85e"}
+(pass) real SQS redelivery after process death at committed external inbox barrier preserves exact records [4177.56ms]
+(pass) external logical identity, financial replay, content conflict and rollback preserve exact records [260.73ms]
+delivery external cleanup: UoW
+delivery external cleanup: SQL
+delivery external cleanup: database
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"drop_start","elapsedMs":4693.5511}
+{"component":"test_database","database":"delivery_external_1792335370113_hqyg9u","phase":"drop_finished","elapsedMs":4716.3384}
+delivery external cleanup: complete
+
+ 2 pass
+ 0 fail
+ 22 expect() calls
+Ran 2 tests across 1 file. [5.20s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\ledger-constraints-m12.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\ledger-constraints-m12.test.ts:
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"create_start","elapsedMs":0.21719999999993433}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"create_confirmed","elapsedMs":45.044599999999946}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"maintenance_closed","elapsedMs":45.55589999999995}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"migrations_start","elapsedMs":45.93700000000001}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"migrations_confirmed","elapsedMs":189.47199999999998}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"migrator_closed","elapsedMs":189.8188}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"grants_confirmed","elapsedMs":207.92629999999997}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"ready","elapsedMs":208.3854}
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > binds transaction, wallet and currency with the composite FK, independently of duplicates [107.98ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects zero with the precise database diagnostic and no partial effects [32.73ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative with the precise database diagnostic and no partial effects [23.74ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects credit arithmetic with the precise database diagnostic and no partial effects [31.55ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects debit arithmetic with the precise database diagnostic and no partial effects [20.18ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects unknown type with the precise database diagnostic and no partial effects [19.73ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative before with the precise database diagnostic and no partial effects [20.68ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative after with the precise database diagnostic and no partial effects [20.93ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects amount overflow with the precise database diagnostic and no partial effects [18.96ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects before overflow with the precise database diagnostic and no partial effects [20.03ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects after overflow with the precise database diagnostic and no partial effects [19.71ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects NaN amount with the precise database diagnostic and no partial effects [21.00ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects NaN before with the precise database diagnostic and no partial effects [22.33ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > keeps wallet balances finite, nonnegative and within NUMERIC capacity [57.54ms]
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"create_start","elapsedMs":0.034799999999904685}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"create_confirmed","elapsedMs":30.64580000000001}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"maintenance_closed","elapsedMs":30.8603999999998}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"migrations_start","elapsedMs":30.938699999999926}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"migrations_confirmed","elapsedMs":165.6286}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"migrator_closed","elapsedMs":165.7597999999998}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"grants_confirmed","elapsedMs":181.5351999999998}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"ready","elapsedMs":181.61019999999985}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"drop_start","elapsedMs":422.5854999999999}
+{"component":"test_database","database":"m12_migration_1792335376122_1eo7lq","phase":"drop_finished","elapsedMs":448.41959999999995}
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > preserves complete existing rows in incremental UP/DOWN/UP; invalid legacy data aborts UP without deletion [449.24ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > accepts exact cent arithmetic at NUMERIC maximum and rejects a second entry for the operation [26.54ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > proves enabled UPDATE/DELETE trigger as admin and permission denial including TRUNCATE as app [101.31ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles zero entries and detects direct SQL balance drift exactly beyond safe number precision [132.41ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reports aggregate drift outside single-column Money limits as exact signed decimal strings [41.73ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles valid high turnover independently of timestamp/UUID order without intermediate Money overflow [24.02ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles opening, BET, WIN, REFUND, ROLLBACK; LOSS, rejection and replay add no entries [477.00ms]
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"drop_start","elapsedMs":1972.2499999999998}
+{"component":"test_database","database":"m12_1792335375407_tdwtbj","phase":"drop_finished","elapsedMs":1993.4666}
+
+ 21 pass
+ 0 fail
+ 155 expect() calls
+Ran 21 tests across 1 file. [2.55s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\migrations.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\migrations.test.ts:
+(pass) Reversible Migrations on Disposable Database > should successfully run UP and DOWN migrations incrementally on a newly created disposable database [394.81ms]
+
+ 1 pass
+ 0 fail
+ 32 expect() calls
+Ran 1 test across 1 file. [436.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\pending-reference-worker-m10.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\pending-reference-worker-m10.test.ts:
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"create_start","elapsedMs":0.21699999999998454}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"create_confirmed","elapsedMs":42.76520000000005}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"maintenance_closed","elapsedMs":43.13620000000003}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"migrations_start","elapsedMs":43.357900000000086}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"migrations_confirmed","elapsedMs":178.54160000000002}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"migrator_closed","elapsedMs":178.88420000000008}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"grants_confirmed","elapsedMs":194.4602}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"ready","elapsedMs":194.82900000000006}
+{"component":"references","correlationId":null,"durationMs":7.861799999999903,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":32.83179999999993,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"85b428ec-5238-4222-8907-1c2dc4232243","transactionId":"1e4e107e-09f6-4d49-b223-21b7b57b5052"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > A. NestJS inicia o worker e resolve pendência automaticamente, sem chamar execute manualmente [301.59ms]
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > B. Três processos reais disputam pendências: nenhum crédito/débito, ledger ou evento duplicado [1400.51ms]
+{"component":"references","correlationId":null,"durationMs":2.4768000000003667,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":29.364000000000033,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"3cc816ad-d747-4e1a-bb1c-ad2380183ff2","transactionId":"4f42be7c-aafa-4aad-afed-a719ff56aa5e"}
+{"component":"references","correlationId":null,"durationMs":21.0304000000001,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"rejected","walletId":"3cc816ad-d747-4e1a-bb1c-ad2380183ff2","transactionId":"fa0a446f-9ae4-4fb0-8ed4-773c37902b63"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > C. Duas pendências do mesmo tipo revertendo a mesma referência: uma processada e outra rejeitada auditavelmente [131.38ms]
+{"component":"references","correlationId":null,"durationMs":2.8856000000000677,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":25.182999999999993,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"2c1f7d55-5075-4cb8-ba78-10aaf02967a5","transactionId":"f57e58a8-8e79-47d6-b4df-4aa9ad392329"}
+{"component":"references","correlationId":null,"durationMs":34.33609999999999,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"2c1f7d55-5075-4cb8-ba78-10aaf02967a5","transactionId":"6c1ffd79-8e84-4848-b122-9488650a954f"}
+{"component":"references","correlationId":null,"durationMs":27.28749999999991,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"2c1f7d55-5075-4cb8-ba78-10aaf02967a5","transactionId":"d6b3ce2c-4326-45c6-b091-95d401121a7d"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > D. WIN, REFUND e ROLLBACK são resolvidos com suas regras próprias [224.39ms]
+{"component":"references","correlationId":null,"durationMs":2.795900000000074,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":25.909099999999853,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"ea93d065-cc88-472c-b162-7cef3c138884","transactionId":"7920e756-98a0-4c55-b186-44d18f31c08e"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > E. Processo morre após claim e antes do processamento: outro retoma após expiração (Processo Real) [1053.20ms]
+{"component":"references","correlationId":null,"durationMs":2.295199999999568,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":24.09859999999935,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"b0f01e66-4b44-463d-aa32-8912fe3cc4b4","transactionId":"05d49435-c809-4875-a93f-27c798aa9359"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > F. Reserva expira e outro worker assume: token antigo não pode finalizar indevidamente [94.84ms]
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > G. Processo morre após commit financeiro e antes de finalizar o ciclo: reinício não reaplica efeitos (Processo Real) [809.24ms]
+{"component":"references","correlationId":null,"durationMs":2.8382000000001426,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":19.718000000000757,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"transient_failure","walletId":"d266801f-a7a4-40ac-a65f-5ed7bd9d1906","transactionId":"539bc1d6-ae2e-4acf-b5bc-103bb47c16e1"}
+{"component":"references","correlationId":null,"durationMs":2.643000000000029,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":29.236700000000383,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"d266801f-a7a4-40ac-a65f-5ed7bd9d1906","transactionId":"539bc1d6-ae2e-4acf-b5bc-103bb47c16e1"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > H. Falha transitória permite recuperação sem rejeição financeira [120.53ms]
+{"component":"references","correlationId":null,"durationMs":2.269499999999425,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":11.955700000000434,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"blocked","walletId":"f794d7cf-31bf-45be-a98b-bc9bca3305ca","transactionId":"92439db0-bd0f-44d1-86b8-02e3ae7e7125"}
+{"component":"references","correlationId":null,"durationMs":22.394000000000233,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"f794d7cf-31bf-45be-a98b-bc9bca3305ca","transactionId":"ce5b5aae-2aac-4956-bc5e-62b0d20db269"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > I. Snapshot inválido no início do lote não bloqueia itens válidos [96.02ms]
+{"component":"references","correlationId":null,"durationMs":5.9299999999993815,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":82.82319999999982,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"f2186162-25b9-426c-85da-af7d579e18f9","transactionId":"e5d757ab-b444-4692-b765-2f504aec2c85"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > J. Shutdown coordena ordem comprovada: impede novos claims, conclui drenagem antes do encerramento do ORM (Aplicação Nest Real e Barreira) [239.12ms]
+{"component":"references","correlationId":null,"durationMs":2.449800000000323,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":19.28610000000026,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"rejected","walletId":"88981e7f-d490-49a4-9023-7cd0be9710af","transactionId":"258d68d3-3435-4f65-834c-49dfebd3f62b"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > K. Esgotamento de referência gera uma rejeição e um evento [61.42ms]
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > L. Operações atômicas de lease: releaseLease, renewLease e markOperationallyBlocked informam sucesso inequívoco e protegem concorrência [56.84ms]
+{"component":"references","correlationId":null,"durationMs":2.4895000000005894,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":24.671000000000276,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"bccc85ec-a01c-4084-940b-b2835ec41c53","transactionId":"e08480b2-1a80-4ab6-9cc9-9736fe2257c8"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > M. Validação de elegibilidade e expiração usando exclusivamente relógio do PostgreSQL, imune a Date.now() divergente [85.57ms]
+{"component":"references","correlationId":null,"durationMs":2.1554000000005544,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"unexpected_failure","walletId":"0d3d1149-cbec-409c-a275-6987c38169ac","transactionId":"b19998bf-9095-4c73-9a03-d17cf447f76c"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > N. Falha injetada antes do commit confirma que o lote não contabiliza como concluída uma operação revertida [82.52ms]
+{"component":"references","correlationId":null,"durationMs":2.340100000000348,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"unexpected_failure","walletId":"703e46c2-8c4a-446a-95f0-d3c1bfe5286d","transactionId":"2de8a36c-8ab6-41c5-b9af-ceb4acaded50"}
+{"component":"references","correlationId":null,"durationMs":22.96559999999954,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"703e46c2-8c4a-446a-95f0-d3c1bfe5286d","transactionId":"1273031c-01d9-47d6-b8a0-705093fa63d2"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > O. Classificação de erros: defeito permanente/inesperado (TypeError) não gera rejeição financeira falsa e não bloqueia o restante do lote [111.10ms]
+{"component":"references","correlationId":null,"durationMs":10.84310000000005,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"warning","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"failure","walletId":null}
+{"component":"references","correlationId":null,"durationMs":258.4906000000001,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"aborted","walletId":"61fd4060-4f42-44f5-a92c-cf74e9e17e08","transactionId":"23f86693-fabb-4f90-a78b-7ddc25f6000c"}
+{"component":"references","correlationId":null,"durationMs":2.8425999999999476,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":27.779700000000048,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"61fd4060-4f42-44f5-a92c-cf74e9e17e08","transactionId":"23f86693-fabb-4f90-a78b-7ddc25f6000c"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > after_wallet_save: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [422.24ms]
+{"component":"references","correlationId":null,"durationMs":21.755099999999402,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"warning","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"failure","walletId":null}
+{"component":"references","correlationId":null,"durationMs":247.6291000000001,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"aborted","walletId":"73d165ca-58a7-402c-afbe-fe22090bbb6b","transactionId":"b0daa6e7-55d1-476c-84cf-593c780c7c59"}
+{"component":"references","correlationId":null,"durationMs":3.061000000000604,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":26.674200000000383,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"73d165ca-58a7-402c-afbe-fe22090bbb6b","transactionId":"b0daa6e7-55d1-476c-84cf-593c780c7c59"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > before_commit: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [427.16ms]
+{"component":"references","correlationId":null,"durationMs":13.492299999999886,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"warning","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"failure","walletId":null}
+{"component":"references","correlationId":null,"durationMs":249.41899999999987,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"aborted","walletId":"087f5ff7-04d5-456f-ac5c-de88c133ef99","transactionId":"3541ad4f-439d-4dde-90d9-5bbf5b9d86ef"}
+{"component":"references","correlationId":null,"durationMs":2.447400000000016,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":25.011899999999514,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"087f5ff7-04d5-456f-ac5c-de88c133ef99","transactionId":"3541ad4f-439d-4dde-90d9-5bbf5b9d86ef"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > during_flush: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [415.51ms]
+{"component":"references","correlationId":null,"durationMs":10.269900000000234,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"warning","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"failure","walletId":null}
+{"component":"references","correlationId":null,"durationMs":243.91390000000047,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"c4059395-56ac-46de-8e32-e3b27fd91443","transactionId":"ac1a0256-1292-4641-9ed0-c1bde75b1ebd"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > after_commit: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [376.70ms]
+{"component":"references","correlationId":null,"durationMs":11.795200000000477,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"warning","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"failure","walletId":null}
+{"component":"references","correlationId":null,"durationMs":1011.8567000000003,"messageId":null,"operation":"reprocess","providerId":null,"result":"aborted","walletId":"381c3e5a-243f-4eb6-b2bb-4222d5065649","transactionId":"78b33ed9-6ff4-4308-976a-1a9e631bc1e8"}
+{"component":"references","correlationId":null,"durationMs":2.7822999999989406,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":27.45629999999983,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"381c3e5a-243f-4eb6-b2bb-4222d5065649","transactionId":"78b33ed9-6ff4-4308-976a-1a9e631bc1e8"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > lock_wait: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [1182.86ms]
+{"component":"references","correlationId":null,"durationMs":12.263199999999415,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"warning","walletId":null}
+{"component":"references","correlationId":null,"durationMs":0,"messageId":null,"operation":"lifecycle","providerId":null,"result":"failure","walletId":null}
+{"component":"references","correlationId":null,"durationMs":1209.7703000000001,"messageId":null,"operation":"reprocess","providerId":null,"result":"aborted","walletId":"45385a9c-dd09-4ded-addd-2ddab54e7cb4","transactionId":"3cb09f19-407a-4eda-9bf6-c5ef30ae5ebf"}
+{"component":"references","correlationId":null,"durationMs":2.5956999999998516,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":27.407600000000457,"messageId":null,"operation":"reprocess","providerId":"EVOLUTION","result":"processed","walletId":"45385a9c-dd09-4ded-addd-2ddab54e7cb4","transactionId":"3cb09f19-407a-4eda-9bf6-c5ef30ae5ebf"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > query_wait: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [1382.56ms]
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"drop_start","elapsedMs":9521.3123}
+{"component":"test_database","database":"m10_worker_1792335378512_6z1229","phase":"drop_finished","elapsedMs":9546.5074}
+
+ 21 pass
+ 0 fail
+ 348 expect() calls
+Ran 21 tests across 1 file. [10.18s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\terminal-protection-m11.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\terminal-protection-m11.test.ts:
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"create_start","elapsedMs":0.25140000000000384}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"create_confirmed","elapsedMs":49.666000000000004}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"maintenance_closed","elapsedMs":50.1898}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"migrations_start","elapsedMs":50.4583}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"migrations_confirmed","elapsedMs":217.34029999999998}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"migrator_closed","elapsedMs":217.7327}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"grants_confirmed","elapsedMs":236.8934}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"ready","elapsedMs":237.30530000000002}
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > diagnoses the historical missing column and proves UP/DOWN/UP preserves complete rows [223.03ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > uses a restricted application role and keeps the protection trigger enabled [38.87ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > PROCESSED: app rejects every protected field and both NULL directions without changing the row [999.25ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > PROCESSED: admin rejects every protected field and both NULL directions without changing the row [836.33ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > REJECTED: app rejects every protected field and both NULL directions without changing the row [700.58ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > REJECTED: admin rejects every protected field and both NULL directions without changing the row [726.32ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > FAILED: app rejects every protected field and both NULL directions without changing the row [747.95ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > FAILED: admin rejects every protected field and both NULL directions without changing the row [854.72ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > preserves PENDING/PENDING_REFERENCE transitions to all terminal states and M10 lease operations [47.10ms]
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"drop_start","elapsedMs":5425.5636}
+{"component":"test_database","database":"m11_1792335388145_hly324","phase":"drop_finished","elapsedMs":5443.1198}
+
+ 9 pass
+ 0 fail
+ 676 expect() calls
+Ran 9 tests across 1 file. [5.50s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\wager-win-loss-m06.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-win-loss-m06.test.ts:
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"create_start","elapsedMs":0.21870000000001255}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"create_confirmed","elapsedMs":39.84839999999997}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"maintenance_closed","elapsedMs":40.29129999999998}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"migrations_start","elapsedMs":40.578899999999976}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"migrations_confirmed","elapsedMs":183.6381}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"migrator_closed","elapsedMs":183.98799999999994}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"grants_confirmed","elapsedMs":202.414}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"ready","elapsedMs":202.7889}
+{"component":"http","correlationId":"idemp-win-267817cf-7b74-4805-be16-ac3d0b26aef3","durationMs":47.10090000000014,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"c09e6f88-d794-4d02-9270-e3326ecc8cd2"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 1. WIN Válida: Crédito, Versão, Ledger, Outbox e Reconciliação > deve creditar exatamente o valor informado, incrementar version uma vez, gerar ledger CREDIT e 2 outbox events na mesma transação [166.62ms]
+{"component":"http","correlationId":"idemp-win-zero-0df87805-1029-4d81-a73c-3ab797a86739","durationMs":1.1490000000001146,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"2ee0dbc3-94ad-438f-bead-e295092a2695"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN com valor zero ("0.00") com 400 Bad Request e sem efeitos parciais [35.43ms]
+{"component":"http","correlationId":"idemp-win-neg-bbc518bc-28e6-47b5-936b-84f903200d6e","durationMs":0.3894999999999982,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"79eadc89-5591-4e67-8302-c407c7fb6eac"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN com valor negativo ("-10.00") com 400 Bad Request [27.22ms]
+{"component":"http","correlationId":"idemp-bad-fmt-2a71a0b3-4a2e-482b-8b84-b1faf4231386","durationMs":0.4048000000000229,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"0a3ee3f6-c008-4434-ae03-70b7970799e3"}
+{"component":"http","correlationId":"idemp-bad-fmt-dadfed4e-c31a-4955-a610-28886248ba38","durationMs":0.37449999999989814,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"0a3ee3f6-c008-4434-ae03-70b7970799e3"}
+{"component":"http","correlationId":"idemp-bad-fmt-b81f2a48-2c0e-4461-ab49-47a7bace504e","durationMs":0.34699999999998,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"0a3ee3f6-c008-4434-ae03-70b7970799e3"}
+{"component":"http","correlationId":"idemp-bad-fmt-be9e86bb-1c49-4694-8203-33bea7e2b63d","durationMs":0.4891000000000076,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"0a3ee3f6-c008-4434-ae03-70b7970799e3"}
+{"component":"http","correlationId":"idemp-bad-fmt-85a126ca-73aa-44b3-834b-b3504151d9f5","durationMs":0.38589999999999236,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"0a3ee3f6-c008-4434-ae03-70b7970799e3"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar formatos não canônicos ("10", "10.5", " 10.00 ") com 400 Bad Request [29.51ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN com moeda incompatível com a carteira (422 Unprocessable Entity) [34.02ms]
+{"component":"http","correlationId":"idemp-win-bad-player-34873043-4eda-4194-a638-f92a12759a01","durationMs":7.442700000000059,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"0897a879-41ef-49c4-8378-1f69c4c5a172"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN para wallet que não pertence ao player informado (400 Bad Request) [34.37ms]
+{"component":"http","correlationId":"idemp-win-limit-ce2ece67-5de6-4b8a-84d4-2bbce282e687","durationMs":28.63930000000005,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"da3d022f-b7eb-4e62-aa13-1d62ba860ba7"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 3. Crédito no Limite Money e Rejeição de Overflow > deve creditar com sucesso quando a WIN atinge exatamente o limite Money ("9999999999999999.99") [54.64ms]
+{"component":"http","correlationId":"idemp-overflow-35424844-26f1-45ee-bf93-7982b890bfd5","durationMs":12.504500000000007,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"ff1dc43b-ea9d-402b-ae5e-35e2fab527ce"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 3. Crédito no Limite Money e Rejeição de Overflow > deve rejeitar crédito adicional que cause overflow com erro de domínio e ausência de alterações parciais [49.86ms]
+{"component":"http","correlationId":"idemp-loss-4109cba4-51fe-4902-a081-f7323621e3b8","durationMs":27.7965999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"cea78aaa-c11e-4ac3-a609-1c9214547524"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 4. LOSS Válida: Sem Mutação de Saldo/Versão/UpdatedAt, Sem Ledger e Somente WagerTransactionProcessed > deve persistir PROCESSED, não alterar saldo/version/updatedAt, não gerar ledger e emitir somente WagerTransactionProcessed [71.84ms]
+{"component":"http","correlationId":"idemp-loss-zero-1c69cd1b-5cc2-4a9f-b40f-5fd26dba5503","durationMs":18.434999999999945,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"0d2f0815-2d61-4484-a4b7-b4b9c6ff996b"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 4. LOSS Válida: Sem Mutação de Saldo/Versão/UpdatedAt, Sem Ledger e Somente WagerTransactionProcessed > deve aceitar LOSS com valor zero ("0.00") conforme política documentada sem alterar carteira [43.84ms]
+{"component":"http","correlationId":"idemp-loss-high-7aba6daf-a4b2-45d3-bbea-62c0e8ea40b9","durationMs":30.526499999999942,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"7b280f31-996f-4490-95fb-9aeb3e3e3bd8"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 4. LOSS Válida: Sem Mutação de Saldo/Versão/UpdatedAt, Sem Ledger e Somente WagerTransactionProcessed > LOSS nunca movimenta saldo mesmo quando submetida com valor positivo alto [55.61ms]
+{"component":"http","correlationId":"idemp-loss-neg-64f03ec9-7598-4076-bddb-b73a1fa6f118","durationMs":0.4678999999998723,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"5043c710-2081-4426-bb93-54b79f371e0c"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 5. Entradas Inválidas de LOSS > deve rejeitar LOSS com valor negativo ("-5.00") com 400 Bad Request [33.32ms]
+{"component":"http","correlationId":"idemp-loss-ref-8824d776-db71-4b38-a7db-cbf6fb5bf57c","durationMs":0.5606999999999971,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":400,"walletId":"1a397dd9-06bf-42b5-9aba-ed33f8cb728d"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 5. Entradas Inválidas de LOSS > deve rejeitar LOSS com tentativa de fornecer referenceExternalTransactionId com 400 Bad Request [24.95ms]
+{"component":"http","correlationId":"idemp-win-replay-aadd0e73-d0b0-414b-9c31-c2a599c0a323","durationMs":34.277300000000196,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8dbb5711-a165-494a-9eaa-21ed912903a0"}
+{"component":"http","correlationId":"idemp-intervening-8208e60c-612f-488a-b780-61b27ec54188","durationMs":30.77449999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8dbb5711-a165-494a-9eaa-21ed912903a0"}
+{"component":"http","correlationId":"idemp-win-replay-aadd0e73-d0b0-414b-9c31-c2a599c0a323","durationMs":13.593199999999797,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8dbb5711-a165-494a-9eaa-21ed912903a0"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Replay de WIN: repetir retorna transactionId e saldo originais com idempotentReplay=true, mesmo após alteração posterior do saldo [108.33ms]
+{"component":"http","correlationId":"idemp-loss-rep-7706d519-58de-4ee4-9026-791baabc0b58","durationMs":20.670199999999795,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"48ced79f-8a2d-4cd7-9b64-d03bcb82cace"}
+{"component":"http","correlationId":"idemp-loss-rep-7706d519-58de-4ee4-9026-791baabc0b58","durationMs":11.141100000000051,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"48ced79f-8a2d-4cd7-9b64-d03bcb82cace"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Replay de LOSS: repetir retorna transactionId e saldo originais com idempotentReplay=true [59.35ms]
+{"component":"http","correlationId":"idemp-conflict-b3c4e0a0-c230-4f97-b5e5-ad49b3d3d56f","durationMs":31.534799999999905,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"4a814c84-249e-4d69-a3bf-ba4c603c0346"}
+{"component":"http","correlationId":"idemp-conflict-b3c4e0a0-c230-4f97-b5e5-ad49b3d3d56f","durationMs":10.15480000000025,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":409,"walletId":"4a814c84-249e-4d69-a3bf-ba4c603c0346"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Conflito de Payload (409): Mesma idempotency-key com payload divergente retorna 409 Conflict [70.52ms]
+{"component":"http","correlationId":"key-1-dedd4220-9a5b-4a2d-b67d-8e00875997a9","durationMs":26.870899999999892,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"d0aeaa1c-5f7c-4bbd-b7d7-134b38827236"}
+{"component":"http","correlationId":"key-2-8e674a51-16b7-4d52-b09e-815991eaee74","durationMs":12.695600000000013,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":409,"walletId":"d0aeaa1c-5f7c-4bbd-b7d7-134b38827236"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Conflito de Identificador Externo: Reutilizar providerId e externalTransactionId sob outra chave retorna 409 Conflict [63.86ms]
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":121.93170000000009,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":117.41609999999991,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":117.8389000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":133.91999999999962,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":152.76049999999987,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":160.54419999999982,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":185.87120000000004,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":170.25919999999996,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":187.60910000000013,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":187.2842999999998,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":213.65959999999995,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":203.63819999999987,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":235.58349999999973,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":218.95279999999957,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":225.37040000000025,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":229.52840000000015,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":233.5549000000001,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":237.87609999999995,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":244.61049999999977,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":249.07479999999987,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":253.63290000000006,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":259.71990000000005,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":265.11670000000004,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":271.4064999999996,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":275.68870000000015,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":281.0492999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":285.2167999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":289.4139,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":297.0108,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":300.53600000000006,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":304.7968000000001,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":308.8101999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":313.9310999999998,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":318.72839999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":323.1894000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":329.79179999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":333.42880000000014,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":337.0916000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":343.50559999999996,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":347.3283000000001,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":354.3654999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":356.8267000000001,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":360.66229999999996,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":364.94370000000026,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":368.6041,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":373.9231,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":375.9720000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":379.90689999999995,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":384.0108,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+{"component":"http","correlationId":"idemp-win-50-a55a6c41-acc4-411f-8fa9-3dba24bbca57","durationMs":387.94450000000006,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"1c6c2e20-5567-46c9-87ed-eb2eca80eb86"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 7. Concorrência Real: 50 WIN Idênticas, 50 LOSS Idênticas e WIN Distintas Simultâneas > 50 WIN idênticas concorrentes: exatamente um crédito, version incrementada em 1 e 1 transação financeira [508.67ms]
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":67.34990000000016,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":72.57540000000017,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":77.57090000000017,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":80.9671000000003,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":87.55569999999989,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":93.24530000000004,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":95.24290000000019,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":101.00650000000041,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":106.5024000000003,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":111.25460000000021,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":115.55799999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":119.02010000000018,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":122.25909999999976,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":128.76350000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":133.80389999999989,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":138.1183000000001,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":143.00900000000001,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":144.2154999999998,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":149.63660000000027,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":153.29860000000008,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":159.9476999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":162.92669999999998,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":167.92529999999988,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":172.50990000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":177.01009999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":181.51850000000013,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":186.09979999999996,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":190.07240000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":193.82659999999987,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":199.1908000000003,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":202.16580000000022,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":206.70830000000024,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":211.5336000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":215.78030000000035,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":227.9751000000001,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":232.9314999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":237.26969999999983,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":243.60840000000007,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":248.04150000000027,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":252.50030000000018,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":256.7991999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":260.61709999999994,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":266.0120999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":269.3287,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":273.3064000000004,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":277.88419999999996,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":281.6768000000002,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":285.67689999999993,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":289.6522,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+{"component":"http","correlationId":"idemp-loss-50-b1be579c-49dc-45af-a04f-c3bb2cedd4c6","durationMs":293.2646999999997,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"fb47cbd4-8829-43c9-96dd-efce13e80832"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 7. Concorrência Real: 50 WIN Idênticas, 50 LOSS Idênticas e WIN Distintas Simultâneas > 50 LOSS idênticas concorrentes: exatamente uma transação, um evento e zero movimentos de saldo [375.01ms]
+{"component":"http","correlationId":"idemp-distinct-win-6-9f6a3271-5ab5-4601-817a-c368428c577c","durationMs":44.08490000000029,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-4-9d6afa7e-db75-4053-a231-3b5eb43aec92","durationMs":68.48759999999993,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-3-bbf14e66-4977-4cf7-aaf7-f60de3bf0db2","durationMs":95.59029999999984,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-1-5dd84864-14e7-4e83-8aba-55c6cab2d971","durationMs":118.3481999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-0-2fae7060-1a08-4160-97b0-b633d6601eb5","durationMs":138.97270000000026,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-2-02cdaef2-444c-4a23-a81e-85183c9f7fdf","durationMs":158.54939999999988,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-5-ce003326-1e4e-4c45-8dc4-e074276b3120","durationMs":176.92430000000013,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-7-9ce86f25-c206-45f7-abcf-2032a742b10d","durationMs":194.40769999999975,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-8-f79b0c37-ca2a-436b-a3e7-2385c921740c","durationMs":213.9980999999998,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+{"component":"http","correlationId":"idemp-distinct-win-9-c534f629-fe05-4973-ae7d-fad8baeb2f59","durationMs":232.71860000000015,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"8934b932-8405-4a9a-af24-08a7604d9f33"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 7. Concorrência Real: 50 WIN Idênticas, 50 LOSS Idênticas e WIN Distintas Simultâneas > WIN distintas concorrentes na mesma wallet: soma exata, sem lost update e com versão correta [286.45ms]
+{"component":"http","correlationId":"idemp-fail-w-save-f2385951-4155-49a6-b0b0-5f3b78a6ca6e","durationMs":12.041400000000067,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":500,"walletId":"0b472e93-1179-4fef-8fb0-2d999c5be45b"}
+{"component":"http","correlationId":"idemp-fail-w-save-f2385951-4155-49a6-b0b0-5f3b78a6ca6e","durationMs":23.617299999999886,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"0b472e93-1179-4fef-8fb0-2d999c5be45b"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-wallet_save e permitir reenvio único [62.70ms]
+{"component":"http","correlationId":"idemp-fail-tx-save-d4bc80e6-ae2e-4b2f-ae73-5feb43e972bd","durationMs":16.459299999999985,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":500,"walletId":"37399e09-f208-4a58-8de6-fa92a3c8b3e0"}
+{"component":"http","correlationId":"idemp-fail-tx-save-d4bc80e6-ae2e-4b2f-ae73-5feb43e972bd","durationMs":22.364000000000033,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"37399e09-f208-4a58-8de6-fa92a3c8b3e0"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-tx_save e permitir reenvio único [64.33ms]
+{"component":"http","correlationId":"idemp-fail-led-save-da02b8a8-6ef2-4a03-8b7f-923dc62606af","durationMs":17.577699999999822,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":500,"walletId":"df7b0671-bce5-4fab-be0d-f6cdf2ef09ac"}
+{"component":"http","correlationId":"idemp-fail-led-save-da02b8a8-6ef2-4a03-8b7f-923dc62606af","durationMs":23.933700000000044,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"df7b0671-bce5-4fab-be0d-f6cdf2ef09ac"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-ledger_save e permitir reenvio único [64.60ms]
+{"component":"http","correlationId":"idemp-fail-out-save-bd663974-3f90-4768-904d-12f5dacf3e40","durationMs":20.510199999999713,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":500,"walletId":"d834a6ec-bf95-4837-a28a-f9d034cf21fe"}
+{"component":"http","correlationId":"idemp-fail-out-save-bd663974-3f90-4768-904d-12f5dacf3e40","durationMs":22.5007999999998,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"d834a6ec-bf95-4837-a28a-f9d034cf21fe"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-outbox_save e permitir reenvio único [67.52ms]
+{"component":"http","correlationId":"idemp-fail-loss-tx-d478e856-6e51-4a3c-adb4-bc00ea7d18f2","durationMs":14.01929999999993,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":500,"walletId":"b5509acb-9637-49d7-ae36-78dad60ced05"}
+{"component":"http","correlationId":"idemp-fail-loss-tx-d478e856-6e51-4a3c-adb4-bc00ea7d18f2","durationMs":15.856299999999921,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"b5509acb-9637-49d7-ae36-78dad60ced05"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > LOSS: deve reverter integralmente quando a falha ocorre pós-tx_save e permitir reenvio único [53.52ms]
+{"component":"http","correlationId":"idemp-fail-loss-out-3b5d4883-0073-43ce-af87-84b8c571ed2b","durationMs":15.360599999999977,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":500,"walletId":"a472da1f-0bd2-4ac6-a7ad-a2746a5d8081"}
+{"component":"http","correlationId":"idemp-fail-loss-out-3b5d4883-0073-43ce-af87-84b8c571ed2b","durationMs":15.563300000000254,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"a472da1f-0bd2-4ac6-a7ad-a2746a5d8081"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > LOSS: deve reverter integralmente quando a falha ocorre pós-outbox_save e permitir reenvio único [54.32ms]
+{"component":"http","correlationId":"key-bet-146673f7-3d7f-47f0-87fd-7077d3b49938","durationMs":21.716300000000047,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"202c614a-78dd-4126-be50-ca98be40b76c"}
+{"component":"http","correlationId":"key-win-61a60f82-20ae-44e0-8468-31ad8de32805","durationMs":30.452899999999772,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"202c614a-78dd-4126-be50-ca98be40b76c"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.1: WIN com referência válida a uma BET processada é executada com sucesso e persiste o vínculo [84.09ms]
+{"component":"http","correlationId":"key-win-missing-b4a1806c-1c8b-4bbf-a732-d0e52cb0a747","durationMs":19.824299999999766,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":202,"walletId":"6e4deac5-e0ed-42ce-a019-d6c6e9d70f28"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.2: WIN com referência a BET ausente ou ainda não processada gera PENDING_REFERENCE (202 Accepted) e outbox de pendência [47.35ms]
+{"component":"http","correlationId":"key-bet-w1-f00d0aef-b1d2-4f3e-83c3-c76b7ded0f77","durationMs":23.90039999999999,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"09900674-166b-4fb3-9213-5b5585a69976"}
+{"component":"http","correlationId":"key-win-cross-642dd818-3508-4a0c-859b-afaca3d6859b","durationMs":19.665500000000065,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":422,"walletId":"a7edd542-fdad-4ae6-863a-e88ba7c09cb3"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.3: WIN com referência a BET de outra rodada ou outra carteira é rejeitada com 422 e REFERENCE_INCOMPATIBLE [87.02ms]
+{"component":"http","correlationId":"key-win1-81e76014-1901-431b-bd26-701a220082c4","durationMs":22.646099999999933,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"a1042ab8-398a-4005-a25d-d14f9565ef31"}
+{"component":"http","correlationId":"key-win2-54f0dfcf-0b70-404b-a327-9e61bae9a339","durationMs":18.84519999999975,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":422,"walletId":"a1042ab8-398a-4005-a25d-d14f9565ef31"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.4: WIN com referência a transação que não é BET (ex: referenciando uma WIN anterior) é rejeitada com 422 e REFERENCE_INCOMPATIBLE [62.26ms]
+{"component":"http","correlationId":"key-rej-bet-857fe6a6-efe0-4624-8074-5c83127900e1","durationMs":16.003900000000158,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":422,"walletId":"6b1d153c-2443-422e-b5ec-e40e7967ad62"}
+{"component":"http","correlationId":"key-win-on-rej-2d60d0d0-6a8d-4ff9-b81f-863f301df312","durationMs":25.66280000000006,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":422,"walletId":"6b1d153c-2443-422e-b5ec-e40e7967ad62"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.5: WIN com referência a BET que foi REJECTED é rejeitada com 422 e REFERENCE_NOT_PROCESSED [63.64ms]
+{"component":"http","correlationId":"key-win-ooo-10-1-30a8e7de-62bd-48a1-843c-d2e330023072","durationMs":18.73149999999987,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":202,"walletId":"aa8d2e4b-835b-476b-b5d5-820addc7d1ad"}
+{"component":"http","correlationId":"key-bet-ooo-10-1-5dac9230-b08f-4aab-82b2-2660391be0e0","durationMs":21.64589999999953,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"aa8d2e4b-835b-476b-b5d5-820addc7d1ad"}
+{"component":"references","correlationId":null,"durationMs":4.547900000000482,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":25.882700000000114,"messageId":null,"operation":"reprocess","providerId":"provider_m06","result":"processed","walletId":"aa8d2e4b-835b-476b-b5d5-820addc7d1ad","transactionId":"b6345e92-d97b-4e89-9c55-605c736d2452"}
+{"component":"http","correlationId":"key-win-ooo-10-1-30a8e7de-62bd-48a1-843c-d2e330023072","durationMs":8.529300000000148,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"aa8d2e4b-835b-476b-b5d5-820addc7d1ad"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.1: WIN chega antes da BET → PENDING_REFERENCE (202); BET chega; execução manual resolve com um crédito [128.40ms]
+{"component":"http","correlationId":"key-win-cross-10-2-e5451122-f206-43fc-8cf2-0ed41690facc","durationMs":19.227499999999964,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":202,"walletId":"b945577f-ea73-4d84-bf72-ca59318d9bd3"}
+{"component":"http","correlationId":"key-bet-cross-10-2-976964ce-bef7-4963-8e1f-91a61f066830","durationMs":22.110000000000582,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"796d7c78-a952-46f1-a9b8-aa0731027ea2"}
+{"component":"references","correlationId":null,"durationMs":2.8993000000000393,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":16.703700000000026,"messageId":null,"operation":"reprocess","providerId":"provider_m06","result":"rejected","walletId":"b945577f-ea73-4d84-bf72-ca59318d9bd3","transactionId":"dbece63f-89fc-4140-a7ae-175ca0a574a2"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.2: Referência incompatível (BET em outra carteira/player) → reprocessador rejeita sem crédito [120.32ms]
+{"component":"http","correlationId":"key-win-rej-10-3-1490eb7f-0d18-4eb5-a1fa-49a7ce6ea1dc","durationMs":20.066899999999805,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":202,"walletId":"078ded2c-00f1-47bb-9580-1d4f69c0ef5f"}
+{"component":"http","correlationId":"key-bet-rej-10-3-851b2022-0bdc-49fb-91e7-cd6443f86349","durationMs":16.469500000000153,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"failure","route":"/wagering/transactions","status":422,"walletId":"078ded2c-00f1-47bb-9580-1d4f69c0ef5f"}
+{"component":"references","correlationId":null,"durationMs":2.8748999999997977,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":18.318599999999606,"messageId":null,"operation":"reprocess","providerId":"provider_m06","result":"rejected","walletId":"078ded2c-00f1-47bb-9580-1d4f69c0ef5f","transactionId":"ae5e7f70-b48f-4e0d-a743-e98dbb3a6580"}
+{"component":"references","correlationId":null,"durationMs":15.605199999999968,"messageId":null,"operation":"reprocess","providerId":"provider_m06","result":"rescheduled","walletId":"6e4deac5-e0ed-42ce-a019-d6c6e9d70f28","transactionId":"8430c46d-2000-4b7e-8f50-24a38d53ba84"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.3: Referência rejeitada (BET REJECTED por saldo insuficiente) → reprocessador rejeita sem crédito [100.47ms]
+{"component":"http","correlationId":"key-bet-seq-9cb0d359-a63c-454d-b2c0-e04dca0f5f06","durationMs":25.32009999999991,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"de791b4e-3798-4dd1-9b96-1a50c8adf1de"}
+{"component":"http","correlationId":"key-win1-seq-642177d5-6a50-4bd0-8be2-b7623a7f9c2c","durationMs":25.743399999999383,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"de791b4e-3798-4dd1-9b96-1a50c8adf1de"}
+{"component":"http","correlationId":"key-win2-seq-373c3a2d-d5b3-4361-82f1-6469f6966b5c","durationMs":23.741899999999987,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"de791b4e-3798-4dd1-9b96-1a50c8adf1de"}
+{"component":"http","correlationId":"key-win1-seq-642177d5-6a50-4bd0-8be2-b7623a7f9c2c","durationMs":8.223500000000058,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"de791b4e-3798-4dd1-9b96-1a50c8adf1de"}
+{"component":"http","correlationId":"key-win2-seq-373c3a2d-d5b3-4361-82f1-6469f6966b5c","durationMs":7.785200000000259,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"de791b4e-3798-4dd1-9b96-1a50c8adf1de"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.4: Duas WIN distintas vinculadas à mesma BET sequencialmente → ambas processam, créditos exatos, version, ledger, outbox e replay [131.76ms]
+{"component":"http","correlationId":"key-bet-con-c8f7d25a-ba8f-48a8-a46b-f363b623fc6e","durationMs":21.540100000000166,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"4364c94e-ca54-4131-ac66-7e01915786df"}
+{"component":"http","correlationId":"key-win1-con-554d9f8f-b0b8-426e-b730-001e6011277e","durationMs":24.135400000000118,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"4364c94e-ca54-4131-ac66-7e01915786df"}
+{"component":"http","correlationId":"key-win2-con-511a2bda-cbed-4c4f-9713-82742a424199","durationMs":44.83839999999964,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"4364c94e-ca54-4131-ac66-7e01915786df"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.5: Duas WIN distintas vinculadas à mesma BET concorrentemente → ambas processam, créditos exatos sem lost update [98.70ms]
+{"component":"http","correlationId":"key-win1-2ooo-92de87d1-5ee4-4ba7-82f8-cc74cd5a9fca","durationMs":17.511900000000423,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":202,"walletId":"7c6905e1-c931-4810-b8bb-2ae91ff92a8e"}
+{"component":"http","correlationId":"key-win2-2ooo-4ab9b4fa-85f5-49b4-b4af-39b87b3c5a8a","durationMs":17.65810000000056,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":202,"walletId":"7c6905e1-c931-4810-b8bb-2ae91ff92a8e"}
+{"component":"http","correlationId":"key-bet-2ooo-1505ff5e-56b9-494c-b2c2-626020423cc7","durationMs":21.019599999999627,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"7c6905e1-c931-4810-b8bb-2ae91ff92a8e"}
+{"component":"references","correlationId":null,"durationMs":4.193299999999908,"messageId":null,"operation":"reprocess","providerId":null,"result":"claimed","walletId":null}
+{"component":"references","correlationId":null,"durationMs":22.493199999999888,"messageId":null,"operation":"reprocess","providerId":"provider_m06","result":"processed","walletId":"7c6905e1-c931-4810-b8bb-2ae91ff92a8e","transactionId":"4fba360e-0581-4d86-bb4d-1e65e4aadd2a"}
+{"component":"references","correlationId":null,"durationMs":21.277499999999236,"messageId":null,"operation":"reprocess","providerId":"provider_m06","result":"processed","walletId":"7c6905e1-c931-4810-b8bb-2ae91ff92a8e","transactionId":"57b9b223-b117-42c7-8b5b-107c96e54f8c"}
+{"component":"http","correlationId":"key-win1-2ooo-92de87d1-5ee4-4ba7-82f8-cc74cd5a9fca","durationMs":7.846899999999551,"messageId":null,"method":"POST","operation":"request","providerId":"provider_m06","result":"success","route":"/wagering/transactions","status":200,"walletId":"7c6905e1-c931-4810-b8bb-2ae91ff92a8e"}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.6: Duas WINs pendentes para a mesma BET → ambas chegam antes da BET e ambas resolvem uma única vez [146.34ms]
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"create_start","elapsedMs":0.0408000000006723}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"create_confirmed","elapsedMs":28.943500000000313}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"maintenance_closed","elapsedMs":29.20720000000074}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"migrations_start","elapsedMs":29.280900000000656}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"migrations_confirmed","elapsedMs":150.51550000000043}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"migrator_closed","elapsedMs":150.65040000000045}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"grants_confirmed","elapsedMs":164.6217000000006}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"ready","elapsedMs":164.69930000000022}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"drop_start","elapsedMs":413.7551000000003}
+{"component":"test_database","database":"mig004_test_1792335398382_9jxtne","phase":"drop_finished","elapsedMs":441.2632000000003}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 11. Validação da Migration 004 Up/Down/Up e Recusa Segura em Banco Descartável > deve executar up/down/up com sucesso e recusar down com segurança quando existem dados incompatíveis [442.01ms]
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"drop_start","elapsedMs":4443.418}
+{"component":"test_database","database":"m06_win_loss_1792335394400_rfu8bc","phase":"drop_finished","elapsedMs":4462.0093}
+
+ 38 pass
+ 0 fail
+ 583 expect() calls
+Ran 38 tests across 1 file. [5.26s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-http.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-http.test.ts:
+(pass) M18 principal AppModule HTTP and real PostgreSQL > logs only allowed fields, preserves correlation, measures normalized routes including errors/404 [67.30ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > liveness and real SELECT 1 readiness do not mutate financial rows [11.77ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > bounds readiness with an exhausted existing pool and recovers without leaking borrowers [180.47ms]
+Connection Error: error: terminating connection due to administrator command
+Connection Error: error: terminating connection due to administrator command
+(pass) M18 principal AppModule HTTP and real PostgreSQL > returns generic 503 when PostgreSQL rejects connections, keeps liveness, closes resources [63.06ms]
+
+ 4 pass
+ 0 fail
+ 96 expect() calls
+Ran 4 tests across 1 file. [1423.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-messaging.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-messaging.test.ts:
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"create_start","elapsedMs":0.32769999999993615}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"create_confirmed","elapsedMs":52.97709999999995}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"maintenance_closed","elapsedMs":53.56899999999996}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"migrations_start","elapsedMs":53.861099999999965}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"migrations_confirmed","elapsedMs":291.81799999999987}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"migrator_closed","elapsedMs":292.23390000000006}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"grants_confirmed","elapsedMs":319.38710000000003}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"ready","elapsedMs":320.2182999999999}
+(pass) broker confirmation survives failed local mark; retry is distinct from confirmed local result [173.18ms]
+(pass) rollback produces no durable result, commit and inbox replay preserve all financial state [254.01ms]
+(pass) reference metrics count confirmed resolutions only and disclose missing historical correlation [183.26ms]
+(pass) financial invocations include replay, technical failure and external rollback without claiming durability [178.91ms]
+(pass) real SQS unavailability returns generic 503 while liveness stays up, recovers and disabled dependencies skip probing [41.20ms]
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"drop_start","elapsedMs":1485.0558}
+{"component":"test_database","database":"m18_broker_1792335401113_glrx9z","phase":"drop_finished","elapsedMs":1507.2984999999999}
+
+ 5 pass
+ 0 fail
+ 59 expect() calls
+Ran 5 tests across 1 file. [2.28s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\delivery-metrics.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\delivery-metrics.test.ts:
+(pass) bounded financial categories; invocation metrics never claim durable transactions [3.16ms]
+(pass) outbox publication samples cannot overwrite database backlog gauges [0.39ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [13.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\external-wager-contract.test.ts:
+(pass) challenge example accepts opaque messageId and takes financial key only from data [1.59ms]
+(pass) external payload cannot obtain financial identity from transport or envelope messageId [0.29ms]
+
+ 2 pass
+ 0 fail
+ 11 expect() calls
+Ran 2 tests across 1 file. [22.00ms]
+[test-runner] 12 files; 0 failed

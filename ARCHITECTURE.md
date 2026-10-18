@@ -1,5 +1,17 @@
 # Arquitetura e Decisões Técnicas — Processador de Apostas Distribuídas
 
+## Consolidação de entrega M18–M21
+
+As seções de marcos anteriores preservam o histórico. O estado atual inclui migrations **001–010** e dois adaptadores de entrada SQS: ProcessWager v1 permanece compatível; WagerTransactionRequested usa identidade textual externa na inbox e `data.idempotencyKey` como chave financeira. A migration 010 preserva os UUIDs existentes em texto; o down exige que identidades aceitas sejam conversíveis para UUID, recusando perda de dados. Consulte [contrato externo e ambiguidades](docs/messaging/EXTERNAL-CONTRACT.md).
+
+As duas entradas convergem para validação normalizada, mesmo hash financeiro e ProcessWagerUseCase, mantendo inbox/carteira/transação/ledger/outbox atômicos. Namespaces de inbox distintos evitam colisões entre protocolos, enquanto a chave financeira é global. MessageId SQS e ReceiptHandle não substituem o messageId do envelope.
+
+Métricas separam invocações de estados persistidos: `financial_invocations_total` inclui replay e possível rollback externo; `financial_transactions` é gauge consultado no banco. A DLQ expõe somente gauge aproximado via GetQueueAttributes. Backlog outbox é consultado globalmente; o histograma amostra idade após marcação local. [Intervalos, tipos e limitações](docs/delivery/OBSERVABILITY.md).
+
+Autenticação foi deliberadamente omitida, como permite a seção 2 do enunciado. `src/interfaces/http/auth/provider-identity.port.ts` deixa explícito o ponto de extensão: um adapter OIDC/JWKS para Keycloak/Zitadel ou IdP equivalente, invocado por guard nos controladores financeiros. Claims devem vincular providerId e permissões; não criar cadastro/senha próprios. Não há adapter ou guard ativo nesta entrega. Health permanece público; fila é canal interno confiável, sem dispensar validação de provider e domínio.
+
+Compose final habilita os três trabalhadores. Regressão roda em projeto separado da conferência pessoal; testes criam bancos/filas descartáveis exclusivos. A concorrência financeira é por carteira; inbox usa lock por identidade e outbox usa leases concorrentes. Transporte e publicação são at-least-once: crash após envio pode republicar o mesmo eventId. [Provas finais e seus limites](docs/evidence/delivery/RESULTS.md).
+
 Este documento detalha as decisões de engenharia, garantias formais, modelagem contábil, estratégias de concorrência, idempotência, referências fora de ordem e proteções relacionais no PostgreSQL.
 
 ---

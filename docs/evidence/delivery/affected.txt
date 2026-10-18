@@ -1,0 +1,60 @@
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\concurrency.test.ts:
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation [1024.06ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Two concurrent BETs of 80.00 on 100.00 balance: exactly ONE processed, ONE rejected, final balance 20.00 [101.44ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected [136.99ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier [1149.33ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 duplicate submissions across THREE independent OS application processes using synchronization barrier [2146.43ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409 [100.84ms]
+
+ 6 pass
+ 0 fail
+ 314 expect() calls
+Ran 6 tests across 1 file. [32.69s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-http.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-http.test.ts:
+(pass) M18 principal AppModule HTTP and real PostgreSQL > logs only allowed fields, preserves correlation, measures normalized routes including errors/404 [462.47ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > liveness and real SELECT 1 readiness do not mutate financial rows [14.00ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > bounds readiness with an exhausted existing pool and recovers without leaking borrowers [181.28ms]
+Connection Error: Connection ended unexpectedly
+Connection Error: Connection ended unexpectedly
+(pass) M18 principal AppModule HTTP and real PostgreSQL > returns generic 503 when PostgreSQL rejects connections, keeps liveness, closes resources [110.22ms]
+
+ 4 pass
+ 0 fail
+ 96 expect() calls
+Ran 4 tests across 1 file. [13.16s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-messaging.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-messaging.test.ts:
+(pass) broker confirmation survives failed local mark; retry is distinct from confirmed local result [259.18ms]
+(pass) rollback produces no durable result, commit and inbox replay preserve all financial state [276.65ms]
+(pass) reference metrics count confirmed resolutions only and disclose missing historical correlation [261.73ms]
+(pass) financial invocations include replay, technical failure and external rollback without claiming durability [153.10ms]
+(pass) real SQS unavailability returns generic 503 while liveness stays up, recovers and disabled dependencies skip probing [56.85ms]
+
+ 5 pass
+ 0 fail
+ 57 expect() calls
+Ran 5 tests across 1 file. [3.38s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\delivery-metrics.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\delivery-metrics.test.ts:
+(pass) bounded financial categories; invocation metrics never claim durable transactions [3.33ms]
+(pass) outbox publication samples cannot overwrite database backlog gauges [0.46ms]
+
+ 2 pass
+ 0 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [15.00ms]
+[test-runner] 4 files; 0 failed

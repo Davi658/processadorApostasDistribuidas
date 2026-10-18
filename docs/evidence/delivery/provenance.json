@@ -1,0 +1,20 @@
+{
+  "branch": "codex/delivery-final",
+  "submission": false,
+  "worktree": "D:\\processadorApostasDistribuidas\\.worktrees\\delivery-final",
+  "referenceReadOnly": "D:\\processadorApostasDistribuidas\\referencias\\ENUNCIADO_ORIGINA.md",
+  "linux": "Docker Desktop Linux containers",
+  "host": "Windows amd64",
+  "referenceSha256": "47795fce2fc38cae5f1b91368ebaf80b7a2ed1fe147f36704b665faf0613812e",
+  "referenceCommitted": false,
+  "powershell": "7.6.5",
+  "docker": "29.8.2",
+  "candidatePersonalTestsExecuted": false,
+  "bun": "1.4.3",
+  "merge": false,
+  "base": "8798c28c88d74685bc2b815b19868f281e32a58f",
+  "push": false,
+  "compose": "5.6.0",
+  "sourceCommit": "fdf9fb9fff6ca1eb8a6194a2d26620d85637f86e",
+  "finalRegressionDirectory": "verification-final"
+}

@@ -1,0 +1,17 @@
+{
+  "api": "http://127.0.0.1:3094",
+  "preexistingResourcesDeleted": false,
+  "postgresPort": 55594,
+  "notes": "Disposable regression databases/queues were owned by test fixtures. Previous named volumes retained. Final LocalStack remains running to preserve its current in-memory queues; stopping it does not guarantee message persistence.",
+  "sqsPort": 45694,
+  "finalState": "running and healthy for candidate inspection",
+  "volumesDeleted": [],
+  "regressionProjectsStopped": [
+    "delivery-final-20261018",
+    "delivery-validation-20261018",
+    "delivery-regression-20261018",
+    "delivery-regression-final-20261018"
+  ],
+  "finalNamedVolume": "delivery-compose-final-20261018_local_pgdata",
+  "finalProject": "delivery-compose-final-20261018"
+}

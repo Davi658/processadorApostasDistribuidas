@@ -1,0 +1,6 @@
+{"command":["bun","install","--frozen-lockfile"],"ended":"2026-10-18T14:22:29.2371877Z","name":"install","exitCode":0,"started":"2026-10-18T14:22:29.0819252Z"}
+{"command":["docker","compose","config","--quiet"],"ended":"2026-10-18T14:22:29.4502984Z","name":"config","exitCode":0,"started":"2026-10-18T14:22:29.2648073Z"}
+{"command":["docker","compose","build","app","test-runner"],"ended":"2026-10-18T14:22:49.4425921Z","name":"build","exitCode":0,"started":"2026-10-18T14:22:29.4582028Z"}
+{"command":["docker","compose","up","-d","--wait","postgres","localstack"],"ended":"2026-10-18T14:22:50.4005403Z","name":"test-infra","exitCode":0,"started":"2026-10-18T14:22:49.4559945Z"}
+{"command":["bun","run","typecheck"],"ended":"2026-10-18T14:22:56.9500579Z","name":"typecheck","exitCode":0,"started":"2026-10-18T14:22:50.4066647Z"}
+{"command":["bun","run","scripts/run-tests.ts","tests/unit/delivery-metrics.test.ts","tests/unit/external-wager-contract.test.ts","tests/integration/external-wager-contract.test.ts","tests/observability","tests/concurrency"],"ended":"2026-10-18T14:23:17.8343367Z","name":"affected","exitCode":1,"started":"2026-10-18T14:22:56.9553889Z"}

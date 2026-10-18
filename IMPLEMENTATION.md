@@ -1,3 +1,15 @@
+# Consolidação da versão de entrega
+
+O estado atual de M18/M19/M20/M21 é documentado em [resultados da entrega](docs/evidence/delivery/RESULTS.md); entradas anteriores abaixo são registros históricos, não resultados atribuídos automaticamente aos fontes finais.
+
+- Contrato externo confirmado: WagerTransactionRequested com messageId textual e chave em data; preserva ProcessWager interno e exige migration incremental **010_external_inbox_identity**. Migrations atuais **001–010**. Validação, hash, snapshot, atomicidade e delete pós-commit permanecem compartilhados.
+- Observabilidade: invocações separadas de linhas persistidas; labels financeiros limitados; DLQ sem contador cumulativo inventado; gauges outbox do banco separados do histograma após marcação; conflitos PostgreSQL explícitos por SQLSTATE.
+- M20: 50 duplicatas em três processos, locks simultâneos em carteiras diferentes e crash externo real depois de commit/antes de delete. Reutiliza as provas M14/M15/M16 para publishers concorrentes, crash depois do envio, lease recovery e reconciliação.
+- Regressão reproduzível: `scripts/delivery-validate.ps1`, projeto exclusivo, logs e exit codes preservados. A imagem tester cria diretórios de evidência com permissão para bun; o runtime continua não privilegiado. O orçamento de aquisição de conexão dos testes de concorrência é 10 s, mantendo 50 operações, dez conexões por processo e todas as asserções; a configuração de produção não foi alterada. A onda inicial permanece paralela; o worker aguarda todas as respostas e repete no máximo duas vezes somente SQLSTATE 55P03/40P01/40001, registrando a contagem de retries. Erros desconhecidos falham a prova.
+- Conferência pessoal: [roteiro PowerShell](docs/delivery/FINAL-MANUAL-TEST.md), scripts pequenos de HTTP e envio SQS. O agente não executa esse roteiro em nome do candidato.
+
+---
+
 # Plano de Execução e Status da Implementação
 
 ## M12 — Ledger e Constraints (17/10/2026)
