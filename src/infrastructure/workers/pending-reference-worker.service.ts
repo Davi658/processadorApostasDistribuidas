@@ -1,9 +1,10 @@
+import type { OperationalObservabilityPort } from '../../application/ports/operational-observability';
+import { OperationalLogger } from '../observability/operational-logger';
 import {
   Injectable,
   OnApplicationBootstrap,
   OnModuleDestroy,
   BeforeApplicationShutdown,
-  Logger,
   Optional,
 } from '@nestjs/common';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../../application/use-cases/reprocess-pending-references.use-case';
 
 export interface PendingReferenceWorkerOptions {
+  telemetry?: OperationalObservabilityPort;
   enabled?: boolean;
   intervalMs?: number;
   batchSize?: number;
@@ -25,7 +27,7 @@ export interface PendingReferenceWorkerOptions {
 export class PendingReferenceWorkerService
   implements OnApplicationBootstrap, OnModuleDestroy, BeforeApplicationShutdown
 {
-  private readonly logger = new Logger(PendingReferenceWorkerService.name);
+  private readonly logger: OperationalLogger;
   private isRunning = false;
   private isTickRunning = false;
   private isShuttingDown = false;
@@ -46,6 +48,7 @@ export class PendingReferenceWorkerService
     private readonly reprocessUseCase: ReprocessPendingReferencesUseCase,
     @Optional() options?: PendingReferenceWorkerOptions
   ) {
+    this.logger = new OperationalLogger('references', options?.telemetry);
     this.enabled =
       options?.enabled ??
       (process.env.PENDING_WORKER_ENABLED === 'true' || process.env.PENDING_WORKER_ENABLED === '1');

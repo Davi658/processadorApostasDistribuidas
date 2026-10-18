@@ -13,14 +13,16 @@ export class ConsumeWagerCommand {
   static readonly consumerName = 'wager-command-v1';
   constructor(private readonly uow: UnitOfWorkPort, private readonly inbox: InboxPort,
     private readonly wagers: WagerTransactionRepositoryPort, private readonly process: ProcessWagerUseCase) {}
-  async execute(command: WagerCommand, messageId: string, signal?: AbortSignal) {
+  async execute(command: WagerCommand, messageId: string, signal?: AbortSignal, observe?: (result: 'accepted' | 'duplicate') => void) {
+    let outcome: 'accepted' | 'duplicate' = 'accepted';
     // Errors escape the external UoW. Redelivery reconciles in a healthy context,
     // including collisions and commits whose acknowledgement was lost.
-    return this.uow.runInTransaction(async () => {
+    const committed = await this.uow.runInTransaction(async () => {
       const consumer = ConsumeWagerCommand.consumerName;
       await this.inbox.lock(consumer, command.commandId);
       const accepted = await this.inbox.find(consumer, command.commandId);
       if (accepted) {
+        outcome = 'duplicate';
         if (accepted.fingerprint !== command.fingerprint) throw new IdempotencyConflictError('COMMAND_CONTENT_CONFLICT');
         const tx = await this.wagers.findById(accepted.transaction_id, true);
         if (!tx || tx.idempotencyKey !== command.idempotencyKey || tx.payloadHash !== ProcessWagerUseCase.computePayloadHash(command.dto, command.idempotencyKey)) throw new ReplaySnapshotUnavailableError();
@@ -30,5 +32,7 @@ export class ConsumeWagerCommand {
       await this.inbox.accept(consumer, command, result.transactionId, messageId);
       return result;
     }, signal);
+    try { observe?.(outcome); } catch { /* Observability cannot fail an acknowledged commit. */ }
+    return committed;
   }
 }

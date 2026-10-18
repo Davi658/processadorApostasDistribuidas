@@ -1,9 +1,10 @@
+import type { OperationalObservabilityPort } from '../../application/ports/operational-observability';
+import { OperationalLogger } from '../observability/operational-logger';
 import {
   Injectable,
   OnApplicationBootstrap,
   OnModuleDestroy,
   BeforeApplicationShutdown,
-  Logger,
   Optional,
 } from '@nestjs/common';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../../application/use-cases/publish-outbox-events.use-case';
 
 export interface OutboxPublisherWorkerOptions {
+  telemetry?: OperationalObservabilityPort;
   enabled?: boolean;
   intervalMs?: number;
   batchSize?: number;
@@ -25,7 +27,7 @@ export interface OutboxPublisherWorkerOptions {
 export class OutboxPublisherWorkerService
   implements OnApplicationBootstrap, OnModuleDestroy, BeforeApplicationShutdown
 {
-  private readonly logger = new Logger(OutboxPublisherWorkerService.name);
+  private readonly logger: OperationalLogger;
   private isRunning = false;
   private isTickRunning = false;
   private isShuttingDown = false;
@@ -46,6 +48,7 @@ export class OutboxPublisherWorkerService
     private readonly publishUseCase: PublishOutboxEventsUseCase,
     @Optional() options?: OutboxPublisherWorkerOptions
   ) {
+    this.logger = new OperationalLogger('publisher', options?.telemetry);
     this.enabled =
       options?.enabled ??
       (process.env.OUTBOX_PUBLISHER_ENABLED === 'true' ||

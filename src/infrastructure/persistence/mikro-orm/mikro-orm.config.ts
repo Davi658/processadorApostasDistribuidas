@@ -34,10 +34,12 @@ const mikroOrmConfig: Options = {
     OutboxMessageOrmEntity,
   ],
   debug: false,
+  pool: { min: 0, max: 10, acquireTimeoutMillis: 1000 },
   // Also bound queries outside a UnitOfWork (notably the atomic claim).
   // PostgreSQL enforces these limits even when JavaScript requests cancellation.
   driverOptions: {
     connection: {
+      connectionTimeoutMillis: 1000,
       get lock_timeout() { return Number(process.env.DB_LOCK_TIMEOUT_MS) || 5000; },
       get statement_timeout() { return Number(process.env.DB_STATEMENT_TIMEOUT_MS) || 10000; },
     },

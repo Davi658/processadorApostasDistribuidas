@@ -170,3 +170,10 @@ A ordenação é ascendente por `(created_at, id)` e a consulta parametrizada bu
 O timestamp do ledger/cursor é exatamente `YYYY-MM-DDTHH:mm:ss.ffffffZ`: UTC, ano de 0001 a 9999, seis dígitos fracionários. O codec independente de HTTP valida calendário gregoriano, dias por mês, anos bissextos e hora de 00:00:00 a 23:59:59; rejeita formatos alternativos, offsets e datas impossíveis com HTTP 400 antes de qualquer acesso aos repositórios. Datas não são normalizadas com `Date.parse`. PostgreSQL formata os seis microssegundos e recebe de volta o mesmo texto no cursor.
 
 As consultas não alteram saldo, versão, transações, ledger ou outbox. A suíte M17 usa HTTP real com `NestFactory.create(AppModule)` e PostgreSQL descartável, verifica snapshots completos das quatro tabelas e confirma que `app.close()` fecha o único ORM e não deixa sessões da aplicação. O shutdown financeiro do M10 mantém suas barreiras de drenagem e cancelamento.
+
+
+## M18 — observabilidade integrada
+
+AppModule registra `GET /health/live`, `GET /health/ready` e `GET /metrics`, com middleware HTTP e registro único compartilhado por publisher, consumidor e referências. Logs JSON usam allowlist; métricas Prometheus têm cardinalidade limitada e distinguem tentativa, confirmação SQS, commit local e replay. Readiness reutiliza UoW/clientes, limita sondagens concorrentes, consulta apenas dependências habilitadas e recusa tráfego durante shutdown. Liveness independe de PostgreSQL/SQS.
+
+Contratos, lacuna de correlação tardia, semântica dos contadores por processo, reprodução exclusiva e provas: [M18-INTEGRATION.md](M18-INTEGRATION.md) e [evidências M18](docs/evidence/m18/RESULTS.md).

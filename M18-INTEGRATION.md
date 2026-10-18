@@ -1,86 +1,53 @@
-# M18 — integração pendente
+# M18 — Logs, métricas e health
 
-Status: **PARCIALMENTE IMPLEMENTADO**. Base HTTP/health validada isoladamente. Não registrada na aplicação principal; mensageria não implementada nem validada. Nenhuma alteração ou instrumentação de M14.
+Status: **CONCLUÍDO**, com provas Windows e Linux em `docs/evidence/m18/RESULTS.md`.
 
-Base local: main, f73e308a94cf18a366021a4e44c70334ea65d47c.
-Branch: codex/m18-observability.
-Worktree: D:\processadorApostasDistribuidas\.worktrees\m18-observability.
+Base: `cf90a10571d2966643b9ac6287658a22e6f66efa` (origin/main atualizada em 2026-10-18, contém M16 `ab600b4`). Branch `codex/m18-final`, worktree `D:\processadorApostasDistribuidas\.worktrees\m18-final`.
 
-## Contratos consultados
+## Composição implementada
 
-README.md, ARCHITECTURE.md, IMPLEMENTATION.md, package.json, main.ts, AppModule, HttpValidator, ProcessWagerUseCase, DomainExceptionFilter, configuração MikroORM, MikroOrmUnitOfWork, migrations e testes HTTP/banco existentes. Nenhum acesso ao repositório da empresa. Não foi encontrado arquivo local separado do desafio nem exigência explícita de formato de métricas nesses documentos; a base oferece exposição Prometheus text 0.0.4 sem dependência nova.
+O AppModule principal registra o middleware e os endpoints `/health/live`, `/health/ready` e `/metrics`, sem prefixo global. ObservabilityModule fornece uma única instância HttpObservability por aplicação, reutilizada por HTTP, publisher, consumidor e referências. PersistenceModule continua sendo o proprietário do UoW/pool; as sondagens SQS usam os clientes já pertencentes aos componentes. Os casos de uso dependem de uma porta de observação opcional, sem implementação paralela nem alteração das transações financeiras.
 
-Correlação: header x-correlation-id aparado, com fallback para Idempotency-Key aparada, conforme ProcessWagerUseCase. Sem ambos, correlationId é null no log. Não gera outro ID nem modifica headers, DTOs, causalidade ou outbox. A criação de carteira gera sua correlação internamente; relacionar esse ID ao log HTTP exigirá um contrato explícito futuro, sem alteração neste marco.
+## Logs e correlação
 
-## Composição exata a aplicar futuramente
+Cada evento operacional é uma linha JSON com component, operation, result, durationMs e correlationId. HTTP acrescenta method, route normalizada e status; mensageria acrescenta somente eventId/commandId/transactionId quando disponíveis. Sem payloads, valores, saldos, headers completos, ReceiptHandles, erros ou stacks brutos. Falhas usam resultados de vocabulário fechado; falha no sink não altera efeitos financeiros. O diagnóstico já persistido por M14 em outbox.last_error mantém seu contrato anterior; esse campo nunca é emitido em logs ou métricas.
 
-No módulo que já declara MikroOrmUnitOfWork (atualmente AppModule):
+HTTP usa x-correlation-id aparado, depois Idempotency-Key aparada, depois null. Entradas acima de 255 caracteres não são copiadas para logs. O consumidor usa correlationId validado do comando, com fallback na idempotencyKey. O publisher usa a correlação persistida no envelope. Abertura de carteira gera sua própria correlação; não há promessa de vínculo com o log HTTP sem header.
 
-```ts
-import { MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { HttpObservability } from '../../infrastructure/observability/http-observability';
-import { ObservabilityController, PostgresReadiness } from '../../infrastructure/observability/observability.controller';
+**Limitação histórica explícita:** wager_transactions não persiste a correlação original para reprocessamento tardio. O worker preserva a geração de novas correlações de resolução e a causalidade existente, e registra correlationId null com transactionId técnico. Isso não representa correlação ponta a ponta; nenhum registro terminal, hash, snapshot, inbox ou envelope histórico é reescrito.
 
-// Acrescentar ObservabilityController ao array controllers existente.
-// Acrescentar estes dois providers ao array providers existente:
-{ provide: HttpObservability, useFactory: () => new HttpObservability() },
-{
-  provide: PostgresReadiness,
-  useFactory: (uow: MikroOrmUnitOfWork) => new PostgresReadiness(uow, 500),
-  inject: [MikroOrmUnitOfWork],
-},
+## Métricas Prometheus
 
-// Substituir somente a declaração vazia da classe do módulo por:
-export class AppModule implements NestModule {
-  constructor(private readonly http: HttpObservability) {}
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(this.http.middleware).forRoutes('{*path}');
-  }
-}
-```
+`http_requests_total` e `http_request_duration_seconds` preservam o formato text 0.0.4 e os buckets existentes. Labels method/route/status usam templates Express; UUIDs e URLs concretas não viram séries. 404 sem rota usa `__unmatched__`, métodos desconhecidos usam OTHER. Requisições abortadas antes de finish não contam como respostas concluídas.
 
-Manter os providers financeiros existentes e o filtro global. Usar uma instância HttpObservability por aplicação e o UoW já existente, sem criar outro pool. O sink padrão escreve cada evento como uma linha JSON em stdout; se substituído, deve aceitar a linha sem serializar request/response/erro. Aplicar o middleware antes das rotas para observar também falhas. Testar a composição definitiva com os controllers reais e o filtro existente; esta etapa permanece pendente. Não é necessária alteração de main.ts, package.json ou lockfile. Se houver prefixo global, os endpoints de observabilidade herdarão esse prefixo; definir o contrato operacional antes de integrar.
+`operational_events_total{component,operation,result}` usa vocabulários fechados tipados:
 
-Endpoints: GET /health/live (200 sem acessar banco), GET /health/ready (SELECT 1 real, 200 ou 503 com apenas {status: 'unavailable'}), GET /metrics (text/plain; version=0.0.4). Não habilitar worker/publisher para esses testes isolados.
+- Publisher: send/attempt, send/broker_confirmed e mark/local_confirmed são estágios distintos. validation/blocked, validation ou mark/stale_lease e publish/failure indicam os resultados observados. Não representa entrega ao consumidor.
+- Consumidor: receive/received, receive/failure, inbox/accepted ou duplicate após confirmação da transação, transaction/durable e delete/confirmed. processing/delete com TRANSIENT, PERMANENT ou UNKNOWN distingue a etapa que falhou. renewal/confirmed ou failure e retry_visibility/failure observam a posse. delivery/redelivery_observed significa ApproximateReceiveCount maior que um; não implica chegada à DLQ. O consumidor não sonda a DLQ, portanto não expõe contador de chegada inventado.
+- Referências: reprocess/processed, rejected, rescheduled e blocked são emitidos somente depois do commit; claimed não é resultado financeiro confirmado. stale_lease, aborted, transient_failure, unexpected_failure e lifecycle/failure são operacionais.
 
-Readiness usa Knex do MikroORM existente, timeout de query com cancelamento PostgreSQL e deadline HTTP finito, inclusive quando a aquisição do pool demora. Há no máximo uma consulta pendente por instância; chamadas concorrentes compartilham essa consulta, sem enfileirar novas sondagens. Configurar também acquireTimeoutMillis finito no pool principal na integração (por exemplo 1000 ms), pois o deadline HTTP não cancela uma aquisição já aguardando no Knex. O shutdown continua pertencendo exclusivamente ao UoW existente.
+Todos os contadores são locais ao processo, reiniciados no restart. Agregação e taxas entre réplicas pertencem ao coletor Prometheus. Nenhum saldo, valor financeiro ou identificador em labels. Duração zero representa evento instantâneo de estágio; durações das operações concluídas são medidas pelo relógio monotônico. Um resultado durável de consumidor inclui rejeição ou pendência persistida, e não significa movimento no ledger.
 
-## Logs e métricas
+## Health e shutdown
 
-Allowlist dos logs: correlationId, method, route, status, durationMs. Registra ao concluir a resposta, com status final; não registra payloads, resposta, query string, path concreto, headers completos ou exceções. Requisições abortadas antes de finish não entram nos contadores de respostas concluídas.
+Liveness responde 200 sem acessar dependências. Readiness faz SELECT 1 e GetQueueAttributes apenas nas filas dos componentes habilitados: eventos quando OUTBOX_PUBLISHER_ENABLED, comandos quando SQS_CONSUMER_ENABLED. O worker de referências requer apenas PostgreSQL. Não testa saúde enviando, recebendo, apagando mensagens nem alterando visibilidade. Não exige fila de eventos para aplicação apenas HTTP.
 
-Métricas: http_requests_total e histograma http_request_duration_seconds, labels method/route/status. route vem do template Express (por exemplo /probe/:id), sem IDs nem query. 404 usa __unmatched__, métodos desconhecidos usam OTHER. Nenhum ID de correlação, idempotência, carteira ou jogador em labels. Buckets em segundos: .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, +Inf. Registro em memória por processo; agrega-se externamente entre réplicas. O scrape de /metrics aparece no próximo scrape. Sem métricas financeiras fictícias.
+Deadline HTTP de 500 ms; no máximo uma rodada de sondagens pendente por instância. Requisições concorrentes compartilham essa rodada; allSettled retém a rodada até todas as dependências terminarem, inclusive quando uma falha primeiro. SQS tem abort de até 500 ms. Aquisição e conexão PostgreSQL têm limites de 1000 ms e as consultas têm timeout/cancelamento. O timeout HTTP não fecha recursos para cancelar trabalho. O hook OnModuleDestroy marca stopping antes de aguardar sondagens; readiness retorna 503 durante drain, e ORM/clientes fecham nas fases posteriores existentes. Resposta indisponível é somente `{status: "unavailable"}`.
 
-## Mensageria futura — não concluída
+`infra/healthcheck.ts` testa readiness com deadline externo de 2 s. Portanto a saúde do contêiner representa disponibilidade das dependências habilitadas. Para reinício por falha do processo, configure separadamente liveness no orquestrador.
 
-- Publisher M14: integrar depois da estabilização exclusiva pelo Antigravity. Pontos futuros: tentativas, duração, falhas e resultado confirmado de envio; labels com categorias limitadas, sem eventId/correlationId/messageId. Não contar tentativa como entrega confirmada.
-- Consumidor: observação no recebimento, resultado pós-commit, duplicatas/inbox, falhas e duração; propagação da correlação canônica. Não inferir sucesso antes do commit ou confirmação de ack/delete.
-- SQS: resultado de send/receive/delete, retries, visibilidade e DLQ. Nomes de fila devem vir de configuração limitada, nunca de entradas por mensagem; nenhum payload ou receipt handle nos logs. Idade e backlog somente de medições reais. Provas de retry, redelivery, DLQ e shutdown são pendentes.
+## Reprodução exclusiva
 
-## Reprodução isolada, sem Docker
-
-Usar binários nativos já instalados e diretório exclusivo desta worktree. Confirmar porta 55438 livre antes de iniciar. Não usar scripts/db-start.ps1 nem a suíte completa, pois apontam para recursos compartilhados.
+`infra/m18-validation.compose.yml`, projeto `wagers-m18-final`, usa PostgreSQL 16.6 e LocalStack 4.0.3, portas locais 55448 e 45628. Dados PostgreSQL ficam em tmpfs; não usa volumes ou filas preexistentes.
 
 ```powershell
-Set-Location D:\processadorApostasDistribuidas\.worktrees\m18-observability
-$pgBinM18 = "$env:USERPROFILE\.pgsql\pgsql\bin"
-& "$pgBinM18\initdb.exe" -D "$PWD\.data\m18-pg" -U postgres -A trust -E UTF8
-& "$pgBinM18\pg_ctl.exe" -D "$PWD\.data\m18-pg" -l "$PWD\.data\m18-pg.log" -o '-h 127.0.0.1 -p 55438' -w start
-bun run typecheck
-bun test tests/observability/m18-http.test.ts
-& "$pgBinM18\pg_ctl.exe" -D "$PWD\.data\m18-pg" -m fast -w stop
+docker compose -p wagers-m18-final -f infra/m18-validation.compose.yml up -d --wait postgres localstack
+docker compose -p wagers-m18-final -f infra/m18-validation.compose.yml exec -T postgres psql -U postgres -c "CREATE ROLE app_user LOGIN PASSWORD 'app_user_secret';"
+./scripts/m18-validate.ps1
 ```
 
-Inicializar apenas na primeira execução. Cluster descartável .data/m18-pg ignorado pelo Git; cada execução cria m18_observability_<pid>, aplica migrations existentes e remove a base em finally. Não usar esse cluster fora do desenvolvimento local. Dependências foram resolvidas pelo node_modules já disponível no repositório pai, sem instalação ou alteração de manifests.
+Crie o role somente na primeira inicialização. O script executa sequencialmente typecheck, suíte M18, suíte oficial, build e smoke financeiro, registrando exit codes. Os testes criam bancos e filas UUID exclusivos e removem somente esses recursos. Para Linux, compile o target tester e execute `bun run scripts/m18-validate.ts` no serviço tester, com rede exclusiva e sem publicação de portas adicional. O contêiner descartável de validação usa root para gravar docs e .data em /app; o runtime de produção preserva USER bun. O bundle usa `--packages=external`, conservando as dependências instaladas no runtime, e o smoke financeiro usa o AppModule fonte real. Consulte `docs/evidence/m18/RESULTS.md` para resultados efetivamente obtidos e limitações.
 
-## Resultados reais
+## Flake 57P01
 
-- bun run typecheck: PASSOU.
-- bun test tests/observability/m18-http.test.ts: 4 testes passaram, 0 falharam.
-- Nest real com porta HTTP dinâmica; PostgreSQL nativo 16, porta 55438 exclusiva.
-- Logs allowlist com correlação explícita/fallback, payload financeiro e credenciais ausentes; 13 UUIDs na mesma série normalizada, erros 422 e 404 observados.
-- SELECT 1 bem-sucedido; pool saturado retorna 503 dentro do limite e recupera; ALLOW_CONNECTIONS false + término das sessões ORM comprova indisponibilidade real e resposta genérica. Liveness permanece 200.
-- Snapshot integral de wallets (com saldo de fixture), wager_transactions, wallet_ledger_entries e outbox_messages preservado; zero transações financeiras abertas; app.close fecha o ORM e pg_stat_activity confirma zero conexões da aplicação.
-- Falhas intermediárias corrigidas antes da validação final: tipagem da variável snapshot; ALTER DATABASE precisa executar pela conexão de manutenção, não pelo próprio banco alvo.
-
-Pendências para concluir M18: aplicar composição, validar em aplicação principal, alinhar eventual contrato externo do desafio e implementar/validar observabilidade de publisher, consumidor e SQS.
+Reproduzido no teardown do teste M18: pg.Pool.end() pode concluir a remoção dos clientes do pool antes de todos os sockets emitirem end; DROP DATABASE WITH (FORCE) encerrava um cliente administrativo ainda fechando, gerando erro assíncrono sem listener. O teste agora acompanha os clientes e aguarda end antes de DROP DATABASE sem FORCE. Mantém a prova de indisponibilidade real com término das sessões ORM e recuperação. Não instala handlers globais nem ignora erros de produção.
