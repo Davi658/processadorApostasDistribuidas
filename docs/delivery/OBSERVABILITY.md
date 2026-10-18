@@ -2,6 +2,7 @@
 
 | Série | Tipo e significado |
 |---|---|
+| `http_request_duration_seconds` | Histogram entre entrada do middleware HTTP e evento finish da resposta; não mede roundtrip do cliente nem tempo anterior ao middleware. |
 | `financial_invocations_total{status,kind}` | Counter por processo de saídas do ProcessWager, inclusive falha e replay financeiro. O status é o retornado pelo use case; uma UoW externa ainda pode reverter. Duplicata já encontrada na inbox não chama o use case. Não é contagem de commits. |
 | `financial_invocation_duration_seconds{kind,status}` | Histogram entre entrada do ProcessWager e seu finally: validação, locks, execução e reconciliação de races. Com UoW própria inclui o commit; com UoW externa exclui o commit do dono. Sempre exclui delete SQS. |
 | `financial_transactions{status,kind}` | Gauge de linhas persistidas por estado atual, coletado por SELECT no scrape; inclui OPENING. Replay não cria linha e rollback externo não aparece. Não somar entre réplicas ligadas ao mesmo banco. |

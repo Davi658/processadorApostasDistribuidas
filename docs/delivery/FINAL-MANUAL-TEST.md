@@ -2,7 +2,7 @@
 
 Este roteiro é para execução pessoal do candidato. Não foi executado nem marcado como realizado pelo agente. As validações automatizadas separadas estão em `docs/evidence/delivery/RESULTS.md`. Nenhum comando publica ou envia o desafio.
 
-Use PowerShell **7+** (os scripts usam `-SkipHttpErrorCheck`), Git, Bun **1.4.3**, Docker Desktop com engine Linux, Compose v2 e portas livres. Imagens fixadas: PostgreSQL **16.6-alpine**, LocalStack **4.0.3**, oven/bun **1.4.3**. Disponibilize internet na primeira instalação/build. O projeto não depende de AWS real. Os segredos abaixo são exclusivamente locais e descartáveis.
+Use PowerShell **7+** (os scripts usam `-SkipHttpErrorCheck`), Git, Bun **1.4.3**, Docker Desktop com engine Linux, Compose v2+ e portas livres. Imagens fixadas: PostgreSQL **16.6-alpine**, LocalStack **4.0.3**, oven/bun **1.4.3**. Disponibilize internet na primeira instalação/build. O projeto não depende de AWS real. Os segredos abaixo são exclusivamente locais e descartáveis.
 
 ## 1. Preparar projeto pessoal exclusivo
 
@@ -154,6 +154,6 @@ git rev-parse HEAD | Set-Content .data/personal/logs/source-sha.txt
 docker compose stop
 ```
 
-`stop` preserva contêineres, filas e volume. Para retomar, mantenha as mesmas variáveis e execute `docker compose up -d --wait app`. Não use `down -v`, prune ou scripts de limpeza global. Não publique os arquivos de diagnóstico sem revisar seus metadados.
+`stop` preserva contêineres e o volume PostgreSQL. O broker LocalStack não tem persistência configurada: parar seu processo pode perder mensagens, e o bootstrap recria a topologia na próxima subida. Não use este broker como armazenamento durável. Para retomar, mantenha as mesmas variáveis e execute `docker compose up -d --wait app`. Não use `down -v`, prune ou scripts de limpeza global. Não publique os arquivos de diagnóstico sem revisar seus metadados.
 
 Autenticação HTTP foi omitida conforme permitido na seção 2. O ponto de extensão é `ProviderIdentityPort`, para um adapter OIDC/JWKS e guard nas rotas financeiras; health permanece público e SQS é canal interno confiável com validação de domínio. Não há validação AWS de produção, IAM real ou promessa exactly-once. O envio final e esta conferência pessoal permanecem sob responsabilidade do candidato.

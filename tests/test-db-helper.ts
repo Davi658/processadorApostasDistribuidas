@@ -12,6 +12,10 @@ export interface IsolatedTestDatabase {
 export async function createIsolatedTestDatabase(prefix = 'betting_test_'): Promise<IsolatedTestDatabase> {
   const adminBaseConfig = getMigrationDatabaseConfig();
   const dbName = `${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const started = performance.now();
+  const trace = (phase: string) => {
+    if (process.env.DELIVERY_TEST_SETUP_TRACE === 'true') console.log(JSON.stringify({ component: 'test_database', database: dbName, phase, elapsedMs: performance.now() - started }));
+  };
 
   // 1. Connect to administrative postgres database to create disposable database
   const maintenancePool = new pg.Pool({
@@ -23,9 +27,12 @@ export async function createIsolatedTestDatabase(prefix = 'betting_test_'): Prom
   });
 
   try {
+    trace('create_start');
     await maintenancePool.query(`CREATE DATABASE ${dbName};`);
+    trace('create_confirmed');
   } finally {
     await maintenancePool.end();
+    trace('maintenance_closed');
   }
 
   // 2. Run migrations on the isolated database using admin privileges
@@ -38,8 +45,11 @@ export async function createIsolatedTestDatabase(prefix = 'betting_test_'): Prom
   };
 
   const migrator = new DatabaseMigrator(adminIsolatedConfig);
+  trace('migrations_start');
   await migrator.up();
+  trace('migrations_confirmed');
   await migrator.close();
+  trace('migrator_closed');
 
   // 3. Configure application user least privileges on the isolated database
   const adminClient = new pg.Client(adminIsolatedConfig);
@@ -57,6 +67,7 @@ export async function createIsolatedTestDatabase(prefix = 'betting_test_'): Prom
     `);
   } finally {
     await adminClient.end();
+    trace('grants_confirmed');
   }
 
   const appBaseConfig = getAppDatabaseConfig();
@@ -71,8 +82,10 @@ export async function createIsolatedTestDatabase(prefix = 'betting_test_'): Prom
   // Set environment variable so any nested components or workers inherit the isolated database
   const previousEnvDb = process.env.DB_NAME;
   process.env.DB_NAME = dbName;
+  trace('ready');
 
   const closeAndDrop = async () => {
+    trace('drop_start');
     // Restore environment variable
     if (previousEnvDb !== undefined) {
       process.env.DB_NAME = previousEnvDb;
@@ -100,6 +113,7 @@ export async function createIsolatedTestDatabase(prefix = 'betting_test_'): Prom
       console.error(`Failed to drop isolated database ${dbName}:`, e);
     } finally {
       await dropPool.end();
+      trace('drop_finished');
     }
   };
 

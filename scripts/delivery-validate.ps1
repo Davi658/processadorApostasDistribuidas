@@ -1,7 +1,12 @@
-param([string]$Project = 'delivery-validation-20261018', [int]$PostgresPort = 55592, [int]$SqsPort = 45692, [string]$EvidenceDirectory = 'docs/evidence/delivery')
+param([string]$Project = 'delivery-validation-20261018', [int]$PostgresPort = 55592, [int]$SqsPort = 45692, [string]$EvidenceDirectory = 'docs/evidence/delivery', [switch]$EphemeralTestStorage)
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 $env:COMPOSE_PROJECT_NAME = $Project
+if ($EphemeralTestStorage) {
+  $env:COMPOSE_PATH_SEPARATOR = ';'
+  $env:COMPOSE_FILE = 'docker-compose.yml;infra/delivery-validation.compose.yml'
+}
+$env:DELIVERY_TEST_SETUP_TRACE = 'true'
 $env:APP_IMAGE = 'delivery-final-app:20261018'
 $env:TEST_IMAGE = 'delivery-final-tests:20261018'
 $env:LOCAL_POSTGRES_PORT = "$PostgresPort"
@@ -31,8 +36,8 @@ Step 'config' 'docker' @('compose','config','--quiet')
 Step 'build' 'docker' @('compose','build','app','test-runner')
 Step 'test-infra' 'docker' @('compose','up','-d','--wait','postgres','localstack')
 Step 'typecheck' 'bun' @('run','typecheck')
-Step 'affected' 'bun' @('run','scripts/run-tests.ts','tests/unit/delivery-metrics.test.ts','tests/unit/external-wager-contract.test.ts','tests/integration/external-wager-contract.test.ts','tests/integration/migrations.test.ts','tests/integration/ledger-constraints-m12.test.ts','tests/integration/terminal-protection-m11.test.ts','tests/integration/wager-win-loss-m06.test.ts','tests/observability','tests/concurrency')
+Step 'affected' 'bun' @('run','scripts/run-tests.ts','tests/unit/delivery-metrics.test.ts','tests/unit/external-wager-contract.test.ts','tests/integration/external-wager-contract.test.ts','tests/integration/migrations.test.ts','tests/integration/ledger-constraints-m12.test.ts','tests/integration/pending-reference-worker-m10.test.ts','tests/integration/terminal-protection-m11.test.ts','tests/integration/wager-win-loss-m06.test.ts','tests/observability','tests/concurrency')
 Step 'windows-official' 'bun' @('run','test')
-Step 'linux-official' 'docker' @('compose','run','--rm','--no-deps','-e','APP_DB_HOST=postgres','-e','APP_DB_PORT=5432','-e','SQS_ENDPOINT=http://localstack:4566','test-runner','bun','run','test')
+Step 'linux-official' 'docker' @('compose','run','--rm','--no-deps','-e','APP_DB_HOST=postgres','-e','APP_DB_PORT=5432','-e','SQS_ENDPOINT=http://localstack:4566','-e','DELIVERY_TEST_SETUP_TRACE=true','test-runner','bun','run','test')
 Step 'financial-smoke' 'bun' @('run','scripts/m15-financial-smoke.ts')
 # Retain the exclusive infrastructure for inspection. Never remove volumes here.
