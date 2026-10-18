@@ -1,3 +1,5 @@
+Atualização: M15 possui implementação e evidências nesta branch. Consulte [contrato final M15](M15-IMPLEMENTED.md); o texto abaixo preserva a proposta histórica.
+
 # M15/M16 — transação e confirmação propostas
 
 Especificação pendente de implementação. Base: `13009c73dabf7b7be7193cababd4e74f19372397`. Contrato de entrada em [INPUT-CONTRACT.md](INPUT-CONTRACT.md), provas em [ACCEPTANCE-MATRIX.md](ACCEPTANCE-MATRIX.md), decisões em [IMPLEMENTATION-HANDOFF.md](IMPLEMENTATION-HANDOFF.md).

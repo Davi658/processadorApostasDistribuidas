@@ -1,3 +1,5 @@
+Atualização: M15 possui implementação e evidências nesta branch. Consulte [contrato final M15](M15-IMPLEMENTED.md); o texto abaixo preserva a proposta histórica.
+
 # M15/M16 — contrato de entrada proposto
 
 Estado: especificação para revisão; consumidor, Inbox, retry SQS, DLQ e shutdown do consumidor **não implementados por esta tarefa**. Base de inspeção: `origin/main` local em `13009c73dabf7b7be7193cababd4e74f19372397`. Não houve consulta remota. Não foi localizado texto separado do desafio; as propostas abaixo não são requisitos externos comprovados.

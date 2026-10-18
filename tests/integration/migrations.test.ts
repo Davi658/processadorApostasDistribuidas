@@ -31,7 +31,8 @@ describe('Reversible Migrations on Disposable Database', () => {
 
       // 2. Run UP migrations
       const applied = await migrator.up();
-      expect(applied.length).toBe(8);
+      expect(applied.length).toBe(9);
+      expect(applied).toContain('009_command_inbox');
       expect(applied).toContain('001_initial_schema');
       expect(applied).toContain('002_reinforce_schema_and_outbox');
       expect(applied).toContain('003_protect_terminals_and_composite_fk');
@@ -62,7 +63,10 @@ describe('Reversible Migrations on Disposable Database', () => {
       `);
       expect(triggerRes.rows.length).toBe(1);
 
-      // M14 outbox lease migration must reverse first
+      expect((await client.query("select to_regclass('command_inbox') as name")).rows[0].name).toBe('command_inbox');
+      expect(await migrator.down()).toBe('009_command_inbox');
+      expect((await client.query("select to_regclass('command_inbox') as name")).rows[0].name).toBeNull();
+      // M14 outbox lease migration reverses after M15 Inbox.
       const outboxLeaseColumns = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'outbox_messages' AND column_name = 'lease_token'`);
       expect(outboxLeaseColumns.rows.length).toBe(1);
       expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');

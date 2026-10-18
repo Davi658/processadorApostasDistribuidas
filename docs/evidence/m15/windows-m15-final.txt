@@ -1,0 +1,31 @@
+$ bun run scripts/run-tests.ts tests/integration/sqs-inbox-m15.test.ts
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m15-sqs-inbox\tests\integration\sqs-inbox-m15.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\sqs-inbox-m15.test.ts:
+(pass) A: five operations via actual receive/delete, ledger and outbox identities [852.39ms]
+(pass) B: normalization and hash match HTTP; FIFO and malformed input fail closed [31.67ms]
+(pass) C/E/F/G: atomic external commit, replay and original preservation [185.66ms]
+(pass) D: rejected and pending accepted without ledger movement [213.62ms]
+(pass) I: all write failure cuts roll back whole unit [517.51ms]
+[Nest] 4264  - 18/10/2026, 02:39:08    WARN [SqsWagerConsumer] SQS_COMMAND_NOT_ACKNOWLEDGED stage=TRANSACTION
+(pass) J/M: lost delete or commit confirmation leaves durable result recoverable [102.22ms]
+(pass) H: separate processes duplicate commands and HTTP/queue global key race [5398.30ms]
+(pass) K: real process crash with explicit pre/post commit barriers and recovery [1984.59ms]
+[Nest] 4264  - 18/10/2026, 02:39:15    WARN [SqsWagerConsumer] SQS_COMMAND_NOT_ACKNOWLEDGED stage=DELETE
+(pass) J: DeleteMessage failure after commit followed by actual redelivery [92.22ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["82cdb720-d1cc-4e50-9879-c2af8c81270b","e249e3b7-7fac-4de9-a50d-ec1bde9e3594"]}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"82cdb720-d1cc-4e50-9879-c2af8c81270b","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"e249e3b7-7fac-4de9-a50d-ec1bde9e3594","outcome":"PROCESSED","attempts":1}
+(pass) L: worker resolves pending and inbox replay returns terminal snapshot [162.08ms]
+(pass) N: normal Nest shutdown drains transaction before ORM/client closure [414.21ms]
+(pass) H: different wallets contend on global key in separate HTTP/queue processes [1967.61ms]
+(pass) snapshot corruption fails closed without changing historical state [72.47ms]
+(pass) automatic enabled polling consumes, stops new receives and drains its loop [129.58ms]
+
+ 14 pass
+ 0 fail
+ 228 expect() calls
+Ran 14 tests across 1 file. [13.48s]
+[test-runner] 1 files; 0 failed

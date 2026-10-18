@@ -12,6 +12,7 @@
     "test:integration": "bun run scripts/run-tests.ts tests/integration",
     "test:concurrency": "bun run scripts/run-tests.ts tests/concurrency",
     "typecheck": "tsc --noEmit",
+    "test:m15": "bun run scripts/run-tests.ts tests/integration/sqs-inbox-m15.test.ts",
     "test:m14": "bun run scripts/run-tests.ts tests/integration/outbox-publisher-m14.test.ts",
     "test:m17": "bun run scripts/run-tests.ts tests/integration/m17-read-endpoints.test.ts"
   },

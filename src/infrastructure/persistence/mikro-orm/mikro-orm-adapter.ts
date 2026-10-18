@@ -29,6 +29,7 @@ import {
 import defaultMikroOrmConfig from './mikro-orm.config';
 
 export type FailureHookPoint =
+  | 'after_inbox_save'
   | 'after_wallet_save'
   | 'after_tx_save'
   | 'after_ledger_save'
