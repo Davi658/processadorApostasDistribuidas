@@ -109,6 +109,10 @@ export class PublishOutboxEventsUseCase {
       return result;
     }
 
+    const oldestOccurredAt = Math.min(...claimedEvents.map(e => new Date(e.occurredAt).getTime()));
+    const delaySeconds = Math.max(0, (Date.now() - oldestOccurredAt) / 1000);
+    this.telemetry?.recordOutboxLag?.(delaySeconds, claimedEvents.length);
+
     await this.triggerHook('after_claim', { claimedEvents, workerId });
 
     for (const event of claimedEvents) {
@@ -120,7 +124,16 @@ export class PublishOutboxEventsUseCase {
       }
 
       const started = performance.now();
-      const context = { correlationId: event.correlationId, eventId: event.id };
+      const walletId = event.aggregateId ?? null;
+      const providerId = (event.payload as any)?.providerId ?? (event.payload as any)?.data?.providerId ?? null;
+      const messageId = (event.payload as any)?.messageId ?? (event.payload as any)?.data?.messageId ?? null;
+      const context = {
+        correlationId: event.correlationId,
+        eventId: event.id,
+        walletId,
+        providerId,
+        messageId,
+      };
       // 1. Envelope validation: isolate invalid events without blocking the whole batch
       const validation = validateOutboxContract(event);
       if (!validation.valid) {
@@ -163,6 +176,10 @@ export class PublishOutboxEventsUseCase {
 
         if (marked) {
           result.published++;
+          const occurredAtMs = new Date(event.occurredAt).getTime();
+          const publishLagSeconds = Math.max(0, (Date.now() - occurredAtMs) / 1000);
+          this.telemetry?.recordOutboxLag?.(publishLagSeconds, undefined, publishLagSeconds);
+
           this.telemetry?.event('publisher', 'mark', 'local_confirmed', { ...context, durationMs: performance.now() - markStarted });
           await this.triggerHook('after_mark_published', { event, envelope, workerId });
         } else {

@@ -63,10 +63,10 @@ export function isTransientError(err: unknown): boolean {
 }
 
 type ReprocessItemOutcome =
-  | { outcome: 'PROCESSED'; transactionId: string; attempts: number }
-  | { outcome: 'REJECTED'; transactionId: string; attempts: number; failureCode?: string }
-  | { outcome: 'RESCHEDULED' | 'PENDING_REFERENCE'; transactionId: string; attempts: number }
-  | { outcome: 'BLOCKED'; transactionId: string; reason: string }
+  | { outcome: 'PROCESSED'; transactionId: string; attempts: number; providerId?: string }
+  | { outcome: 'REJECTED'; transactionId: string; attempts: number; failureCode?: string; providerId?: string }
+  | { outcome: 'RESCHEDULED' | 'PENDING_REFERENCE'; transactionId: string; attempts: number; providerId?: string }
+  | { outcome: 'BLOCKED'; transactionId: string; reason: string; providerId?: string }
   | { outcome: 'SKIPPED' };
 
 export class ReprocessPendingReferencesUseCase {
@@ -100,7 +100,12 @@ export class ReprocessPendingReferencesUseCase {
       PENDING_REFERENCE_TRANSIENT_FAILURE: 'transient_failure', PENDING_REFERENCE_UNEXPECTED_ERROR: 'unexpected_failure',
     };
     this.telemetry?.event('references', 'reprocess', results[logData.event] ?? 'unknown', {
-      transactionId: logData.transactionId, correlationId: null, durationMs: logData.durationMs ?? 0,
+      transactionId: logData.transactionId,
+      correlationId: null,
+      durationMs: logData.durationMs ?? 0,
+      walletId: logData.walletId ?? null,
+      providerId: logData.providerId ?? null,
+      messageId: logData.messageId ?? null,
     });
   }
 
@@ -138,6 +143,7 @@ export class ReprocessPendingReferencesUseCase {
 
     for (const claimed of claimedList) {
       const started = performance.now();
+      let itemProviderId: string | null = null;
       if (abortSignal?.aborted) {
         break;
       }
@@ -160,6 +166,7 @@ export class ReprocessPendingReferencesUseCase {
           if (!tx) {
             return { outcome: 'SKIPPED' };
           }
+          itemProviderId = tx.providerId;
 
           // If already terminal, do not repeat movements or events (idempotency)
           if (tx.isTerminal()) {
@@ -187,6 +194,7 @@ export class ReprocessPendingReferencesUseCase {
               outcome: 'BLOCKED',
               transactionId: tx.id,
               reason: tx.operationalBlockReason ?? 'ALREADY_BLOCKED',
+              providerId: tx.providerId,
             };
           }
 
@@ -211,6 +219,7 @@ export class ReprocessPendingReferencesUseCase {
               outcome: 'BLOCKED',
               transactionId: tx.id,
               reason,
+              providerId: tx.providerId,
             };
           }
 
@@ -252,6 +261,7 @@ export class ReprocessPendingReferencesUseCase {
               transactionId: tx.id,
               attempts: tx.attempts,
               failureCode: 'REFERENCE_NOT_FOUND',
+              providerId: tx.providerId,
             };
           }
 
@@ -277,6 +287,7 @@ export class ReprocessPendingReferencesUseCase {
               outcome: result.outcome,
               transactionId: tx.id,
               attempts: tx.attempts,
+              providerId: tx.providerId,
             };
           } else if (tx.kind === 'REFUND' || tx.kind === 'ROLLBACK') {
             const result = await this.reversalProcessor.processReversal(wallet, {
@@ -301,6 +312,7 @@ export class ReprocessPendingReferencesUseCase {
               outcome: result.outcome,
               transactionId: tx.id,
               attempts: tx.attempts,
+              providerId: tx.providerId,
             };
           }
 
@@ -318,6 +330,8 @@ export class ReprocessPendingReferencesUseCase {
             durationMs: performance.now() - started,
             outcome: 'PROCESSED',
             attempts: itemResult.attempts,
+            walletId: claimed.walletId,
+            providerId: itemResult.providerId ?? itemProviderId ?? null,
           });
         } else if (itemResult.outcome === 'REJECTED') {
           rejected++;
@@ -330,6 +344,8 @@ export class ReprocessPendingReferencesUseCase {
             outcome: 'REJECTED',
             failureCode: itemResult.failureCode,
             attempts: itemResult.attempts,
+            walletId: claimed.walletId,
+            providerId: itemResult.providerId ?? itemProviderId ?? null,
           });
         } else if (itemResult.outcome === 'RESCHEDULED' || itemResult.outcome === 'PENDING_REFERENCE') {
           rescheduled++;
@@ -340,6 +356,8 @@ export class ReprocessPendingReferencesUseCase {
             transactionId: itemResult.transactionId,
             durationMs: performance.now() - started,
             attempts: itemResult.attempts,
+            walletId: claimed.walletId,
+            providerId: itemResult.providerId ?? itemProviderId ?? null,
           });
         } else if (itemResult.outcome === 'BLOCKED') {
           blocked++;
@@ -350,6 +368,8 @@ export class ReprocessPendingReferencesUseCase {
             transactionId: itemResult.transactionId,
             durationMs: performance.now() - started,
             reason: itemResult.reason,
+            walletId: claimed.walletId,
+            providerId: itemResult.providerId ?? itemProviderId ?? null,
           });
         }
       } catch (err) {
@@ -361,6 +381,8 @@ export class ReprocessPendingReferencesUseCase {
             transactionId: claimed.id,
             durationMs: performance.now() - started,
             error: err.message,
+            walletId: claimed.walletId,
+            providerId: itemProviderId ?? null,
           });
           continue;
         }
@@ -382,6 +404,8 @@ export class ReprocessPendingReferencesUseCase {
             transactionId: claimed.id,
             durationMs: performance.now() - started,
             reason: err instanceof Error ? err.message : String(err),
+            walletId: claimed.walletId,
+            providerId: itemProviderId ?? null,
           });
           break;
         }
@@ -401,6 +425,8 @@ export class ReprocessPendingReferencesUseCase {
             transactionId: claimed.id,
             durationMs: performance.now() - started,
             error: err instanceof Error ? err.message : String(err),
+            walletId: claimed.walletId,
+            providerId: itemProviderId ?? null,
           });
 
           failed++;
@@ -422,6 +448,8 @@ export class ReprocessPendingReferencesUseCase {
           errorName: err instanceof Error ? err.name : 'UnknownError',
           errorMessage: err instanceof Error ? err.message : String(err),
           stack: err instanceof Error ? err.stack : undefined,
+          walletId: claimed.walletId,
+          providerId: itemProviderId ?? null,
         });
 
         failed++;

@@ -8,6 +8,7 @@ export interface ConsumerConfig {
   telemetry?: HttpObservability;
   client?: SQSClient;
   queueUrl?: string;
+  dlqUrl?: string;
   enabled?: boolean;
   requestTimeoutMs?: number;
   visibilitySeconds?: number;
@@ -21,6 +22,7 @@ export class SqsWagerConsumer implements OnApplicationBootstrap, OnModuleDestroy
   private readonly client: SQSClient;
   private readonly ownsClient: boolean;
   private readonly queueUrl: string;
+  private readonly dlqUrl: string;
   private readonly enabled: boolean;
   private readonly timeout: number;
   private readonly visibility: number;
@@ -39,6 +41,7 @@ export class SqsWagerConsumer implements OnApplicationBootstrap, OnModuleDestroy
     this.telemetry = config.telemetry ?? new HttpObservability();
     this.enabled = config.enabled ?? ['true', '1'].includes(process.env.SQS_CONSUMER_ENABLED ?? '');
     this.queueUrl = config.queueUrl ?? process.env.WAGER_TRANSACTIONS_QUEUE_URL ?? '';
+    this.dlqUrl = config.dlqUrl ?? process.env.WAGER_TRANSACTIONS_DLQ_URL ?? '';
     if (this.enabled && (!this.queueUrl || !this.queueUrl.endsWith('.fifo') || this.queueUrl.includes('wager-events'))) throw new Error('INVALID_COMMAND_QUEUE');
     this.timeout = config.requestTimeoutMs ?? Number(process.env.SQS_REQUEST_TIMEOUT_MS ?? 5000);
     if (!Number.isSafeInteger(this.timeout) || this.timeout <= 0) throw new Error('INVALID_SQS_TIMEOUT');
@@ -62,6 +65,27 @@ export class SqsWagerConsumer implements OnApplicationBootstrap, OnModuleDestroy
     if (this.stopping) throw new Error('SHUTTING_DOWN');
     await this.client.send(new GetQueueAttributesCommand({ QueueUrl: this.queueUrl, AttributeNames: ['QueueArn'] }),
       { abortSignal: AbortSignal.timeout(Math.min(this.timeout, 500)) });
+  }
+  async probeDlqMetrics(): Promise<void> {
+    if (!this.dlqUrl) return;
+    try {
+      const response = await this.client.send(
+        new GetQueueAttributesCommand({
+          QueueUrl: this.dlqUrl,
+          AttributeNames: [
+            'ApproximateNumberOfMessages',
+            'ApproximateNumberOfMessagesNotVisible',
+            'ApproximateNumberOfMessagesDelayed',
+          ],
+        }),
+        { abortSignal: AbortSignal.timeout(Math.min(this.timeout, 1000)) }
+      );
+      const visible = Number(response.Attributes?.ApproximateNumberOfMessages ?? 0);
+      const queueName = this.dlqUrl.split('/').pop() ?? 'wager-transactions-dlq.fifo';
+      this.telemetry.recordDlqStats?.(queueName, visible);
+    } catch {
+      /* Non-critical metric probe; do not affect application or scrape. */
+    }
   }
   async onApplicationBootstrap(): Promise<void> {
     if (!this.enabled || this.loop || this.stopping) return;
@@ -102,8 +126,11 @@ export class SqsWagerConsumer implements OnApplicationBootstrap, OnModuleDestroy
       throw error;
     }
     for (const message of response.Messages ?? []) {
-      this.telemetry.event('consumer', 'receive', 'received', { durationMs: Date.now() - receivedAt });
-      if (Number(message.Attributes?.ApproximateReceiveCount) > 1) this.telemetry.event('consumer', 'delivery', 'redelivery_observed');
+      const messageId = message.MessageId ?? null;
+      this.telemetry.event('consumer', 'receive', 'received', { messageId, durationMs: Date.now() - receivedAt });
+      if (Number(message.Attributes?.ApproximateReceiveCount) > 1) {
+        this.telemetry.event('consumer', 'delivery', 'redelivery_observed', { messageId });
+      }
       if (this.stopping) break;
       await this.processMessage(message, receivedAt);
     }
@@ -120,6 +147,9 @@ export class SqsWagerConsumer implements OnApplicationBootstrap, OnModuleDestroy
     const started = performance.now();
     let correlationId: string | null = null;
     let commandId: string | undefined;
+    let walletId: string | null = null;
+    let providerId: string | null = null;
+    const messageId = message.MessageId ?? null;
     let stage = 'VALIDATION';
     let timer: ReturnType<typeof setTimeout> | undefined;
     let renewal: Promise<void> | undefined;
@@ -141,10 +171,10 @@ export class SqsWagerConsumer implements OnApplicationBootstrap, OnModuleDestroy
             const remaining = Math.floor((renewalDeadline - Date.now()) / 1000);
             if (remaining <= 0) throw new Error('VISIBILITY_LIMIT');
             await change(Math.min(this.visibility, remaining));
-            this.telemetry.event('consumer', 'renewal', 'confirmed');
+            this.telemetry.event('consumer', 'renewal', 'confirmed', { messageId, correlationId, walletId, providerId });
           } catch {
             uncertain = true;
-            this.telemetry.event('consumer', 'renewal', 'failure');
+            this.telemetry.event('consumer', 'renewal', 'failure', { messageId, correlationId, walletId, providerId });
           }
           if (!finished && !uncertain) schedule();
         })();
@@ -156,21 +186,51 @@ export class SqsWagerConsumer implements OnApplicationBootstrap, OnModuleDestroy
       const command = parseWagerCommand(message.Body, message.Attributes);
       correlationId = command.correlationId ?? command.idempotencyKey;
       commandId = command.commandId;
+      walletId = command.dto.walletId ?? null;
+      providerId = command.dto.providerId ?? null;
       stage = 'TRANSACTION';
       await this.consume.execute(command, message.MessageId, signal, outcome => {
-        this.telemetry.event('consumer', 'inbox', outcome, { correlationId, commandId, durationMs: performance.now() - started });
+        this.telemetry.event('consumer', 'inbox', outcome, {
+          correlationId,
+          commandId,
+          walletId,
+          providerId,
+          messageId,
+          durationMs: performance.now() - started,
+        });
       });
-      this.telemetry.event('consumer', 'transaction', 'durable', { correlationId, commandId, durationMs: performance.now() - started });
+      this.telemetry.event('consumer', 'transaction', 'durable', {
+        correlationId,
+        commandId,
+        walletId,
+        providerId,
+        messageId,
+        durationMs: performance.now() - started,
+      });
       stage = 'DELETE';
       await this.client.send(new DeleteMessageCommand({ QueueUrl: this.queueUrl, ReceiptHandle: message.ReceiptHandle }),
         { abortSignal: AbortSignal.timeout(this.timeout) });
-      this.telemetry.event('consumer', 'delete', 'confirmed', { correlationId, commandId, durationMs: performance.now() - started });
+      this.telemetry.event('consumer', 'delete', 'confirmed', {
+        correlationId,
+        commandId,
+        walletId,
+        providerId,
+        messageId,
+        durationMs: performance.now() - started,
+      });
       return true;
     } catch (error) {
       const policy = stage === 'VALIDATION' ? 'PERMANENT' : classifyConsumerFailure(error);
       const rawCount = Number(message.Attributes?.ApproximateReceiveCount ?? 1);
       const count = Number.isSafeInteger(rawCount) && rawCount > 0 ? rawCount : 1;
-      this.telemetry.event('consumer', stage === 'DELETE' ? 'delete' : 'processing', policy, { correlationId, commandId, durationMs: performance.now() - started });
+      this.telemetry.event('consumer', stage === 'DELETE' ? 'delete' : 'processing', policy, {
+        correlationId,
+        commandId,
+        walletId,
+        providerId,
+        messageId,
+        durationMs: performance.now() - started,
+      });
       // Finish renewal before setting retry visibility so it cannot overwrite backoff.
       finished = true;
       clearTimeout(timer);

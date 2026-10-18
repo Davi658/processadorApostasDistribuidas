@@ -22,6 +22,7 @@ import {
   WagerTransactionRejectedEvent,
   WalletBalanceChangedEvent,
 } from '../../domain/events/events';
+import type { OperationalObservabilityPort } from '../ports/operational-observability';
 import { ReversalProcessor } from '../services/reversal-processor.service';
 import { WinProcessor } from '../services/win-processor.service';
 import { validateReplaySnapshot } from '../validators/snapshot.validator';
@@ -37,7 +38,8 @@ export class ProcessWagerUseCase {
     protected readonly outboxRepo: OutboxRepositoryPort,
     protected readonly uow: UnitOfWorkPort,
     reversalProcessor?: ReversalProcessor,
-    winProcessor?: WinProcessor
+    winProcessor?: WinProcessor,
+    protected readonly telemetry?: OperationalObservabilityPort
   ) {
     this.reversalProcessor =
       reversalProcessor ??
@@ -48,123 +50,151 @@ export class ProcessWagerUseCase {
   }
 
   public async execute(idempotencyKey: string, dto: ProcessWagerDto, options?: { externalTransaction?: boolean }): Promise<WagerResponseDto> {
-    // 1. Independent Domain Validation (decoupled from HTTP transport)
-    this.validateDomainRules(idempotencyKey, dto);
-
-    const cleanIdempotencyKey = idempotencyKey.trim();
-    const currency = dto.money.currency.trim().toUpperCase();
-    const money = Money.create(dto.money.amount, currency);
-    const correlationId = dto.correlationId?.trim() || cleanIdempotencyKey;
-
-    // Canonical payload hash computed on normalized values
-    const payloadHash = ProcessWagerUseCase.computePayloadHash(dto, cleanIdempotencyKey);
+    const startTime = performance.now();
+    let outcomeStatus = 'FAILED';
+    let transactionId: string | undefined;
+    const cleanIdempotencyKey = typeof idempotencyKey === 'string' ? idempotencyKey.trim() : '';
+    const correlationId = dto?.correlationId?.trim() || cleanIdempotencyKey || null;
 
     try {
-      return await this.uow.runInTransaction(async () => {
-        // 2. Pessimistic lock on the target wallet
-        const wallet = await this.walletRepo.findById(dto.walletId, true);
-        if (!wallet) {
-          throw new WalletNotFoundError(dto.walletId);
-        }
+      // 1. Independent Domain Validation (decoupled from HTTP transport)
+      this.validateDomainRules(idempotencyKey, dto);
 
-        if (wallet.playerId.toLowerCase() !== dto.playerId.toLowerCase()) {
-          throw new InvalidWagerOperationError(
-            `Wallet "${dto.walletId}" does not belong to player "${dto.playerId}"`
-          );
-        }
+      const currency = dto.money.currency.trim().toUpperCase();
+      const money = Money.create(dto.money.amount, currency);
 
-        if (wallet.currency !== currency) {
-          throw new CurrencyMismatchError(
-            `Transaction currency "${currency}" does not match wallet currency "${wallet.currency}"`
-          );
-        }
+      // Canonical payload hash computed on normalized values
+      const payloadHash = ProcessWagerUseCase.computePayloadHash(dto, cleanIdempotencyKey);
 
-        // 3. Persistent Idempotency check by key
-        const existingByIdempotency = await this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
-        if (existingByIdempotency) {
-          if (existingByIdempotency.payloadHash === payloadHash) {
-            return await this.buildReplayResponse(existingByIdempotency);
-          } else {
-            throw new IdempotencyConflictError(
-              `Idempotency key "${cleanIdempotencyKey}" was previously submitted with a different payload`
+      try {
+        const result = await this.uow.runInTransaction(async () => {
+          // 2. Pessimistic lock on the target wallet
+          const wallet = await this.walletRepo.findById(dto.walletId, true);
+          if (!wallet) {
+            throw new WalletNotFoundError(dto.walletId);
+          }
+
+          if (wallet.playerId.toLowerCase() !== dto.playerId.toLowerCase()) {
+            throw new InvalidWagerOperationError(
+              `Wallet "${dto.walletId}" does not belong to player "${dto.playerId}"`
             );
           }
-        }
 
-        // 4. Provider deduplication check
-        const existingByProvider = await this.wagerRepo.findByProviderAndExternalId(
-          dto.providerId,
-          dto.externalTransactionId
-        );
-        if (existingByProvider) {
+          if (wallet.currency !== currency) {
+            throw new CurrencyMismatchError(
+              `Transaction currency "${currency}" does not match wallet currency "${wallet.currency}"`
+            );
+          }
+
+          // 3. Persistent Idempotency check by key
+          const existingByIdempotency = await this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
+          if (existingByIdempotency) {
+            if (existingByIdempotency.payloadHash === payloadHash) {
+              return await this.buildReplayResponse(existingByIdempotency);
+            } else {
+              throw new IdempotencyConflictError(
+                `Idempotency key "${cleanIdempotencyKey}" was previously submitted with a different payload`
+              );
+            }
+          }
+
+          // 4. Provider deduplication check
+          const existingByProvider = await this.wagerRepo.findByProviderAndExternalId(
+            dto.providerId,
+            dto.externalTransactionId
+          );
+          if (existingByProvider) {
+            throw new IdempotencyConflictError(
+              `Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was already processed under another idempotency key`
+            );
+          }
+
+          const txId = crypto.randomUUID();
+
+          // 5. Operation branch
+          switch (dto.kind) {
+            case 'BET':
+              return this.handleBet(txId, cleanIdempotencyKey, correlationId ?? cleanIdempotencyKey, payloadHash, wallet, dto, money);
+            case 'WIN':
+              return this.handleWin(txId, cleanIdempotencyKey, correlationId ?? cleanIdempotencyKey, payloadHash, wallet, dto, money);
+            case 'LOSS':
+              return this.handleLoss(txId, cleanIdempotencyKey, correlationId ?? cleanIdempotencyKey, payloadHash, wallet, dto, money);
+            case 'REFUND':
+              return this.handleRefund(txId, cleanIdempotencyKey, correlationId ?? cleanIdempotencyKey, payloadHash, wallet, dto, money);
+            case 'ROLLBACK':
+              return this.handleRollback(txId, cleanIdempotencyKey, correlationId ?? cleanIdempotencyKey, payloadHash, wallet, dto, money);
+            default:
+              throw new InvalidWagerOperationError(`Unsupported operation kind: "${dto.kind}"`);
+          }
+        });
+        outcomeStatus = result.status;
+        transactionId = result.transactionId;
+        return result;
+      } catch (err: any) {
+        // The external owner must exit the aborted UoW before any reconciliation.
+        if (options?.externalTransaction) throw err;
+        // 6. Safe 23505 race resolution outside aborted PostgreSQL transaction
+        const uniqueConstraintCause = this.identifyWagerUniqueConstraint(err);
+
+        if (uniqueConstraintCause === 'IDEMPOTENCY_KEY') {
+          let committedTx: WagerTransaction | null = null;
+          for (let attempt = 0; attempt < 5; attempt++) {
+            committedTx = await this.uow.runInTransaction(async () => {
+              return this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
+            });
+            if (committedTx) break;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+
+          if (committedTx) {
+            if (committedTx.payloadHash === payloadHash) {
+              const replayRes = await this.buildReplayResponse(committedTx);
+              outcomeStatus = replayRes.status;
+              transactionId = replayRes.transactionId;
+              return replayRes;
+            } else {
+              throw new IdempotencyConflictError(
+                `Concurrent conflict: Idempotency key "${cleanIdempotencyKey}" was registered by a racing request with a different payload`
+              );
+            }
+          }
+
           throw new IdempotencyConflictError(
-            `Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was already processed under another idempotency key`
+            `Concurrent conflict: Idempotency key "${cleanIdempotencyKey}" collided during transaction processing`
           );
         }
 
-        const transactionId = crypto.randomUUID();
-
-        // 5. Operation branch
-        switch (dto.kind) {
-          case 'BET':
-            return this.handleBet(transactionId, cleanIdempotencyKey, correlationId, payloadHash, wallet, dto, money);
-          case 'WIN':
-            return this.handleWin(transactionId, cleanIdempotencyKey, correlationId, payloadHash, wallet, dto, money);
-          case 'LOSS':
-            return this.handleLoss(transactionId, cleanIdempotencyKey, correlationId, payloadHash, wallet, dto, money);
-          case 'REFUND':
-            return this.handleRefund(transactionId, cleanIdempotencyKey, correlationId, payloadHash, wallet, dto, money);
-          case 'ROLLBACK':
-            return this.handleRollback(transactionId, cleanIdempotencyKey, correlationId, payloadHash, wallet, dto, money);
-          default:
-            throw new InvalidWagerOperationError(`Unsupported operation kind: "${dto.kind}"`);
-        }
-      });
-    } catch (err: any) {
-      // The external owner must exit the aborted UoW before any reconciliation.
-      if (options?.externalTransaction) throw err;
-      // 6. Safe 23505 race resolution outside aborted PostgreSQL transaction
-      const uniqueConstraintCause = this.identifyWagerUniqueConstraint(err);
-
-      if (uniqueConstraintCause === 'IDEMPOTENCY_KEY') {
-        let committedTx: WagerTransaction | null = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
-          committedTx = await this.uow.runInTransaction(async () => {
-            return this.wagerRepo.findByIdempotencyKey(cleanIdempotencyKey);
-          });
-          if (committedTx) break;
-          await new Promise((resolve) => setTimeout(resolve, 20));
+        if (uniqueConstraintCause === 'PROVIDER_EXTERNAL') {
+          throw new IdempotencyConflictError(
+            `Concurrent conflict: Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was registered by a racing request`
+          );
         }
 
-        if (committedTx) {
-          if (committedTx.payloadHash === payloadHash) {
-            return await this.buildReplayResponse(committedTx);
-          } else {
-            throw new IdempotencyConflictError(
-              `Concurrent conflict: Idempotency key "${cleanIdempotencyKey}" was registered by a racing request with a different payload`
-            );
-          }
+        if (uniqueConstraintCause === 'REVERSAL_REFERENCE') {
+          throw new IdempotencyConflictError(
+            `Concurrent conflict: A reversal of type "${dto.kind}" for reference "${dto.referenceExternalTransactionId}" was already processed`
+          );
         }
 
-        throw new IdempotencyConflictError(
-          `Concurrent conflict: Idempotency key "${cleanIdempotencyKey}" collided during transaction processing`
-        );
+        // Unrelated 23505 or other database error: rethrow without transforming into IdempotencyConflictError
+        throw err;
       }
-
-      if (uniqueConstraintCause === 'PROVIDER_EXTERNAL') {
-        throw new IdempotencyConflictError(
-          `Concurrent conflict: Provider transaction "${dto.providerId}/${dto.externalTransactionId}" was registered by a racing request`
-        );
-      }
-
-      if (uniqueConstraintCause === 'REVERSAL_REFERENCE') {
-        throw new IdempotencyConflictError(
-          `Concurrent conflict: A reversal of type "${dto.kind}" for reference "${dto.referenceExternalTransactionId}" was already processed`
-        );
-      }
-
-      // Unrelated 23505 or other database error: rethrow without transforming into IdempotencyConflictError
-      throw err;
+    } finally {
+      const durationSeconds = Math.max(0, performance.now() - startTime) / 1000;
+      const durationMs = durationSeconds * 1000;
+      this.telemetry?.recordFinancialTransaction?.(
+        dto?.kind ?? 'UNKNOWN',
+        outcomeStatus,
+        durationSeconds,
+        {
+          correlationId,
+          walletId: dto?.walletId ?? null,
+          providerId: dto?.providerId ?? null,
+          messageId: null,
+          transactionId,
+          durationMs,
+        }
+      );
     }
   }
 

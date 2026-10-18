@@ -89,6 +89,9 @@ services:
       WAGER_TRANSACTIONS_QUEUE_URL: http://localstack:4566/queue/us-east-1/000000000000/wager-transactions.fifo
       WAGER_TRANSACTIONS_DLQ_URL: http://localstack:4566/queue/us-east-1/000000000000/wager-transactions-dlq.fifo
       OUTBOX_EVENTS_QUEUE_URL: http://localstack:4566/queue/us-east-1/000000000000/wager-events.fifo
+      SQS_CONSUMER_ENABLED: "true"
+      OUTBOX_PUBLISHER_ENABLED: "true"
+      PENDING_WORKER_ENABLED: "true"
     ports:
       - "127.0.0.1:${LOCAL_API_PORT:-3000}:3000"
     depends_on:

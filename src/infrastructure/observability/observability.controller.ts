@@ -49,5 +49,5 @@ export class ObservabilityController {
 
   @Get('metrics')
   @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
-  metrics() { return this.http.render(); }
+  async metrics() { return await this.http.render(); }
 }
