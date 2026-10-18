@@ -5,6 +5,9 @@ $env:COMPOSE_PROJECT_NAME = $Project
 if ($EphemeralTestStorage) {
   $env:COMPOSE_PATH_SEPARATOR = ';'
   $env:COMPOSE_FILE = 'docker-compose.yml;infra/delivery-validation.compose.yml'
+} else {
+  $env:COMPOSE_FILE = 'docker-compose.yml'
+  Remove-Item Env:COMPOSE_PATH_SEPARATOR -ErrorAction SilentlyContinue
 }
 $env:DELIVERY_TEST_SETUP_TRACE = 'true'
 $env:APP_IMAGE = 'delivery-final-app:20261018'

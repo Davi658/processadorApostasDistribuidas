@@ -20,6 +20,8 @@ bun install --frozen-lockfile
 if ($LASTEXITCODE -ne 0) { throw 'Install failed' }
 
 # Altere portas se ocupadas. Mantenha este terminal e estas variáveis em todas as etapas.
+$env:COMPOSE_FILE = 'docker-compose.yml'
+Remove-Item Env:COMPOSE_PATH_SEPARATOR -ErrorAction SilentlyContinue
 $env:COMPOSE_PROJECT_NAME = "wagers-personal-$((Get-Date).ToString('yyyyMMddHHmmss'))"
 $env:LOCAL_API_PORT = '3093'
 $env:LOCAL_POSTGRES_PORT = '55593'
