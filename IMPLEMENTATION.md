@@ -441,3 +441,10 @@ Base: `51c14400282749e972903929ef4517674c77bf0c`; branch `codex/m14-stabilizatio
 ## M15 — consumidor de comandos
 
 Implementados envelope v1, validação FIFO, normalização compartilhada, inbox transacional reversível, replay pelo snapshot atual, receive/process/delete com SDK oficial e drenagem normal. Ativação: SQS_CONSUMER_ENABLED=true e WAGER_TRANSACTIONS_QUEUE_URL explícita. Inbox ACCEPTED é representada pela existência da associação; inclui rejeições persistidas e pendências. Não existe reserva confirmada separada. Colisões escapam da UoW externa e são reconciliadas em redelivery saudável. Consulte [contrato final M15](docs/messaging/M15-IMPLEMENTED.md) e [evidências](docs/evidence/m15-sqs-inbox.md). Retry avançado, renovação de visibilidade, DLQ e shutdown completo sob falhas permanecem em M16.
+
+
+## M18 — observabilidade integrada
+
+AppModule registra `GET /health/live`, `GET /health/ready` e `GET /metrics`, com middleware HTTP e registro único compartilhado por publisher, consumidor e referências. Logs JSON usam allowlist; métricas Prometheus têm cardinalidade limitada e distinguem tentativa, confirmação SQS, commit local e replay. Readiness reutiliza UoW/clientes, limita sondagens concorrentes, consulta apenas dependências habilitadas e recusa tráfego durante shutdown. Liveness independe de PostgreSQL/SQS.
+
+Contratos, lacuna de correlação tardia, semântica dos contadores por processo, reprodução exclusiva e provas: [M18-INTEGRATION.md](M18-INTEGRATION.md) e [evidências M18](docs/evidence/m18/RESULTS.md).

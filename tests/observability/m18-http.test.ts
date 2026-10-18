@@ -1,7 +1,10 @@
+import { PendingReferenceWorkerService } from '../../src/infrastructure/workers/pending-reference-worker.service';
 import 'reflect-metadata';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Controller, Get, Module, Post, HttpException, type INestApplication } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
+import { AppModule } from '../../src/interfaces/http/app.module';
+import { DomainExceptionFilter } from '../../src/interfaces/http/filters/domain-exception.filter';
 import pg from 'pg';
 import config from '../../src/infrastructure/persistence/mikro-orm/mikro-orm.config';
 import { getMigrationDatabaseConfig } from '../../src/infrastructure/config/database.config';
@@ -26,37 +29,49 @@ const uow = new MikroOrmUnitOfWork({ ...config, ...connection, dbName,
   driverOptions: { connection: { application_name: 'm18_observability', statement_timeout: 1000 } },
 });
 const readiness = new PostgresReadiness(uow, 150);
-@Module({ controllers: [ObservabilityController, ProbeController], providers: [
-  { provide: MikroOrmUnitOfWork, useValue: uow },
-  { provide: HttpObservability, useValue: http },
-  { provide: PostgresReadiness, useValue: readiness },
-] })
-class TestModule {}
 
-describe('M18 isolated Nest HTTP and real PostgreSQL', () => {
+describe('M18 principal AppModule HTTP and real PostgreSQL', () => {
   let app: INestApplication;
   let url: string;
   let admin: pg.Pool;
   let maintenance: pg.Pool;
   let before: pg.QueryResultRow[][];
+  const adminClients = new Set<pg.PoolClient>();
+  const maintenanceClients = new Set<pg.PoolClient>();
+  const track = (pool: pg.Pool, clients: Set<pg.PoolClient>) => pool.on('connect', client => {
+    clients.add(client); client.once('end', () => clients.delete(client));
+  });
+  const closePool = async (pool: pg.Pool, clients: Set<pg.PoolClient>) => {
+    // pg.Pool.end() drains bookkeeping before every backend socket has ended.
+    // Await client 'end' before DROP DATABASE, avoiding a forced 57P01 on a closing idle client.
+    const ended = [...clients].map(client => new Promise<void>(resolve => client.once('end', resolve)));
+    await pool.end(); await Promise.all(ended);
+  };
   const snapshot = async () => {
     const values = [];
-    for (const table of ['wallets', 'wager_transactions', 'wallet_ledger_entries', 'outbox_messages']) {
-      values.push((await admin.query(`SELECT to_jsonb(t) AS row FROM ${table} t ORDER BY id`)).rows);
+    for (const table of ['wallets', 'wager_transactions', 'wallet_ledger_entries', 'outbox_messages', 'command_inbox']) {
+      values.push((await admin.query(`SELECT to_jsonb(t) AS row FROM ${table} t ORDER BY to_jsonb(t)::text`)).rows);
     }
     return values;
   };
   beforeAll(async () => {
     maintenance = new pg.Pool({ ...connection, database: 'postgres' });
+    track(maintenance, maintenanceClients);
     await maintenance.query(`CREATE DATABASE ${dbName}`);
     admin = new pg.Pool({ ...connection, database: dbName });
+    track(admin, adminClients);
     const migrator = new DatabaseMigrator({ ...connection, database: dbName });
     try { await migrator.up(); } finally { await migrator.close(); }
     await admin.query(`INSERT INTO wallets (id, player_id, currency, balance, version, created_at, updated_at)
       VALUES ($1, 'm18-player', 'BRL', 9876.54, 1, NOW(), NOW())`, [crypto.randomUUID()]);
     before = await snapshot();
-    app = await NestFactory.create(TestModule, { logger: false });
-    app.use(http.middleware);
+    process.env.OUTBOX_PUBLISHER_ENABLED = 'false'; process.env.SQS_CONSUMER_ENABLED = 'false'; process.env.PENDING_WORKER_ENABLED = 'false';
+    const module = await Test.createTestingModule({ imports: [AppModule], controllers: [ProbeController] })
+      .overrideProvider(MikroOrmUnitOfWork).useValue(uow)
+      .overrideProvider(HttpObservability).useValue(http)
+      .overrideProvider(PostgresReadiness).useValue(readiness).compile();
+    app = module.createNestApplication({ logger: false });
+    app.useGlobalFilters(new DomainExceptionFilter());
     await app.listen(0, '127.0.0.1');
     url = await app.getUrl();
   }, 30000);
@@ -64,10 +79,10 @@ describe('M18 isolated Nest HTTP and real PostgreSQL', () => {
   afterAll(async () => {
     try { if (app) await app.close(); }
     finally {
-      if (admin) await admin.end();
+      if (admin) await closePool(admin, adminClients);
       if (maintenance) {
-        try { await maintenance.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`); }
-        finally { await maintenance.end(); }
+        try { await maintenance.query(`DROP DATABASE IF EXISTS ${dbName}`); }
+        finally { await closePool(maintenance, maintenanceClients); }
       }
     }
   });
@@ -86,13 +101,14 @@ describe('M18 isolated Nest HTTP and real PostgreSQL', () => {
     await fallback.text();
     await (await fetch(`${url}/probe/error/${crypto.randomUUID()}`)).text();
     for (let i = 0; i < 3; i++) await (await fetch(`${url}/unknown/${crypto.randomUUID()}?token=secret`)).text();
+    for (let i = 0; i < 2; i++) await (await fetch(`${url}/wallets/${crypto.randomUUID()}`)).text();
     const records = lines.map(line => JSON.parse(line));
     expect(records.filter(record => record.correlationId === 'trace-m18')).toHaveLength(12);
     expect(records.some(record => record.correlationId === 'fallback-m18')).toBe(true);
     expect(records.some(record => record.status === 422)).toBe(true);
     expect(records.some(record => record.status === 404)).toBe(true);
     for (const record of records) {
-      expect(Object.keys(record).sort()).toEqual(['correlationId', 'durationMs', 'method', 'route', 'status']);
+      expect(Object.keys(record).sort()).toEqual(['component', 'correlationId', 'durationMs', 'method', 'operation', 'result', 'route', 'status']);
       expect(record.durationMs).toBeGreaterThanOrEqual(0);
     }
     expect(lines.join('')).not.toMatch(/9876\.54|secret|Bearer|private-error|unused-key/);
@@ -101,6 +117,7 @@ describe('M18 isolated Nest HTTP and real PostgreSQL', () => {
     const metrics = await response.text();
     expect(metrics).toContain('http_requests_total{method="POST",route="/probe/:id",status="201"} 13');
     expect(metrics).toContain('route="__unmatched__",status="404"} 3');
+    expect(metrics).toContain('http_requests_total{method="GET",route="/wallets/:walletId",status="404"} 2');
     expect(metrics).toContain('http_request_duration_seconds_bucket');
     expect(metrics).toContain('le="+Inf"} 13');
     expect(metrics).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-|trace-m18|fallback-m18|secret|9876\.54/);
@@ -123,6 +140,7 @@ describe('M18 isolated Nest HTTP and real PostgreSQL', () => {
       expect(responses.every(response => response.status === 503)).toBe(true);
       for (const response of responses) expect(await response.json()).toEqual({ status: 'unavailable' });
       expect(performance.now() - start).toBeLessThan(1000);
+      expect(knex.client.pool.numPendingAcquires()).toBeLessThanOrEqual(1);
       expect((await fetch(`${url}/health/live`)).status).toBe(200);
     } finally {
       await knex.client.releaseConnection(first);
@@ -142,7 +160,19 @@ describe('M18 isolated Nest HTTP and real PostgreSQL', () => {
       expect((await fetch(`${url}/health/live`)).status).toBe(200);
       expect(await snapshot()).toEqual(before);
     } finally { await maintenance.query(`ALTER DATABASE ${dbName} ALLOW_CONNECTIONS true`); }
-    await app.close();
+    expect((await fetch(`${url}/health/ready`)).status).toBe(200);
+    let release!: () => void, entered!: () => void;
+    const held = new Promise<void>(resolve => release = resolve);
+    const entering = new Promise<void>(resolve => entered = resolve);
+    const worker = app.get(PendingReferenceWorkerService);
+    const drain = worker.onModuleDestroy.bind(worker);
+    worker.onModuleDestroy = async () => { entered(); await held; await drain(); };
+    const closing = app.close();
+    await entering;
+    try {
+      expect((await fetch(`${url}/health/ready`)).status).toBe(503);
+      expect((await fetch(`${url}/health/live`)).status).toBe(200);
+    } finally { release(); await closing; }
     expect(uow.isClosed()).toBe(true);
     expect((await admin.query(`SELECT count(*)::int AS count FROM pg_stat_activity WHERE application_name = 'm18_observability' AND datname = $1`, [dbName])).rows[0].count).toBe(0);
   });

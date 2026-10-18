@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_PASSWORD: m18-exclusive
+    ports: ["127.0.0.1:55448:5432"]
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+  localstack:
+    image: localstack/localstack:4.0.3
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+    ports: ["127.0.0.1:45628:4566"]
+  tester:
+    # Disposable validation container must write evidence and build outputs in /app.
+    user: root
+    build:
+      context: ..
+      target: tester
+    image: wagers-m18-tester:local
+    environment:
+      APP_DB_HOST: postgres
+      APP_DB_PORT: 5432
+      APP_DB_USER: app_user
+      APP_DB_PASSWORD: app_user_secret
+      MIGRATION_DB_USER: postgres
+      MIGRATION_DB_PASSWORD: m18-exclusive
+      SQS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      OUTBOX_PUBLISHER_ENABLED: 'false'
+      SQS_CONSUMER_ENABLED: 'false'
+      PENDING_WORKER_ENABLED: 'false'

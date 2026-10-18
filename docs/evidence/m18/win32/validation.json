@@ -1,0 +1,75 @@
+{
+  "base": "cf90a10571d2966643b9ac6287658a22e6f66efa",
+  "branch": "codex/m18-final",
+  "platform": "win32",
+  "bun": "1.4.3",
+  "started": "2026-10-18T04:01:53.401Z",
+  "steps": [
+    {
+      "name": "typecheck",
+      "command": [
+        "bun",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "durationMs": 6326.657099999999,
+      "passedTests": 0,
+      "failedTests": 0
+    },
+    {
+      "name": "m18",
+      "command": [
+        "bun",
+        "test",
+        "tests/observability",
+        "--timeout",
+        "30000"
+      ],
+      "exitCode": 0,
+      "durationMs": 2801.2447999999995,
+      "passedTests": 8,
+      "failedTests": 0
+    },
+    {
+      "name": "official",
+      "command": [
+        "bun",
+        "run",
+        "test"
+      ],
+      "exitCode": 0,
+      "durationMs": 169259.7764,
+      "passedTests": 486,
+      "failedTests": 0,
+      "filesSummary": "[test-runner] 31 files; 0 failed"
+    },
+    {
+      "name": "build",
+      "command": [
+        "bun",
+        "build",
+        "src/main.ts",
+        "--target=bun",
+        "--packages=external",
+        "--outdir=.data/m18-build"
+      ],
+      "exitCode": 0,
+      "durationMs": 386.8940000029397,
+      "passedTests": 0,
+      "failedTests": 0
+    },
+    {
+      "name": "smoke",
+      "command": [
+        "bun",
+        "run",
+        "scripts/m15-financial-smoke.ts"
+      ],
+      "exitCode": 0,
+      "durationMs": 1930.5318999977317,
+      "passedTests": 0,
+      "failedTests": 0
+    }
+  ]
+}

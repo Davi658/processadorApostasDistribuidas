@@ -1,9 +1,13 @@
+import { ObservabilityModule } from '../../infrastructure/observability/observability.module';
+import { SqsOutboxQueuePublisher } from '../../infrastructure/messaging/sqs-outbox-queue-publisher.service';
+import { HttpObservability } from '../../infrastructure/observability/http-observability';
+import { ObservabilityController, PostgresReadiness } from '../../infrastructure/observability/observability.controller';
 import { ConsumeWagerCommand } from '../../application/messaging/consume-wager-command';
 import { MikroOrmInboxRepository } from '../../infrastructure/persistence/mikro-orm/mikro-orm-inbox-repository';
 import { SqsWagerConsumer } from '../../infrastructure/messaging/sqs-wager-consumer.service';
 import { PersistenceModule } from '../../infrastructure/persistence/persistence.module';
 import { WageringQueryModule } from './wagering-query.module';
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, NestModule, Module } from '@nestjs/common';
 import {
   MikroOrmOutboxRepository,
   MikroOrmUnitOfWork,
@@ -23,14 +27,17 @@ import { WageringController } from './controllers/wagering.controller';
 import { OutboxPublisherWorkerModule } from '../../infrastructure/workers/outbox-publisher-worker.module';
 
 @Module({
-  imports: [PersistenceModule, WageringQueryModule, OutboxPublisherWorkerModule],
-  controllers: [WalletController, WageringController],
+  imports: [ObservabilityModule, PersistenceModule, WageringQueryModule, OutboxPublisherWorkerModule],
+  controllers: [WalletController, WageringController, ObservabilityController],
   providers: [
+    { provide: PostgresReadiness, useFactory: (uow: MikroOrmUnitOfWork, publisher: SqsOutboxQueuePublisher, consumer: SqsWagerConsumer) =>
+      new PostgresReadiness(uow, 500, [() => publisher.checkReadiness(), () => consumer.checkReadiness()]),
+      inject: [MikroOrmUnitOfWork, SqsOutboxQueuePublisher, SqsWagerConsumer] },
     {
       provide: SqsWagerConsumer,
-      useFactory: (uow: MikroOrmUnitOfWork, wagers: MikroOrmWagerTransactionRepository, process: ProcessWagerUseCase) =>
-        new SqsWagerConsumer(new ConsumeWagerCommand(uow, new MikroOrmInboxRepository(uow), wagers, process)),
-      inject: [MikroOrmUnitOfWork, MikroOrmWagerTransactionRepository, ProcessWagerUseCase],
+      useFactory: (uow: MikroOrmUnitOfWork, wagers: MikroOrmWagerTransactionRepository, process: ProcessWagerUseCase, telemetry: HttpObservability) =>
+        new SqsWagerConsumer(new ConsumeWagerCommand(uow, new MikroOrmInboxRepository(uow), wagers, process), { telemetry }),
+      inject: [MikroOrmUnitOfWork, MikroOrmWagerTransactionRepository, ProcessWagerUseCase, HttpObservability],
     },
     {
       provide: CreateWalletUseCase,
@@ -104,23 +111,28 @@ import { OutboxPublisherWorkerModule } from '../../infrastructure/workers/outbox
         wagerRepo: MikroOrmWagerTransactionRepository,
         ledgerRepo: MikroOrmWalletLedgerRepository,
         outboxRepo: MikroOrmOutboxRepository,
-        uow: MikroOrmUnitOfWork
-      ) => new ReprocessPendingReferencesUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow, 5),
+        uow: MikroOrmUnitOfWork,
+        telemetry: HttpObservability
+      ) => new ReprocessPendingReferencesUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow, 5, undefined, undefined, telemetry),
       inject: [
         MikroOrmWalletRepository,
         MikroOrmWagerTransactionRepository,
         MikroOrmWalletLedgerRepository,
         MikroOrmOutboxRepository,
         MikroOrmUnitOfWork,
+        HttpObservability,
       ],
     },
     {
       provide: PendingReferenceWorkerService,
-      useFactory: (reprocessUseCase: ReprocessPendingReferencesUseCase) => {
-        return new PendingReferenceWorkerService(reprocessUseCase);
+      useFactory: (reprocessUseCase: ReprocessPendingReferencesUseCase, telemetry: HttpObservability) => {
+        return new PendingReferenceWorkerService(reprocessUseCase, { telemetry });
       },
-      inject: [ReprocessPendingReferencesUseCase],
+      inject: [ReprocessPendingReferencesUseCase, HttpObservability],
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  constructor(private readonly http: HttpObservability) {}
+  configure(consumer: MiddlewareConsumer): void { consumer.apply(this.http.middleware).forRoutes('{*path}'); }
+}

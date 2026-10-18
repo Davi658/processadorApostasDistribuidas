@@ -1,0 +1,1 @@
+{"step": {"name": "build", "command": ["bun", "build", "src/main.ts", "--target=bun", "--outdir=.data/m18-build"], "exitCode": 1, "durationMs": 1699.5884000000078, "passedTests": 0, "failedTests": 0}, "reason": "optional unused dependency bundling; retain runtime packages external"}

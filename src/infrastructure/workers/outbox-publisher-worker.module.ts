@@ -1,3 +1,5 @@
+import { HttpObservability } from '../observability/http-observability';
+import { ObservabilityModule } from '../observability/observability.module';
 import { Module } from '@nestjs/common';
 import { PersistenceModule } from '../persistence/persistence.module';
 import { MikroOrmOutboxRepository } from '../persistence/mikro-orm/mikro-orm-adapter';
@@ -6,25 +8,26 @@ import { PublishOutboxEventsUseCase } from '../../application/use-cases/publish-
 import { OutboxPublisherWorkerService } from './outbox-publisher-worker.service';
 
 @Module({
-  imports: [PersistenceModule],
+  imports: [PersistenceModule, ObservabilityModule],
   providers: [
     SqsOutboxQueuePublisher,
     {
       provide: PublishOutboxEventsUseCase,
       useFactory: (
         outboxRepo: MikroOrmOutboxRepository,
-        queuePublisher: SqsOutboxQueuePublisher
+        queuePublisher: SqsOutboxQueuePublisher,
+        telemetry: HttpObservability
       ) => {
-        return new PublishOutboxEventsUseCase(outboxRepo, queuePublisher);
+        return new PublishOutboxEventsUseCase(outboxRepo, queuePublisher, undefined, telemetry);
       },
-      inject: [MikroOrmOutboxRepository, SqsOutboxQueuePublisher],
+      inject: [MikroOrmOutboxRepository, SqsOutboxQueuePublisher, HttpObservability],
     },
     {
       provide: OutboxPublisherWorkerService,
-      useFactory: (publishUseCase: PublishOutboxEventsUseCase) => {
-        return new OutboxPublisherWorkerService(publishUseCase);
+      useFactory: (publishUseCase: PublishOutboxEventsUseCase, telemetry: HttpObservability) => {
+        return new OutboxPublisherWorkerService(publishUseCase, { telemetry });
       },
-      inject: [PublishOutboxEventsUseCase],
+      inject: [PublishOutboxEventsUseCase, HttpObservability],
     },
   ],
   exports: [

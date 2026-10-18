@@ -1,5 +1,5 @@
+import type { OperationalObservabilityPort } from '../ports/operational-observability';
 import { validateOutboxContract } from '../validation/outbox-contract';
-import { Logger } from '@nestjs/common';
 import type {
   ClaimedOutboxMessage,
   OutboxQueuePublisherPort,
@@ -29,7 +29,6 @@ export type OutboxPublishHookPoint =
   | 'after_mark_published';
 
 export class PublishOutboxEventsUseCase {
-  private readonly logger = new Logger(PublishOutboxEventsUseCase.name);
   private readonly testHooks = new Map<
     OutboxPublishHookPoint,
     (context: any) => Promise<void> | void
@@ -42,7 +41,8 @@ export class PublishOutboxEventsUseCase {
   constructor(
     private readonly outboxRepo: OutboxRepositoryPort,
     private readonly queuePublisher: OutboxQueuePublisherPort,
-    options?: PublishOutboxOptions
+    options?: PublishOutboxOptions,
+    private readonly telemetry?: OperationalObservabilityPort
   ) {
     this.baseDelayMs =
       options?.baseDelayMs ??
@@ -119,12 +119,11 @@ export class PublishOutboxEventsUseCase {
         continue;
       }
 
+      const started = performance.now();
+      const context = { correlationId: event.correlationId, eventId: event.id };
       // 1. Envelope validation: isolate invalid events without blocking the whole batch
       const validation = validateOutboxContract(event);
       if (!validation.valid) {
-        this.logger.warn(
-          `Outbox message ${event.id} is invalid: ${validation.reason}. Isolating event.`
-        );
         const blocked = await this.outboxRepo.markOperationallyBlocked(
           event.id,
           event.leaseToken,
@@ -133,6 +132,7 @@ export class PublishOutboxEventsUseCase {
         );
         if (blocked) result.blocked++;
         else result.staleLease++;
+        this.telemetry?.event('publisher', 'validation', blocked ? 'blocked' : 'stale_lease', { ...context, durationMs: performance.now() - started });
         continue;
       }
 
@@ -150,33 +150,33 @@ export class PublishOutboxEventsUseCase {
       try {
         await this.triggerHook('before_sqs_send', { event, envelope, workerId });
 
+        this.telemetry?.event('publisher', 'send', 'attempt', context);
         await this.queuePublisher.publish(envelope, { signal });
 
+        this.telemetry?.event('publisher', 'send', 'broker_confirmed', { ...context, durationMs: performance.now() - started });
         await this.triggerHook('after_sqs_send', { event, envelope, workerId });
 
         await this.triggerHook('before_mark_published', { event, envelope, workerId });
 
+        const markStarted = performance.now();
         const marked = await this.outboxRepo.markPublished(event.id, event.leaseToken);
 
         if (marked) {
           result.published++;
+          this.telemetry?.event('publisher', 'mark', 'local_confirmed', { ...context, durationMs: performance.now() - markStarted });
           await this.triggerHook('after_mark_published', { event, envelope, workerId });
         } else {
-          this.logger.warn(
-            `Failed to mark outbox event ${event.id} as published: lease token was stale or lost.`
-          );
           result.staleLease++;
+          this.telemetry?.event('publisher', 'mark', 'stale_lease', { ...context, durationMs: performance.now() - markStarted });
         }
       } catch (err: any) {
-        this.logger.error(
-          `Failed to publish outbox event ${event.id} to queue: ${err?.message || err}`,
-          err?.stack
-        );
+        this.telemetry?.event('publisher', 'publish', 'failure', { ...context, durationMs: performance.now() - started });
 
         if (signal?.aborted) {
           await this.outboxRepo.releaseLease(event.id, event.leaseToken);
         } else {
           const delayMs = this.calculateBackoffDelayMs(event.attempts);
+          // Preserve M14's persisted diagnostic contract; never emit this value to logs or labels.
           const errorMsg = String(err?.message || err || 'SQS_SEND_FAILED').slice(0, 1000);
           await this.outboxRepo.recordFailure(
             event.id,

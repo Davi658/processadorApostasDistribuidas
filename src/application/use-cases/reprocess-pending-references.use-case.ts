@@ -1,3 +1,4 @@
+import type { OperationalObservabilityPort, OperationalResult } from '../ports/operational-observability';
 import {
   OutboxRepositoryPort,
   UnitOfWorkPort,
@@ -80,7 +81,8 @@ export class ReprocessPendingReferencesUseCase {
     private readonly uow: UnitOfWorkPort,
     private readonly maxAttempts = 5,
     reversalProcessor?: ReversalProcessor,
-    winProcessor?: WinProcessor
+    winProcessor?: WinProcessor,
+    private readonly telemetry?: OperationalObservabilityPort
   ) {
     this.reversalProcessor =
       reversalProcessor ??
@@ -91,9 +93,15 @@ export class ReprocessPendingReferencesUseCase {
   }
 
   private logStructured(logData: Record<string, any>): void {
-    // Strictly strip any financial payloads or sensitive amounts
-    const { amount, balance, money, payload, ...safeData } = logData;
-    console.log(JSON.stringify(safeData));
+    const results: Record<string, OperationalResult> = {
+      PENDING_REFERENCES_CLAIMED: 'claimed', PENDING_REFERENCE_RESOLVED: logData.outcome === 'PROCESSED' ? 'processed' : 'rejected',
+      PENDING_REFERENCE_RESCHEDULED: 'rescheduled', PENDING_REFERENCE_OPERATIONALLY_BLOCKED: 'blocked',
+      PENDING_REFERENCE_STALE_LEASE: 'stale_lease', PENDING_REFERENCE_SHUTDOWN_ABORTED: 'aborted',
+      PENDING_REFERENCE_TRANSIENT_FAILURE: 'transient_failure', PENDING_REFERENCE_UNEXPECTED_ERROR: 'unexpected_failure',
+    };
+    this.telemetry?.event('references', 'reprocess', results[logData.event] ?? 'unknown', {
+      transactionId: logData.transactionId, correlationId: null, durationMs: logData.durationMs ?? 0,
+    });
   }
 
   public async execute(
@@ -106,6 +114,7 @@ export class ReprocessPendingReferencesUseCase {
       return { processed: 0, rejected: 0, rescheduled: 0, blocked: 0, failed: 0 };
     }
 
+    const claimStarted = performance.now();
     const claimedList = await this.wagerRepo.claimPendingReferences(limit, leaseDurationMs, workerId);
 
     if (claimedList.length === 0) {
@@ -115,6 +124,7 @@ export class ReprocessPendingReferencesUseCase {
     this.logStructured({
       level: 'info',
       event: 'PENDING_REFERENCES_CLAIMED',
+      durationMs: performance.now() - claimStarted,
       workerId,
       count: claimedList.length,
       transactionIds: claimedList.map((c) => c.id),
@@ -127,6 +137,7 @@ export class ReprocessPendingReferencesUseCase {
     let failed = 0;
 
     for (const claimed of claimedList) {
+      const started = performance.now();
       if (abortSignal?.aborted) {
         break;
       }
@@ -304,6 +315,7 @@ export class ReprocessPendingReferencesUseCase {
             event: 'PENDING_REFERENCE_RESOLVED',
             workerId,
             transactionId: itemResult.transactionId,
+            durationMs: performance.now() - started,
             outcome: 'PROCESSED',
             attempts: itemResult.attempts,
           });
@@ -314,6 +326,7 @@ export class ReprocessPendingReferencesUseCase {
             event: 'PENDING_REFERENCE_RESOLVED',
             workerId,
             transactionId: itemResult.transactionId,
+            durationMs: performance.now() - started,
             outcome: 'REJECTED',
             failureCode: itemResult.failureCode,
             attempts: itemResult.attempts,
@@ -325,6 +338,7 @@ export class ReprocessPendingReferencesUseCase {
             event: 'PENDING_REFERENCE_RESCHEDULED',
             workerId,
             transactionId: itemResult.transactionId,
+            durationMs: performance.now() - started,
             attempts: itemResult.attempts,
           });
         } else if (itemResult.outcome === 'BLOCKED') {
@@ -334,6 +348,7 @@ export class ReprocessPendingReferencesUseCase {
             event: 'PENDING_REFERENCE_OPERATIONALLY_BLOCKED',
             workerId,
             transactionId: itemResult.transactionId,
+            durationMs: performance.now() - started,
             reason: itemResult.reason,
           });
         }
@@ -344,6 +359,7 @@ export class ReprocessPendingReferencesUseCase {
             event: 'PENDING_REFERENCE_STALE_LEASE',
             workerId,
             transactionId: claimed.id,
+            durationMs: performance.now() - started,
             error: err.message,
           });
           continue;
@@ -364,6 +380,7 @@ export class ReprocessPendingReferencesUseCase {
             event: 'PENDING_REFERENCE_SHUTDOWN_ABORTED',
             workerId,
             transactionId: claimed.id,
+            durationMs: performance.now() - started,
             reason: err instanceof Error ? err.message : String(err),
           });
           break;
@@ -382,6 +399,7 @@ export class ReprocessPendingReferencesUseCase {
             event: 'PENDING_REFERENCE_TRANSIENT_FAILURE',
             workerId,
             transactionId: claimed.id,
+            durationMs: performance.now() - started,
             error: err instanceof Error ? err.message : String(err),
           });
 

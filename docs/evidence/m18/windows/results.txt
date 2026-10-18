@@ -1,0 +1,10 @@
+typecheck exit=0
+m18 exit=1
+typecheck exit=0
+m18 exit=0
+typecheck exit=0
+m18 exit=1
+official exit=1
+typecheck exit=0
+m18 exit=0
+official exit=1

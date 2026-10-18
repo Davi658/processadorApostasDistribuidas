@@ -631,7 +631,7 @@ Para coordenar múltiplos processos e nós de aplicação independentes disputan
 4. **Isolamento de Itens no Lote:**
    - O processamento de cada item do lote ocorre em bloco `try/catch` individual com transação própria. A falha de um registro nunca aborta nem bloqueia o processamento dos demais itens do lote.
 5. **Observabilidade e Logs Estruturados:**
-   - Logs em formato JSON registram eventos do ciclo de vida: `worker_claim_batch`, `worker_process_success`, `worker_process_rejected`, `worker_process_transient_error`, `worker_operational_block` e `worker_stale_lease`.
+   - Logs JSON usam component=`references`, operation=`reprocess` e resultados claimed/processed/rejected/rescheduled/blocked/stale_lease/transient_failure/unexpected_failure. A correlação histórica ausente é explicitamente null; transactionId permite localizar o registro técnico.
    - Nenhuma informação financeira confidencial, dados de payload ou valores monetários (`amount`, `balance`) são emitidos nos logs.
 
 ### 13.5 Delimitação Estrita de Escopo (M10 vs M14 / M15 / M16)
@@ -707,3 +707,10 @@ Base: `51c14400282749e972903929ef4517674c77bf0c`; branch `codex/m14-stabilizatio
 ## M15 — SQS de comandos e inbox
 
 O consumidor opcional SqsWagerConsumer recebe da FIFO de comandos e usa ConsumeWagerCommand com a UoW compartilhada. A migration 009 adiciona command_inbox, identidade consumer/commandId e associação à transação financeira. ProcessWagerUseCase continua sendo o motor financeiro único. O delete depende do retorno confirmado da UoW externa; replay valida o snapshot atual persistido. Normalização compartilhada vive em application/validators/wager-input.validator.ts; o HTTP apenas adapta erros para 400. Contrato e limites: [M15](docs/messaging/M15-IMPLEMENTED.md).
+
+
+## M18 — observabilidade integrada
+
+AppModule registra `GET /health/live`, `GET /health/ready` e `GET /metrics`, com middleware HTTP e registro único compartilhado por publisher, consumidor e referências. Logs JSON usam allowlist; métricas Prometheus têm cardinalidade limitada e distinguem tentativa, confirmação SQS, commit local e replay. Readiness reutiliza UoW/clientes, limita sondagens concorrentes, consulta apenas dependências habilitadas e recusa tráfego durante shutdown. Liveness independe de PostgreSQL/SQS.
+
+Contratos, lacuna de correlação tardia, semântica dos contadores por processo, reprodução exclusiva e provas: [M18-INTEGRATION.md](M18-INTEGRATION.md) e [evidências M18](docs/evidence/m18/RESULTS.md).

@@ -1,5 +1,5 @@
-import { Injectable, BeforeApplicationShutdown, Logger, Optional } from '@nestjs/common';
-import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import { Injectable, BeforeApplicationShutdown, Optional } from '@nestjs/common';
+import { SQSClient, SendMessageCommand, GetQueueAttributesCommand } from '@aws-sdk/client-sqs';
 import type { IntegrationEventEnvelope } from '../../domain/events/events';
 import type { OutboxQueuePublisherPort } from '../../application/ports/ports';
 
@@ -15,7 +15,6 @@ export interface SqsPublisherConfig {
 
 @Injectable()
 export class SqsOutboxQueuePublisher implements OutboxQueuePublisherPort, BeforeApplicationShutdown {
-  private readonly logger = new Logger(SqsOutboxQueuePublisher.name);
   private readonly client: SQSClient;
   private readonly queueUrl: string;
   private readonly requestTimeoutMs: number;
@@ -97,10 +96,16 @@ export class SqsOutboxQueuePublisher implements OutboxQueuePublisherPort, Before
     if (this.ownsClient) {
       try {
         this.client.destroy();
-      } catch (err) {
-        this.logger.warn('Error destroying SQSClient', err);
+      } catch {
+        console.log(JSON.stringify({ component: 'publisher', operation: 'close', result: 'failure', correlationId: null, durationMs: 0 }));
       }
     }
+  }
+
+  public async checkReadiness(): Promise<void> {
+    if (!['true', '1'].includes(process.env.OUTBOX_PUBLISHER_ENABLED ?? '')) return;
+    await this.client.send(new GetQueueAttributesCommand({ QueueUrl: this.queueUrl, AttributeNames: ['QueueArn'] }),
+      { abortSignal: AbortSignal.timeout(Math.min(this.requestTimeoutMs, 500)) });
   }
 
   public getQueueUrl(): string {
