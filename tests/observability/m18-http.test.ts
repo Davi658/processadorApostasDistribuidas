@@ -4,6 +4,7 @@ import { Controller, Get, Module, Post, HttpException, type INestApplication } f
 import { NestFactory } from '@nestjs/core';
 import pg from 'pg';
 import config from '../../src/infrastructure/persistence/mikro-orm/mikro-orm.config';
+import { getMigrationDatabaseConfig } from '../../src/infrastructure/config/database.config';
 import { MikroOrmUnitOfWork } from '../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter';
 import { DatabaseMigrator } from '../../src/infrastructure/persistence/migrator';
 import { HttpObservability } from '../../src/infrastructure/observability/http-observability';
@@ -18,8 +19,9 @@ class ProbeController {
 const lines: string[] = [];
 const http = new HttpObservability(line => lines.push(line));
 const dbName = `m18_observability_${process.pid}`;
-const connection = { host: '127.0.0.1', port: 55438, user: 'postgres' };
-const uow = new MikroOrmUnitOfWork({ ...config, ...connection, password: '', dbName,
+const adminConfig = getMigrationDatabaseConfig();
+const connection = { host: adminConfig.host, port: adminConfig.port, user: adminConfig.user, password: adminConfig.password };
+const uow = new MikroOrmUnitOfWork({ ...config, ...connection, dbName,
   pool: { min: 0, max: 2, acquireTimeoutMillis: 300 },
   driverOptions: { connection: { application_name: 'm18_observability', statement_timeout: 1000 } },
 });

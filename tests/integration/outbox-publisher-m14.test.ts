@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import {
   SQSClient,
+  CreateQueueCommand,
+  DeleteQueueCommand,
   ReceiveMessageCommand,
   DeleteMessageCommand,
 } from '@aws-sdk/client-sqs';
@@ -156,9 +158,6 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     process.env.PENDING_WORKER_ENABLED = 'false';
 
     const sqsEndpoint = process.env.SQS_ENDPOINT || 'http://127.0.0.1:4566';
-    queueUrl =
-      process.env.OUTBOX_EVENTS_QUEUE_URL ||
-      'http://127.0.0.1:4566/queue/us-east-1/000000000000/wager-events.fifo';
 
     sqsClient = new SQSClient({
       endpoint: sqsEndpoint,
@@ -169,7 +168,9 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
       },
     });
 
-    await purgeQueue();
+    const created = await sqsClient.send(new CreateQueueCommand({ QueueName: `m14-${uuidv4()}.fifo`, Attributes: { FifoQueue: 'true' } }));
+    queueUrl = created.QueueUrl!;
+    process.env.OUTBOX_EVENTS_QUEUE_URL = queueUrl;
 
     app = await NestFactory.create(AppModule, { logger: false });
     app.useGlobalFilters(new DomainExceptionFilter());
@@ -197,7 +198,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
   afterAll(async () => {
     try {
       if (app) await app.close();
-      if (sqsClient) sqsClient.destroy();
+      if (sqsClient) { if (queueUrl) await sqsClient.send(new DeleteQueueCommand({ QueueUrl: queueUrl })); sqsClient.destroy(); }
       if (adminPool) await adminPool.end();
       if (isolatedDb) await isolatedDb.closeAndDrop();
     } catch {
@@ -215,7 +216,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
       await uncommittedClient.query(
         `INSERT INTO outbox_messages
          (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-         VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-a', NULL, NOW(), '{"amount":"10.00"}', NOW());`,
+         VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-a', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
         [eventId, walletId]
       );
 
@@ -231,6 +232,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
       // Roll back uncommitted transaction
       await uncommittedClient.query('ROLLBACK');
     } finally {
+      await uncommittedClient.query('ROLLBACK');
       uncommittedClient.release();
     }
 
@@ -249,17 +251,14 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     const correlationId = `corr-b-${uuidv4()}`;
     const causationId = `caus-b-${uuidv4()}`;
     const occurredAt = new Date().toISOString();
-    const payload = {
-      walletId: aggregateId,
-      amount: '50.00',
-      currency: 'BRL',
-      reason: 'TEST_DEPOSIT',
-    };
+    const payload = { walletId: aggregateId, playerId: 'fixture-player', currency: 'BRL',
+      previousBalance: { amount: '0.00', currency: 'BRL' }, currentBalance: { amount: '50.00', currency: 'BRL' },
+      version: 1, triggerTransactionId: 'fixture-tx' };
 
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 2, $3, $4, $5, $6, NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, $3, $4, $5, $6, NOW());`,
       [eventId, aggregateId, correlationId, causationId, occurredAt, JSON.stringify(payload)]
     );
 
@@ -278,8 +277,8 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
 
     const body = JSON.parse(msg.Body);
     expect(body.eventId).toBe(eventId);
-    expect(body.eventType).toBe('WalletBalanceChangedEvent');
-    expect(body.version).toBe(2);
+    expect(body.eventType).toBe('WalletBalanceChanged');
+    expect(body.version).toBe(1);
     expect(body.occurredAt).toBe(occurredAt);
     expect(body.aggregateId).toBe(aggregateId);
     expect(body.correlationId).toBe(correlationId);
@@ -306,8 +305,8 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
       await adminPool.query(
         `INSERT INTO outbox_messages
          (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-         VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-c', NULL, NOW(), $3, NOW());`,
-        [id, uuidv4(), JSON.stringify({ idx: i })]
+         VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-c', NULL, NOW(), $3, NOW());`,
+        [id, `wallet-${i}`, JSON.stringify({ walletId: `wallet-${i}`, playerId: 'player', currency: 'BRL', previousBalance: { amount: '0.00', currency: 'BRL' }, currentBalance: { amount: '1.00', currency: 'BRL' }, version: 1, triggerTransactionId: 'tx' })]
       );
     }
 
@@ -342,7 +341,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-d', NULL, NOW(), '{"foo":"d"}', NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-d', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
       [eventId, uuidv4()]
     );
 
@@ -387,7 +386,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-e', NULL, NOW(), '{"val":"e"}', NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-e', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
       [eventId, uuidv4()]
     );
 
@@ -448,7 +447,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-f', NULL, NOW(), '{"crash":"f"}', NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-f', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
       [eventId, aggregateId]
     );
 
@@ -519,7 +518,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-g', NULL, NOW(), '{"stale":"g"}', NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-g', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
       [eventId, uuidv4()]
     );
 
@@ -570,7 +569,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-h', NULL, NOW(), '{"sqs":"h"}', NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-h', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
       [eventId, uuidv4()]
     );
 
@@ -598,7 +597,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     expect(dbRes.rows[0].last_error).not.toBeNull();
     expect(new Date(dbRes.rows[0].next_attempt_at).getTime()).toBeGreaterThan(Date.now());
 
-    await brokenQueuePublisher.onModuleDestroy();
+    await brokenQueuePublisher.beforeApplicationShutdown();
   });
 
   it('I. Evento inválido não impede publicação dos demais', async () => {
@@ -610,7 +609,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-i1', NULL, NOW(), '{"item":1}', NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-i1', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
       [idValid1, uuidv4()]
     );
 
@@ -619,7 +618,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', '', 'WalletBalanceChangedEvent', 1, 'corr-i2', NULL, NOW(), '{"item":2}', NOW());`,
+       VALUES ($1, 'Wallet', '', 'WalletBalanceChanged', 1, 'corr-i2', NULL, NOW(), '{}', NOW());`,
       [idInvalidUuid]
     );
 
@@ -627,7 +626,7 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     await adminPool.query(
       `INSERT INTO outbox_messages
        (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-i3', NULL, NOW(), '{"item":3}', NOW());`,
+       VALUES ($1, 'Wallet', $2::text, 'WalletBalanceChanged', 1, 'corr-i3', NULL, NOW(), json_build_object('walletId', $2::text, 'playerId', 'player-fixture', 'currency', 'BRL', 'previousBalance', json_build_object('amount','0.00','currency','BRL'), 'currentBalance', json_build_object('amount','1.00','currency','BRL'), 'version',1,'triggerTransactionId','fixture-tx'), NOW());`,
       [idValid2, uuidv4()]
     );
 
@@ -655,58 +654,150 @@ describe('M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL
     expect(blockedDb.rows[0].published_at).toBeNull();
   });
 
-  it('J. Shutdown em aplicação Nest real preserva recuperabilidade e fecha recursos na ordem correta', async () => {
-    // Spin up an independent real Nest application instance for shutdown testing
-    const testApp = await NestFactory.create(AppModule, { logger: false });
-    await testApp.init();
-    const appPublishUseCase = testApp.get(PublishOutboxEventsUseCase);
-    const appWorkerService = testApp.get(OutboxPublisherWorkerService);
-
-    const eventId = uuidv4();
-    await adminPool.query(
-      `INSERT INTO outbox_messages
-       (id, aggregate_type, aggregate_id, event_type, version, correlation_id, causation_id, occurred_at, payload, created_at)
-       VALUES ($1, 'Wallet', $2, 'WalletBalanceChangedEvent', 1, 'corr-j', NULL, NOW(), '{"shutdown":"j"}', NOW());`,
-      [eventId, uuidv4()]
-    );
-
-    let inFlightStarted = false;
-    let inFlightFinished = false;
-
-    // Inject a barrier during SQS publishing to catch shutdown in-flight
-    appPublishUseCase.setTestHook('before_sqs_send', async () => {
-      inFlightStarted = true;
-      await new Promise((r) => setTimeout(r, 200));
-      inFlightFinished = true;
+  for (const phase of ['send', 'cancel', 'ack'] as const) {
+    it(`J. Real Nest shutdown: ${phase}, execution ends before SQS and ORM`, async () => {
+      const barrier = () => {
+        let resolve!: () => void;
+        const promise = new Promise<void>(r => { resolve = r; });
+        return { promise, resolve };
+      };
+      const entered = barrier(), release = barrier(), stopping = barrier(), cancelled = barrier();
+      const order: string[] = [];
+      const testApp = await NestFactory.create(AppModule, { logger: false });
+      await testApp.init();
+      const useCase = testApp.get(PublishOutboxEventsUseCase);
+      const worker = testApp.get(OutboxPublisherWorkerService);
+      const publisher = testApp.get(SqsOutboxQueuePublisher);
+      const orm = testApp.get(MikroOrmUnitOfWork);
+      const client = (publisher as any).client as SQSClient;
+      const originalSend = client.send.bind(client) as any;
+      const destroy = client.destroy.bind(client);
+      client.destroy = () => { order.push('client.destroy'); destroy(); };
+      const close = orm.close.bind(orm);
+      orm.close = async () => { order.push('ORM close'); await close(); };
+      const shutdown = worker.onModuleDestroy.bind(worker);
+      worker.onModuleDestroy = async () => { const p = shutdown(); stopping.resolve(); await p; };
+      if (phase === 'cancel') Object.defineProperty(worker, 'drainTimeoutMs', { value: 0 });
+      if (phase === 'send') client.middlewareStack.add(next => async args => {
+        // The real SDK send is in progress, before broker acceptance.
+        entered.resolve(); await release.promise; return next(args);
+      }, { step: 'initialize', name: 'shutdownSendBarrier' });
+      (client as any).send = async (command: any, options: any) => {
+        const response = await originalSend(command, options);
+        // Real SQS has accepted the send, while the caller is still awaiting its result.
+        if (phase === 'cancel') {
+          options.abortSignal.addEventListener('abort', () => cancelled.resolve(), { once: true });
+          entered.resolve();
+          await release.promise;
+          if (options.abortSignal.aborted) throw new Error('CANCELLED_AFTER_BROKER_ACCEPTED');
+        }
+        return response;
+      };
+      if (phase === 'ack') useCase.setTestHook('before_mark_published', async () => {
+        entered.resolve(); await release.promise;
+      });
+      const eventId = uuidv4(), walletId = uuidv4();
+      await adminPool.query(`INSERT INTO outbox_messages
+        (id,aggregate_type,aggregate_id,event_type,version,correlation_id,occurred_at,payload,created_at)
+        VALUES ($1,'Wallet',$2,'WalletBalanceChanged',1,'shutdown',NOW(),$3,NOW())`,
+        [eventId, walletId, JSON.stringify({ walletId, playerId: 'player', currency: 'BRL',
+          previousBalance: { amount: '0.00', currency: 'BRL' }, currentBalance: { amount: '1.00', currency: 'BRL' },
+          version: 1, triggerTransactionId: 'tx' })]);
+      const execution = worker.executeBatch(1).finally(() => order.push('execution-ended'));
+      await entered.promise;
+      const closing = testApp.close();
+      await stopping.promise;
+      expect(worker.isShuttingDownStatus()).toBe(true);
+      expect((await worker.executeBatch()).claimed).toBe(0);
+      expect(order).toEqual([]);
+      if (phase === 'cancel') { await cancelled.promise; expect(worker.isAbortRequested()).toBe(true); expect(order).toEqual([]); }
+      const pending = await adminPool.query('SELECT published_at FROM outbox_messages WHERE id=$1', [eventId]);
+      expect(pending.rows[0].published_at).toBeNull();
+      release.resolve();
+      await Promise.all([execution, closing]);
+      expect(order).toEqual(['execution-ended', 'client.destroy', 'ORM close']);
+      const final = await adminPool.query('SELECT published_at FROM outbox_messages WHERE id=$1', [eventId]);
+      if (phase === 'cancel') {
+        expect(final.rows[0].published_at).toBeNull();
+        const recovered = await publishUseCase.execute(1);
+        expect(recovered.published).toBe(1);
+      } else expect(final.rows[0].published_at).not.toBeNull();
+      expect((await receiveMessages(1)).map(m => JSON.parse(m.Body).eventId)).toContain(eventId);
     });
+  }
 
-    const execPromise = appWorkerService.executeBatch(1, 30000);
-
-    while (!inFlightStarted) {
-      await new Promise((r) => setTimeout(r, 10));
+  for (const operation of ['markPublished', 'recordFailure', 'markOperationallyBlocked'] as const) {
+    for (const state of ['valid', 'wrong', 'expired', 'reclaimed', 'published', 'blocked'] as const) {
+      it(`L. PostgreSQL authorization ${operation}/${state}: unauthorized updates mutate nothing`, async () => {
+        const id = uuidv4();
+        await adminPool.query(`INSERT INTO outbox_messages
+          (id,aggregate_type,aggregate_id,event_type,version,correlation_id,occurred_at,payload,created_at)
+          VALUES ($1,'Wallet','wallet','WalletBalanceChanged',1,'corr',NOW(),'{}',NOW())`, [id]);
+        const [claim] = await outboxRepo.claimUnpublishedEvents(1, 30000, 'fencing');
+        let token = claim.leaseToken;
+        if (state === 'wrong') token = uuidv4();
+        if (state === 'expired' || state === 'reclaimed') await adminPool.query(
+          "UPDATE outbox_messages SET lease_expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1", [id]);
+        if (state === 'reclaimed') await outboxRepo.claimUnpublishedEvents(1, 30000, 'new-owner');
+        // Retain token deliberately to prove state eligibility independently from fencing.
+        if (state === 'published') await adminPool.query('UPDATE outbox_messages SET published_at=clock_timestamp() WHERE id=$1', [id]);
+        if (state === 'blocked') await adminPool.query('UPDATE outbox_messages SET is_operationally_blocked=true WHERE id=$1', [id]);
+        const before = (await adminPool.query('SELECT * FROM outbox_messages WHERE id=$1', [id])).rows;
+        const result = operation === 'markPublished' ? await outboxRepo.markPublished(id, token) :
+          operation === 'recordFailure' ? await outboxRepo.recordFailure(id, token, 1000, 'failure') :
+          await outboxRepo.markOperationallyBlocked(id, token, 'reason', 'error');
+        expect(result).toBe(state === 'valid');
+        if (state !== 'valid') expect((await adminPool.query('SELECT * FROM outbox_messages WHERE id=$1', [id])).rows).toEqual(before);
+      });
     }
+  }
 
-    // Trigger graceful shutdown
-    const closePromise = testApp.close();
-    await new Promise((r) => setTimeout(r, 50));
-
-    // Verify worker blocks new claims immediately during shutdown
-    expect(appWorkerService.isShuttingDownStatus()).toBe(true);
-    const rejectionResult = await appWorkerService.executeBatch(1, 30000);
-    expect(rejectionResult.published).toBe(0);
-
-    // Wait for shutdown to complete
-    await Promise.all([execPromise, closePromise]);
-
-    expect(inFlightFinished).toBe(true);
-
-    // Message was safely committed as published
-    const finalDb = await adminPool.query(
-      'SELECT published_at FROM outbox_messages WHERE id = $1',
-      [eventId]
-    );
-    expect(finalDb.rows[0].published_at).not.toBeNull();
+  it('M. Send accepted after lease expiry stays unpublished and republishes identical identity', async () => {
+    const wallet = await createWalletUseCase.execute({ playerId: uuidv4(), initialBalance: { amount: '1.00', currency: 'BRL' } });
+    let original: any;
+    publishUseCase.setTestHook('after_sqs_send', async ({ event, envelope }) => {
+      original = envelope;
+      await adminPool.query("UPDATE outbox_messages SET lease_expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1", [event.id]);
+    });
+    expect((await publishUseCase.execute(1)).staleLease).toBe(1);
+    expect((await adminPool.query('SELECT published_at FROM outbox_messages WHERE id=$1', [original.eventId])).rows[0].published_at).toBeNull();
+    publishUseCase.clearTestHooks();
+    let replay: any;
+    publishUseCase.setTestHook('before_sqs_send', ({ envelope }) => { if (envelope.eventId === original.eventId) replay = envelope; });
+    expect((await publishUseCase.execute(20)).published).toBe(2);
+    expect(replay).toEqual(original);
   });
+
+  it('N. releaseLease permits expired matching token only, without authorizing publication', async () => {
+    const wallet = await createWalletUseCase.execute({ playerId: uuidv4(), initialBalance: { amount: '1.00', currency: 'BRL' } });
+    const [claim] = await outboxRepo.claimUnpublishedEvents(1);
+    await adminPool.query("UPDATE outbox_messages SET lease_expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id=$1", [claim.id]);
+    expect(await outboxRepo.markPublished(claim.id, claim.leaseToken)).toBe(false);
+    expect(await outboxRepo.releaseLease(claim.id, 'wrong')).toBe(false);
+    expect(await outboxRepo.releaseLease(claim.id, claim.leaseToken)).toBe(true);
+    expect(await outboxRepo.markPublished(claim.id, claim.leaseToken)).toBe(false);
+    const [next] = await outboxRepo.claimUnpublishedEvents(1);
+    expect(await outboxRepo.releaseLease(next.id, claim.leaseToken)).toBe(false);
+  });
+
+  for (const corruption of ['payload', 'money', 'currency', 'type', 'version', 'metadata'] as const) {
+    it(`O. Persisted invalid ${corruption} blocks only its event and preserves data`, async () => {
+      await createWalletUseCase.execute({ playerId: uuidv4(), initialBalance: { amount: '1.00', currency: 'BRL' } });
+      const { rows: [invalid] } = await adminPool.query("SELECT id FROM outbox_messages WHERE event_type='WalletBalanceChanged'");
+      if (corruption === 'payload') await adminPool.query("UPDATE outbox_messages SET payload='{}' WHERE id=$1", [invalid.id]);
+      if (corruption === 'money') await adminPool.query(`UPDATE outbox_messages SET payload=jsonb_set(payload::jsonb, '{currentBalance,amount}', '1') WHERE id=$1`, [invalid.id]);
+      if (corruption === 'currency') await adminPool.query(`UPDATE outbox_messages SET payload=jsonb_set(payload::jsonb, '{currentBalance,currency}', '"USD"') WHERE id=$1`, [invalid.id]);
+      if (corruption === 'type') await adminPool.query("UPDATE outbox_messages SET event_type='FutureEvent' WHERE id=$1", [invalid.id]);
+      if (corruption === 'version') await adminPool.query('UPDATE outbox_messages SET version=2 WHERE id=$1', [invalid.id]);
+      if (corruption === 'metadata') await adminPool.query("UPDATE outbox_messages SET correlation_id='' WHERE id=$1", [invalid.id]);
+      const before = (await adminPool.query('SELECT payload, occurred_at FROM outbox_messages WHERE id=$1', [invalid.id])).rows[0];
+      const result = await publishUseCase.execute(20);
+      expect(result.blocked).toBe(1); expect(result.published).toBe(1);
+      const after = (await adminPool.query('SELECT payload, occurred_at, published_at, is_operationally_blocked FROM outbox_messages WHERE id=$1', [invalid.id])).rows[0];
+      expect(after.published_at).toBeNull(); expect(after.is_operationally_blocked).toBe(true);
+      expect(after.payload).toEqual(before.payload); expect(after.occurred_at).toEqual(before.occurred_at);
+    });
+  }
 
   it('K. Publicação não altera saldo, versão, transações ou ledger', async () => {
     // 1. Create wallet with 100.00 BRL

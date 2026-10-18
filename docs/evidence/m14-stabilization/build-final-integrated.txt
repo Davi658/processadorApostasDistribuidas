@@ -1,0 +1,126 @@
+ Image m14-stabilization-app:local Building 
+ Image m14-stabilization-test:local Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.72kB 0.0s done
+#1 DONE 0.0s
+
+#2 [app internal] load build definition from Dockerfile
+#2 transferring dockerfile: 772B 0.0s done
+#2 DONE 0.1s
+
+#3 [test-runner internal] load metadata for docker.io/oven/bun:1.4.3
+#3 ...
+
+#4 [auth] oven/bun:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 [test-runner internal] load metadata for docker.io/oven/bun:1.4.3
+#3 DONE 1.9s
+
+#5 [test-runner internal] load .dockerignore
+#5 transferring context: 200B 0.0s done
+#5 DONE 0.4s
+
+#6 [app internal] load build context
+#6 transferring context: 7.14kB 0.2s done
+#6 DONE 0.3s
+
+#7 [test-runner internal] load build context
+#7 ...
+
+#8 [test-runner dependencies 1/4] FROM docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#8 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 0.4s done
+#8 DONE 0.5s
+
+#9 [app base 3/6] COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
+#9 CACHED
+
+#10 [app base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#10 CACHED
+
+#11 [app base 5/6] COPY --chown=bun:bun src ./src
+#11 CACHED
+
+#12 [app dependencies 2/4] WORKDIR /app
+#12 CACHED
+
+#13 [app dependencies 3/4] COPY package.json bun.lock ./
+#13 CACHED
+
+#14 [app dependencies 4/4] RUN bun install --frozen-lockfile
+#14 CACHED
+
+#15 [app base 6/6] COPY --chown=bun:bun infra ./infra
+#15 CACHED
+
+#16 [app] exporting to image
+#16 exporting layers 0.0s done
+#16 exporting manifest sha256:e5a2ea8d5f0b082023d6a4331e04445eba3723513e16c394be1fb6ef68ee1edf 0.0s done
+#16 exporting config sha256:12b04951a2dd0caa7a86d4c8275849f4861f3b39c471ce6d7c005e02c02d2663 0.1s done
+#16 exporting attestation manifest sha256:83493a911c470672e5be266147d83c64b550d523ec536bb512249589314c5534
+#16 ...
+
+#15 [test-runner base 6/6] COPY --chown=bun:bun infra ./infra
+#15 CACHED
+
+#7 [test-runner internal] load build context
+#7 transferring context: 932.52kB 0.9s done
+#7 DONE 1.3s
+
+#17 [test-runner base 6/6] COPY --chown=bun:bun infra ./infra
+#17 CACHED
+
+#12 [test-runner dependencies 2/4] WORKDIR /app
+#12 CACHED
+
+#18 [test-runner dependencies 3/4] COPY package.json bun.lock ./
+#18 CACHED
+
+#19 [test-runner base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#19 CACHED
+
+#20 [test-runner dependencies 4/4] RUN bun install --frozen-lockfile
+#20 CACHED
+
+#21 [test-runner base 3/6] COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
+#21 CACHED
+
+#22 [test-runner base 5/6] COPY --chown=bun:bun src ./src
+#22 CACHED
+
+#23 [test-runner tester 1/2] COPY --chown=bun:bun scripts ./scripts
+#23 CACHED
+
+#24 [test-runner tester 2/2] COPY --chown=bun:bun tests ./tests
+#24 DONE 0.7s
+
+#16 [app] exporting to image
+#16 exporting attestation manifest sha256:83493a911c470672e5be266147d83c64b550d523ec536bb512249589314c5534 0.4s done
+#16 exporting manifest list sha256:789d5ffcc30777e540af8197a4810164e5895cf8bc64b591cd478f17d24d1e01 0.3s done
+#16 naming to docker.io/library/m14-stabilization-app:local 0.0s done
+#16 unpacking to docker.io/library/m14-stabilization-app:local 0.0s done
+#16 DONE 1.6s
+
+#25 [test-runner] exporting to image
+#25 exporting layers 1.6s done
+#25 exporting manifest sha256:43c84ec2ebd64e2fd0536f7f7a1c87b7c10ef03be3b87688ca55b6ccec09e7e4 0.1s done
+#25 exporting config sha256:582d38c4b050af0b390a333f31d24175d0eda1d389deb8f5bf299a61257a45c9
+#25 exporting config sha256:582d38c4b050af0b390a333f31d24175d0eda1d389deb8f5bf299a61257a45c9 0.1s done
+#25 ...
+
+#26 [app] resolving provenance for metadata file
+#26 DONE 0.0s
+
+#25 [test-runner] exporting to image
+#25 exporting attestation manifest sha256:d9b2d08cc3028f4296a5408f9b289bf1dab1f76f6906604d8124b652fee3ad7a 0.1s done
+#25 exporting manifest list sha256:2f5001099504fe4ea9537d98cf84e4e322f0f23948a010aed66a54a9570ae53e
+#25 exporting manifest list sha256:2f5001099504fe4ea9537d98cf84e4e322f0f23948a010aed66a54a9570ae53e 0.1s done
+#25 naming to docker.io/library/m14-stabilization-test:local
+#25 naming to docker.io/library/m14-stabilization-test:local 0.0s done
+#25 unpacking to docker.io/library/m14-stabilization-test:local 0.1s done
+#25 DONE 2.5s
+
+#27 [test-runner] resolving provenance for metadata file
+#27 DONE 0.1s
+ Image m14-stabilization-app:local Built 
+ Image m14-stabilization-test:local Built 

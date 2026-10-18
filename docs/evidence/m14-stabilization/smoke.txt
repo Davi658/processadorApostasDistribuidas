@@ -1,0 +1,9 @@
+[smoke-api] Running smoke tests against http://127.0.0.1:13014...
+[smoke-api] 1. Abertura OK: walletId=1039d24d-174c-4913-9904-8f300268d8eb, balance=100.00
+[smoke-api] 1.1 GET Wallet OK: balance=100.00
+[smoke-api] 2. BET OK: txId=66520e87-a2bd-4013-9916-006a5f084a93, newBalance=75.00
+[smoke-api] 3. Replay OK: idempotentReplay=true, balance=75.00
+[smoke-api] 4.1 Consulta Transação OK: id=66520e87-a2bd-4013-9916-006a5f084a93, kind=BET, status=PROCESSED, amount=25.00 BRL
+[smoke-api] 4.2 Consulta Ledger OK: items=2 (CREDIT=100.00, DEBIT=25.00), hasMore=false, nextCursor=null
+[smoke-api] 5. Reconciliação OK: consistent=true, diff=0.00, checkedEntries=2
+[smoke-api] All smoke operations passed successfully!

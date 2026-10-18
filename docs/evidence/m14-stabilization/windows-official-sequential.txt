@@ -1,0 +1,855 @@
+$ bun run scripts/run-tests.ts
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\concurrency\concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\concurrency.test.ts:
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation [1154.79ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Two concurrent BETs of 80.00 on 100.00 balance: exactly ONE processed, ONE rejected, final balance 20.00 [369.03ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected [440.38ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier [1224.75ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat duplicate submissions with at least THREE independent OS application processes using synchronization barrier [1150.24ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409 [102.95ms]
+
+ 6 pass
+ 0 fail
+ 218 expect() calls
+Ran 6 tests across 1 file. [6.20s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\financial-outbox-m13.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\financial-outbox-m13.test.ts:
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.1 Abertura positiva: persiste exatamente 2 eventos (Processed + BalanceChanged) [91.79ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.2 Abertura zero: não persiste nenhum evento na outbox (0 eventos) [22.51ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.3 BET processado com movimento: persiste exatamente 2 eventos (Processed + BalanceChanged) [88.89ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.4 BET rejeitado por saldo insuficiente: persiste somente 1 evento (Rejected) [72.86ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.5 LOSS: persiste somente 1 evento (Processed) e nenhum evento de saldo [65.41ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.6 WIN com movimento: persiste 2 eventos (Processed + BalanceChanged) [92.56ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.7 WIN aceito como PENDING_REFERENCE: persiste 1 evento de pendência [63.53ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker_m13","count":1,"transactionIds":["7977fbf4-adcc-4a0e-b2bf-1fd6bb111809"]}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker_m13","transactionId":"7977fbf4-adcc-4a0e-b2bf-1fd6bb111809","attempts":1}
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.8 Reagendamento via worker: não duplica evento de pendência (0 novos eventos) [132.18ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker_m13","count":1,"transactionIds":["26860124-8ab0-4d6e-bf5f-0c3f5e013b5c"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker_m13","transactionId":"26860124-8ab0-4d6e-bf5f-0c3f5e013b5c","outcome":"PROCESSED","attempts":1}
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.9 Resolução posterior via worker: persiste exatamente os 2 eventos terminais [139.14ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.10 REFUND processado com movimento: persiste 2 eventos (Processed + BalanceChanged) [103.73ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.11 ROLLBACK de WIN (débito): persiste 2 eventos (Processed + BalanceChanged) [100.68ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.12 Replay e Conflito de idempotência: nenhum evento adicional é emitido [87.32ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.13 WIN rejeitado por referência incompatível: persiste somente 1 evento (Rejected) [100.05ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.14 REFUND aceito como PENDING_REFERENCE: persiste 1 evento de pendência [122.18ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.15 REFUND rejeitado: persiste 1 evento (Rejected) [88.06ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.16 ROLLBACK de BET (crédito): persiste 2 eventos (Processed + BalanceChanged) [109.97ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.17 ROLLBACK aceito como PENDING_REFERENCE: persiste 1 evento de pendência [55.76ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.18 ROLLBACK rejeitado por saldo insuficiente ao estornar WIN: persiste 1 evento (Rejected) [131.28ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.1 Valida campos do envelope, imutabilidade de IDs e estado inicial não publicado [66.18ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.2 Suporta correlationId não-UUID longo (até 255 chars) preservando conteúdo exato [69.71ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.3 listUnpublished e findById no OutboxRepositoryPort [45.57ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.4 Reconstrução de evento sem regenerar identidade ou timestamp [0.25ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.1 Barreira MVCC: eventos e alterações financeiras NÃO ficam visíveis antes do commit [73.21ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.2 Falha após a primeira gravação de outbox: reverte saldo, versão, transação, ledger e outbox; reenvio tem sucesso [90.95ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.3 Falha após a última gravação de outbox: reverte tudo; reenvio gera exatamente o conjunto esperado [97.01ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.4 Concorrência de duplicatas: requisições concorrentes idênticas não multiplicam eventos [128.57ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.5 Falha técnica genérica antes do commit: nenhum evento financeiro ou de outbox é confirmado [65.83ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.6 Timestamps iguais com ordenação de UUID contrária à emissão: identifica eventos por tipo e ID sem presumir ordenação de array ou UUID [53.38ms]
+
+ 28 pass
+ 0 fail
+ 218 expect() calls
+Ran 28 tests across 1 file. [4.20s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\http-endpoints.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\http-endpoints.test.ts:
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > POST /wallets should create a wallet with initial balance and return 201 with aligned contract [119.89ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > POST /wallets should allow opening with explicit zero balance "0.00" [21.97ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > POST /wallets should return 409 Conflict if wallet already exists for player and currency [61.10ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > GET /wallets/:walletId should return 200 with wallet details or 404 if not found [54.16ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when amount is passed as a number instead of string [1.73ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when initialBalance is passed as null, 0, false or empty string [5.12ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when initialBalance contains non-canonical decimal like "00.00" [1.41ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when playerId is not a valid UUID [1.43ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when body contains unexpected properties [1.30ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when Idempotency-Key header is missing [1.82ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when Idempotency-Key is empty or whitespace only [1.31ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when Idempotency-Key exceeds 255 chars (256 chars) [1.44ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when kind is not in allowed kinds [1.69ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when required fields are empty strings [1.33ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Idempotency-Key Lengths & Outbox Propagation (Requirement 1) > should accept 128, 129, and 255 char keys without truncation and persist in outbox with full length [252.06ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Idempotency-Key Lengths & Outbox Propagation (Requirement 1) > should propagate independent x-correlation-id header when provided [104.24ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wagering BET Execution, Idempotency & Reconciliation Contracts > POST /wagering/transactions should process BET (200), reject on insufficient balance (422), and replay correctly [170.14ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Extended Wager Operations (WIN, LOSS, REFUND, ROLLBACK) > POST /wagering/transactions should handle WIN, LOSS, REFUND, and ROLLBACK correctly via HTTP [355.89ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Extended Wager Operations (WIN, LOSS, REFUND, ROLLBACK) > POST /wagering/transactions should return 202 Accepted when reference is missing (PENDING_REFERENCE) [65.35ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Transient Error Handling (Requirement 5) > DomainExceptionFilter should map connection errors and PostgreSQL transient codes to 503 [0.45ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Idempotency Key Payload Conflict & Replay Tests > 3. Via HTTP, mesma Idempotency-Key com valor diferente deve retornar 409 sem novo debito, ledger ou evento na outbox, e 4. Payload identico deve realizar replay com resultado original [154.93ms]
+
+ 21 pass
+ 0 fail
+ 126 expect() calls
+Ran 21 tests across 1 file. [3.66s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\ledger-constraints-m12.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\ledger-constraints-m12.test.ts:
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > binds transaction, wallet and currency with the composite FK, independently of duplicates [138.58ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects zero with the precise database diagnostic and no partial effects [34.40ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative with the precise database diagnostic and no partial effects [36.77ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects credit arithmetic with the precise database diagnostic and no partial effects [31.95ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects debit arithmetic with the precise database diagnostic and no partial effects [38.54ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects unknown type with the precise database diagnostic and no partial effects [31.74ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative before with the precise database diagnostic and no partial effects [32.67ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative after with the precise database diagnostic and no partial effects [30.98ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects amount overflow with the precise database diagnostic and no partial effects [31.36ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects before overflow with the precise database diagnostic and no partial effects [31.13ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects after overflow with the precise database diagnostic and no partial effects [31.64ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects NaN amount with the precise database diagnostic and no partial effects [31.28ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects NaN before with the precise database diagnostic and no partial effects [37.21ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > keeps wallet balances finite, nonnegative and within NUMERIC capacity [63.57ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > preserves complete existing rows in incremental UP/DOWN/UP; invalid legacy data aborts UP without deletion [2724.04ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > accepts exact cent arithmetic at NUMERIC maximum and rejects a second entry for the operation [56.93ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > proves enabled UPDATE/DELETE trigger as admin and permission denial including TRUNCATE as app [114.05ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles zero entries and detects direct SQL balance drift exactly beyond safe number precision [175.26ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reports aggregate drift outside single-column Money limits as exact signed decimal strings [155.01ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles valid high turnover independently of timestamp/UUID order without intermediate Money overflow [69.04ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles opening, BET, WIN, REFUND, ROLLBACK; LOSS, rejection and replay add no entries [671.08ms]
+
+ 21 pass
+ 0 fail
+ 147 expect() calls
+Ran 21 tests across 1 file. [6.55s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\m17-read-endpoints.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\m17-read-endpoints.test.ts:
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 1. GET /wagering/transactions/:transactionId > should return 200 with transaction details and money as { amount, currency } [69.88ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 1. GET /wagering/transactions/:transactionId > should return 404 Not Found when transaction does not exist [6.18ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 1. GET /wagering/transactions/:transactionId > should return 400 Bad Request when transactionId is not a valid UUID [3.48ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 2. GET /providers/:providerId/wagering/transactions/:externalTransactionId > should return 200 with transaction details when querying by provider and external ID [21.03ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 2. GET /providers/:providerId/wagering/transactions/:externalTransactionId > should return 404 Not Found when provider or external ID is unknown [4.46ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 2. GET /providers/:providerId/wagering/transactions/:externalTransactionId > should return 400 Bad Request when externalTransactionId is empty or whitespace [1.22ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 200 with empty items, nextCursor null, and hasMore false for empty wallet [18.88ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 404 Not Found when wallet does not exist [4.10ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 400 Bad Request when walletId is invalid [1.09ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 400 Bad Request for invalid limit values [21.84ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > paginação sem repetição: should paginate deterministically across multiple pages without duplicates or omissions [269.53ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > timestamps iguais: should deterministically break ties with id ASC when multiple entries have identical created_at [170.40ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > cursor inválido: should reject malformed, non-base64, corrupted or invalid payload cursors with 400 Bad Request [13.39ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > cursor vinculado à carteira: should return 400 Bad Request when attempting to use a cursor generated for another wallet [13.54ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > última página: querying past the end should return empty items and nextCursor null [30.88ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 4. Ausência de Mutações & Sem Efeitos Financeiros > should strictly perform read-only queries with zero mutations on balances, ledger, transactions, or outbox [65.79ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > shares one UoW and existing repositories between command and query providers [1.40ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > isolates identical external IDs by provider and returns the identical transaction contract by ID [39.53ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > preserves every microsecond across pages, identical timestamps, UUID ties and exact large ledger amounts [114.16ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > rejects impossible dates and noncanonical cursor formats before any repository SQL [11.26ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > accepts default and maximum limits and rejects repeated query parameters [23.19ms]
+
+ 21 pass
+ 0 fail
+ 290 expect() calls
+Ran 21 tests across 1 file. [2.90s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\migrations.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\migrations.test.ts:
+(pass) Reversible Migrations on Disposable Database > should successfully run UP and DOWN migrations incrementally on a newly created disposable database [1081.51ms]
+
+ 1 pass
+ 0 fail
+ 24 expect() calls
+Ran 1 test across 1 file. [1153.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\mikro-orm-uow-m05.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\mikro-orm-uow-m05.test.ts:
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > A. Identidade Transacional > deve compartilhar o mesmo EntityManager e a mesma conexão/transação PostgreSQL entre todos os repositórios [119.83ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > B. Isolamento e MVCC com Sincronização Explícita > deve manter duas execuções concorrentes em conexões/transações distintas e não vazar visibilidade não commitada [45.73ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após wallet_save [15.30ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após tx_save [24.43ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após ledger_save [32.16ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após outbox_save [18.53ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.1: chamada interna não confirma independentemente antes da externa [22.46ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.2: falha externa desfaz integralmente o trabalho feito pela chamada interna [27.88ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.3: falha interna capturada pela camada externa não permite commit parcial (Rollback-Only) [18.28ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.4: chamada aninhada subsequente em contexto rollback-only é rejeitada com TransactionRollbackOnlyError preservando cause [7.01ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > E. Limpeza e Ausência de Vazamento de Contexto > deve limpar contexto após erro e permitir nova execução bem-sucedida sem resquícios [31.61ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em WalletRepository fora da transação sem persistir no PostgreSQL [2.34ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em WagerTransactionRepository fora da transação [2.41ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em WalletLedgerRepository fora da transação [2.18ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em OutboxRepository fora da transação [2.19ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar lock pessimista fora da transação [0.35ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve permitir consultas simples fora da transação sem erros [75.13ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > G. Ciclo da Aplicação NestJS Real e Liberação de Recursos > deve inicializar via app.init(), executar transação e encerrar via app.close() liberando conexões [2160.30ms]
+
+ 18 pass
+ 0 fail
+ 87 expect() calls
+Ran 18 tests across 1 file. [4.38s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\money-postgres-roundtrip.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\money-postgres-roundtrip.test.ts:
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for zero boundary: "0.00" [74.67ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for one cent boundary: "0.01" [58.50ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for regular decimal: "100.50" [47.56ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for near standard safe integer cents: "90071992547409.91" [40.72ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for above Number.MAX_SAFE_INTEGER cents: "9007199254740991.00" [39.96ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for one cent below NUMERIC(18,2) max limit: "9999999999999999.98" [37.68ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for exact maximum NUMERIC(18,2) limit (16 integer + 2 dec): "9999999999999999.99" [39.19ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.2 Operation Refused by Limit Invariants: No Partial Mutations > should refuse WIN credit that causes overflow and leave zero partial mutations (balance, version, tx, ledger, outbox) [70.00ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.2 Operation Refused by Limit Invariants: No Partial Mutations > should reject wager input with amount exceeding NUMERIC(18,2) limit at domain entry without touching DB [36.19ms]
+
+ 9 pass
+ 0 fail
+ 108 expect() calls
+Ran 9 tests across 1 file. [2.42s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\outbox-publisher-m14.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\outbox-publisher-m14.test.ts:
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > A. Evento de transação não confirmada não é publicado [2055.65ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > B. Publicação preserva integralmente o envelope e os identificadores FIFO [1058.63ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > C. Dois publishers concorrentes não possuem simultaneamente o mesmo claim válido [1173.60ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > D. Falha antes do envio permite recuperação [1088.75ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > E. Crash real após claim: outro processo retoma após expiração [1971.59ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > F. Crash real após confirmação SQS e antes de marcar published_at: recuperação republica sem perda, preservando eventId [2229.68ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > G. Token obsoleto não confirma publicação nem modifica a posse atual [1068.41ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > H. Falha/indisponibilidade do SQS mantém evento não publicado e reagenda [1293.36ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > I. Evento inválido não impede publicação dos demais [1157.28ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: send, execution ends before SQS and ORM [1273.78ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: cancel, execution ends before SQS and ORM [1224.43ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: ack, execution ends before SQS and ORM [1110.17ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/valid: unauthorized updates mutate nothing [1034.31ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/wrong: unauthorized updates mutate nothing [1053.97ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/expired: unauthorized updates mutate nothing [1190.05ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/reclaimed: unauthorized updates mutate nothing [1060.97ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/published: unauthorized updates mutate nothing [1046.92ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/blocked: unauthorized updates mutate nothing [1040.19ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/valid: unauthorized updates mutate nothing [1035.48ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/wrong: unauthorized updates mutate nothing [1042.85ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/expired: unauthorized updates mutate nothing [1038.60ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/reclaimed: unauthorized updates mutate nothing [1058.49ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/published: unauthorized updates mutate nothing [1041.49ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/blocked: unauthorized updates mutate nothing [1052.95ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/valid: unauthorized updates mutate nothing [1041.22ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/wrong: unauthorized updates mutate nothing [1063.77ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/expired: unauthorized updates mutate nothing [1060.35ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/reclaimed: unauthorized updates mutate nothing [1052.15ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/published: unauthorized updates mutate nothing [1052.51ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/blocked: unauthorized updates mutate nothing [1102.50ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > M. Send accepted after lease expiry stays unpublished and republishes identical identity [1204.31ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > N. releaseLease permits expired matching token only, without authorizing publication [1107.53ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid payload blocks only its event and preserves data [1087.81ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid money blocks only its event and preserves data [1133.97ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid currency blocks only its event and preserves data [1120.31ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid type blocks only its event and preserves data [1181.35ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid version blocks only its event and preserves data [1120.99ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid metadata blocks only its event and preserves data [1094.51ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > K. Publicação não altera saldo, versão, transações ou ledger [1207.00ms]
+
+ 39 pass
+ 0 fail
+ 214 expect() calls
+Ran 39 tests across 1 file. [48.18s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\pending-reference-worker-m10.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\pending-reference-worker-m10.test.ts:
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"auto-worker","count":1,"transactionIds":["58a9e34c-4e55-409d-966c-98a8e95da219"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"auto-worker","transactionId":"58a9e34c-4e55-409d-966c-98a8e95da219","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > A. NestJS inicia o worker e resolve pendência automaticamente, sem chamar execute manualmente [458.85ms]
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > B. Três processos reais disputam pendências: nenhum crédito/débito, ledger ou evento duplicado [2380.43ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["af590ae8-fcdd-471d-9cdb-a26c0a6be0c1","200b9be4-1f62-451c-934d-f95a9bbcd416"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"af590ae8-fcdd-471d-9cdb-a26c0a6be0c1","outcome":"PROCESSED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"200b9be4-1f62-451c-934d-f95a9bbcd416","outcome":"REJECTED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > C. Duas pendências do mesmo tipo revertendo a mesma referência: uma processada e outra rejeitada auditavelmente [190.42ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":3,"transactionIds":["a2f53974-6f39-4eb3-82aa-5eee97c5045f","40065774-2b67-492b-9ab8-e053b66cc4ff","450b47a6-d617-4126-b467-a993ad71ac20"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"a2f53974-6f39-4eb3-82aa-5eee97c5045f","outcome":"PROCESSED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"40065774-2b67-492b-9ab8-e053b66cc4ff","outcome":"PROCESSED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"450b47a6-d617-4126-b467-a993ad71ac20","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > D. WIN, REFUND e ROLLBACK são resolvidos com suas regras próprias [277.01ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-2","count":1,"transactionIds":["aa648d3f-1f4b-4ef8-bdf5-bafee8b9c769"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker-2","transactionId":"aa648d3f-1f4b-4ef8-bdf5-bafee8b9c769","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > E. Processo morre após claim e antes do processamento: outro retoma após expiração (Processo Real) [1178.28ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-2","count":1,"transactionIds":["0b595a48-46a9-41bc-b828-d8482c8d24c3"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker-2","transactionId":"0b595a48-46a9-41bc-b828-d8482c8d24c3","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > F. Reserva expira e outro worker assume: token antigo não pode finalizar indevidamente [213.30ms]
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > G. Processo morre após commit financeiro e antes de finalizar o ciclo: reinício não reaplica efeitos (Processo Real) [1001.50ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["829abcf8-36ea-4e24-b48f-084b6015192e"]}
+{"level":"warn","event":"PENDING_REFERENCE_TRANSIENT_FAILURE","workerId":"worker","transactionId":"829abcf8-36ea-4e24-b48f-084b6015192e","error":"Simulated transient database connection timeout"}
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["829abcf8-36ea-4e24-b48f-084b6015192e"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"829abcf8-36ea-4e24-b48f-084b6015192e","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > H. Falha transitória permite recuperação sem rejeição financeira [150.67ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["282626c3-8f9b-40bd-80af-ecfd0e52b52d","0ff127f0-3ce3-445f-99d2-5b2378c81e57"]}
+{"level":"error","event":"PENDING_REFERENCE_OPERATIONALLY_BLOCKED","workerId":"worker","transactionId":"282626c3-8f9b-40bd-80af-ecfd0e52b52d","reason":"Replay snapshot is unavailable. Repeating the operation will not recover historical state; operational analysis is required."}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"0ff127f0-3ce3-445f-99d2-5b2378c81e57","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > I. Snapshot inválido no início do lote não bloqueia itens válidos [160.23ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-097641a1","count":1,"transactionIds":["1984fc6b-3cf7-4b9d-a29b-9cd358c13f99"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker-097641a1","transactionId":"1984fc6b-3cf7-4b9d-a29b-9cd358c13f99","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > J. Shutdown coordena ordem comprovada: impede novos claims, conclui drenagem antes do encerramento do ORM (Aplicação Nest Real e Barreira) [314.73ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["c1308353-9a9f-4d5f-b423-e2e7ebaaf0f5"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"c1308353-9a9f-4d5f-b423-e2e7ebaaf0f5","outcome":"REJECTED","attempts":5}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > K. Esgotamento de referência gera uma rejeição e um evento [94.60ms]
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > L. Operações atômicas de lease: releaseLease, renewLease e markOperationallyBlocked informam sucesso inequívoco e protegem concorrência [90.99ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-clock-test","count":1,"transactionIds":["6977f19c-5429-468b-999a-7409549704c3"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker-clock-test","transactionId":"6977f19c-5429-468b-999a-7409549704c3","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > M. Validação de elegibilidade e expiração usando exclusivamente relógio do PostgreSQL, imune a Date.now() divergente [179.33ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["d1ec2770-bcaa-4394-8c62-693f09484c11"]}
+{"level":"error","event":"PENDING_REFERENCE_UNEXPECTED_ERROR","workerId":"worker","transactionId":"d1ec2770-bcaa-4394-8c62-693f09484c11","errorName":"Error","errorMessage":"Simulated failure immediately prior to transaction commit","stack":"Error: Simulated failure immediately prior to transaction commit\n    at <anonymous> (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\tests\\integration\\pending-reference-worker-m10.test.ts:1313:17)\n    at triggerTestHook (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\infrastructure\\persistence\\mikro-orm\\mikro-orm-adapter.ts:155:13)\n    at <anonymous> (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\infrastructure\\persistence\\mikro-orm\\mikro-orm-adapter.ts:226:20)\n    at async runInTransaction (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\infrastructure\\persistence\\mikro-orm\\mikro-orm-adapter.ts:220:51)\n    at async execute (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\application\\use-cases\\reprocess-pending-references.use-case.ts:135:43)\n    at async <anonymous> (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\tests\\integration\\pending-reference-worker-m10.test.ts:1317:45)\n    at processTicksAndRejections (native:7:39)"}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > N. Falha injetada antes do commit confirma que o lote não contabiliza como concluída uma operação revertida [108.28ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["92ff7029-a110-4c2f-88ea-f3d42b3e16b1","e562cf7d-5600-4cb4-ad6e-b50a42e4e439"]}
+{"level":"error","event":"PENDING_REFERENCE_UNEXPECTED_ERROR","workerId":"worker","transactionId":"92ff7029-a110-4c2f-88ea-f3d42b3e16b1","errorName":"TypeError","errorMessage":"Unexpected runtime memory type violation in domain handler","stack":"TypeError: Unexpected runtime memory type violation in domain handler\n    at <anonymous> (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\tests\\integration\\pending-reference-worker-m10.test.ts:1396:19)\n    at triggerTestHook (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\infrastructure\\persistence\\mikro-orm\\mikro-orm-adapter.ts:155:13)\n    at save (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\infrastructure\\persistence\\mikro-orm\\mikro-orm-adapter.ts:337:20)\n    at async processWin (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\application\\services\\win-processor.service.ts:244:27)\n    at async <anonymous> (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\application\\use-cases\\reprocess-pending-references.use-case.ts:248:52)\n    at async <anonymous> (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\infrastructure\\persistence\\mikro-orm\\mikro-orm-adapter.ts:224:29)\n    at async runInTransaction (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\infrastructure\\persistence\\mikro-orm\\mikro-orm-adapter.ts:220:51)\n    at async execute (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\src\\application\\use-cases\\reprocess-pending-references.use-case.ts:135:43)\n    at async <anonymous> (D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization\\tests\\integration\\pending-reference-worker-m10.test.ts:1401:45)\n    at processTicksAndRejections (native:7:39)"}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"e562cf7d-5600-4cb4-ad6e-b50a42e4e439","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > O. Classificação de erros: defeito permanente/inesperado (TypeError) não gera rejeição financeira falsa e não bloqueia o restante do lote [135.24ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-0daae2a1","count":1,"transactionIds":["b820469f-419c-4655-9bda-5d0299e3a24d"]}
+{"level":"warn","event":"PENDING_REFERENCE_SHUTDOWN_ABORTED","workerId":"worker-0daae2a1","transactionId":"b820469f-419c-4655-9bda-5d0299e3a24d","reason":"Transaction is rollback-only"}
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"recovery-worker","count":1,"transactionIds":["b820469f-419c-4655-9bda-5d0299e3a24d"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"recovery-worker","transactionId":"b820469f-419c-4655-9bda-5d0299e3a24d","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > after_wallet_save: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [476.44ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-06af7251","count":1,"transactionIds":["456864dd-bd59-4433-bf51-dbe03cc1da1b"]}
+{"level":"warn","event":"PENDING_REFERENCE_SHUTDOWN_ABORTED","workerId":"worker-06af7251","transactionId":"456864dd-bd59-4433-bf51-dbe03cc1da1b","reason":"Transaction is rollback-only"}
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"recovery-worker","count":1,"transactionIds":["456864dd-bd59-4433-bf51-dbe03cc1da1b"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"recovery-worker","transactionId":"456864dd-bd59-4433-bf51-dbe03cc1da1b","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > before_commit: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [474.47ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-df52fc84","count":1,"transactionIds":["fa2104f3-ec61-4dc0-8644-9a42d31a23cd"]}
+{"level":"warn","event":"PENDING_REFERENCE_SHUTDOWN_ABORTED","workerId":"worker-df52fc84","transactionId":"fa2104f3-ec61-4dc0-8644-9a42d31a23cd","reason":"Transaction is rollback-only"}
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"recovery-worker","count":1,"transactionIds":["fa2104f3-ec61-4dc0-8644-9a42d31a23cd"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"recovery-worker","transactionId":"fa2104f3-ec61-4dc0-8644-9a42d31a23cd","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > during_flush: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [473.26ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-1ee13061","count":1,"transactionIds":["5dfee6fa-9f86-449e-88eb-f01a1a4634d5"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker-1ee13061","transactionId":"5dfee6fa-9f86-449e-88eb-f01a1a4634d5","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > after_commit: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [427.27ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-db3b01d9","count":1,"transactionIds":["9b7d1eca-a8b3-4bfc-8dd9-8bda4016d8ae"]}
+{"level":"warn","event":"PENDING_REFERENCE_SHUTDOWN_ABORTED","workerId":"worker-db3b01d9","transactionId":"9b7d1eca-a8b3-4bfc-8dd9-8bda4016d8ae","reason":"select \"w0\".* from \"wallets\" as \"w0\" where \"w0\".\"id\" = '9d170b46-44cd-4924-8d50-350bb3de5781' limit 1 for update - canceling statement due to lock timeout"}
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"recovery-worker","count":1,"transactionIds":["9b7d1eca-a8b3-4bfc-8dd9-8bda4016d8ae"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"recovery-worker","transactionId":"9b7d1eca-a8b3-4bfc-8dd9-8bda4016d8ae","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > lock_wait: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [1285.70ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker-7e79cf84","count":1,"transactionIds":["1ff7714f-fd83-499a-ae87-3adbd2da2354"]}
+{"level":"warn","event":"PENDING_REFERENCE_SHUTDOWN_ABORTED","workerId":"worker-7e79cf84","transactionId":"1ff7714f-fd83-499a-ae87-3adbd2da2354","reason":"SELECT pg_sleep(30) - canceling statement due to statement timeout"}
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"recovery-worker","count":1,"transactionIds":["1ff7714f-fd83-499a-ae87-3adbd2da2354"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"recovery-worker","transactionId":"1ff7714f-fd83-499a-ae87-3adbd2da2354","outcome":"PROCESSED","attempts":1}
+(pass) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > query_wait: shutdown preserva resultado transacional e fecha ORM após execução (Aplicação Nest Real e Handshake) [1435.51ms]
+
+ 21 pass
+ 0 fail
+ 348 expect() calls
+Ran 21 tests across 1 file. [13.30s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\postgres-invariants.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\postgres-invariants.test.ts:
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should create wallet with zero balance without ledger or opening transaction [132.91ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should create wallet with positive balance, generating OPENING tx, CREDIT ledger, outbox events, with version 1 [100.78ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should return DuplicateWalletError when creating duplicate wallet for same player and currency [86.49ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should process BET, deduct balance, increment version, and record DEBIT ledger entry and outbox [146.89ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should reject BET on insufficient funds without balance mutation or ledger entry [128.72ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should replay saved result with original observed balance when same idempotency key and payload are submitted [275.70ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should throw IdempotencyConflictError when same idempotency key is submitted with different payload [161.06ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > should throw IdempotencyConflictError when different key is submitted for same provider and externalTransactionId [125.49ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Correlation ID and Idempotency Key Limits (Requirement 1) > should support Idempotency-Key lengths of 128, 129, and 255 characters without outbox persistence errors [140.43ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Composite Foreign Key: Ledger to WagerTransaction (Requirement 3) > should reject ledger insertion referencing a transaction of another wallet [88.75ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Composite Foreign Key: Ledger to WagerTransaction (Requirement 3) > should reject ledger insertion referencing transaction with different currency [69.51ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Composite Foreign Key: Ledger to WagerTransaction (Requirement 3) > should reject ledger insertion referencing non-existent transaction [42.47ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Terminal Transaction Trigger Protection (Requirement 2) > should prevent altering protected fields of PROCESSED or REJECTED transactions as application user [105.54ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Independent Domain & Use Case Invariants (Requirement 4) > should reject BET with non-positive amount in domain without depending on HTTP [37.38ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Independent Domain & Use Case Invariants (Requirement 4) > should reject non-canonical representations like "00.00" in Money.create [0.17ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Independent Domain & Use Case Invariants (Requirement 4) > should reject player-wallet mismatch in use case [32.68ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Independent Domain & Use Case Invariants (Requirement 4) > should reject empty or missing idempotency key [25.74ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Atomic Fault Injections (Requirement 8) > should rollback completely when failure injected after wallet save, leaving no changes, then succeed on retry [71.17ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Atomic Fault Injections (Requirement 8) > should rollback completely when failure injected after tx save, leaving no changes, then succeed on retry [82.37ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Atomic Fault Injections (Requirement 8) > should rollback completely when failure injected after ledger save [47.83ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Atomic Fault Injections (Requirement 8) > should rollback completely when failure injected after outbox save [51.64ms]
+(pass) PostgreSQL Real Integration & Financial Invariants Tests > Security & Privileges > should enforce application user least-privilege security (TRUNCATE forbidden) [19.88ms]
+
+ 22 pass
+ 0 fail
+ 104 expect() calls
+Ran 22 tests across 1 file. [3.89s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\terminal-protection-m11.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\terminal-protection-m11.test.ts:
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > diagnoses the historical missing column and proves UP/DOWN/UP preserves complete rows [199.25ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > uses a restricted application role and keeps the protection trigger enabled [37.33ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > PROCESSED: app rejects every protected field and both NULL directions without changing the row [920.88ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > PROCESSED: admin rejects every protected field and both NULL directions without changing the row [974.19ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > REJECTED: app rejects every protected field and both NULL directions without changing the row [951.02ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > REJECTED: admin rejects every protected field and both NULL directions without changing the row [826.59ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > FAILED: app rejects every protected field and both NULL directions without changing the row [776.54ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > FAILED: admin rejects every protected field and both NULL directions without changing the row [1062.30ms]
+(pass) M11 terminal protection on disposable PostgreSQL with enabled triggers > preserves PENDING/PENDING_REFERENCE transitions to all terminal states and M10 lease operations [183.29ms]
+
+ 9 pass
+ 0 fail
+ 674 expect() calls
+Ran 9 tests across 1 file. [6.88s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\wager-bet-replay.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-bet-replay.test.ts:
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 1. BET Válida: Saldo 100.00, BET 25.00 -> Saldo 75.00, Versão Incrementada, um DEBIT e Eventos Corretos > deve debitar exatamente uma vez, persistir PROCESSED, registrar 1 DEBIT e emitir eventos de outbox [205.65ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 2. Replay Após Mudança de Saldo: Retorno do Saldo Original da Primeira e Preservação do Saldo Atual > deve retornar saldo original da primeira BET no replay e não alterar o saldo atual da carteira [163.08ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 3. Replay de Rejeição: Saldo Insuficiente, Crédito Posterior via WIN e Repetição da BET Rejeitada > deve continuar rejeitada com resultado e saldo originais mesmo após a carteira receber créditos [165.38ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 4. Conflito: Mesma Chave com Valor Diferente Retorna 409 sem Efeito Adicional > deve retornar 409 Conflict quando a mesma chave for reenviada com amount diferente e não alterar banco [101.27ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 5. Concorrência: 50 Duplicatas, Disputa de Saldo, Chave Disputada por Wallets Diferentes, Provider+External Reutilizado e 3 Processos com Handshake > 5.1: 50 duplicatas simultâneas produzem exatamente UMA transação financeira e UM débito [786.40ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 5. Concorrência: 50 Duplicatas, Disputa de Saldo, Chave Disputada por Wallets Diferentes, Provider+External Reutilizado e 3 Processos com Handshake > 5.2: Duas BET de 80.00 sobre saldo 100.00: uma processada, uma rejeitada e saldo final 20.00 [108.87ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 5. Concorrência: 50 Duplicatas, Disputa de Saldo, Chave Disputada por Wallets Diferentes, Provider+External Reutilizado e 3 Processos com Handshake > 5.3: Mesma chave disputada por wallets diferentes: um vencedor, conflito na outra e nenhum efeito parcial [151.56ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 5. Concorrência: 50 Duplicatas, Disputa de Saldo, Chave Disputada por Wallets Diferentes, Provider+External Reutilizado e 3 Processos com Handshake > 5.4: Mesmo identificador externo com chaves distintas não produz efeito duplicado [145.23ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 5. Concorrência: 50 Duplicatas, Disputa de Saldo, Chave Disputada por Wallets Diferentes, Provider+External Reutilizado e 3 Processos com Handshake > 5.5a: Concorrência entre TRÊS processos reais com handshake: Disputa de saldo (80.00 cada em 100.00) [1025.67ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 5. Concorrência: 50 Duplicatas, Disputa de Saldo, Chave Disputada por Wallets Diferentes, Provider+External Reutilizado e 3 Processos com Handshake > 5.5b: Concorrência entre TRÊS processos reais com handshake: Duplicatas da mesma BET [955.19ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 6. Falhas Injetadas: Rollback Integral pelos Identificadores da Tentativa e Reenvio Único > deve fazer rollback integral após wallet_save, conferir ausência por identificador e permitir reenvio único [76.63ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 6. Falhas Injetadas: Rollback Integral pelos Identificadores da Tentativa e Reenvio Único > deve fazer rollback integral após tx_save, conferir ausência por identificador e permitir reenvio único [76.82ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 6. Falhas Injetadas: Rollback Integral pelos Identificadores da Tentativa e Reenvio Único > deve fazer rollback integral após ledger_save, conferir ausência por identificador e permitir reenvio único [105.53ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 6. Falhas Injetadas: Rollback Integral pelos Identificadores da Tentativa e Reenvio Único > deve fazer rollback integral após outbox_save, conferir ausência por identificador e permitir reenvio único [117.61ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 7. Tratamento Rigoroso de Erros de Unicidade 23505 e Rejeição de Contratos Inválidos > não deve converter qualquer erro 23505 em IdempotencyConflictError se a constraint for outra [51.77ms]
+(pass) M04: BET e Replay Terminal — Testes HTTP e PostgreSQL Real em Banco Descartável > 7. Tratamento Rigoroso de Erros de Unicidade 23505 e Rejeição de Contratos Inválidos > rejeição de contrato inválido não deixa alterações parciais [60.53ms]
+
+ 16 pass
+ 0 fail
+ 332 expect() calls
+Ran 16 tests across 1 file. [6.09s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\wager-operations.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-operations.test.ts:
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > WIN: should credit wallet balance, increment version, and record CREDIT in ledger and outbox [236.13ms]
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > LOSS: should record processed transaction WITHOUT mutating balance or creating ledger entry [127.57ms]
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > REFUND: should reverse a processed BET by crediting the wallet with the exact amount [181.95ms]
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > REFUND: should reject duplicate refund for the same reference transaction [245.52ms]
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > ROLLBACK: should reverse BET (credit) and WIN (debit), and reject rollback of WIN when insufficient funds [365.71ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["48088a27-c123-44cb-8749-82b1b5aa414d"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"48088a27-c123-44cb-8749-82b1b5aa414d","outcome":"PROCESSED","attempts":1}
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > Out-of-Order References and Reprocessing Worker (Requirement 11) > should persist PENDING_REFERENCE when reference is missing, and process successfully when reference arrives [304.89ms]
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > Out-of-Order References and Reprocessing Worker (Requirement 11) > should reject reversal when referenced transaction was REJECTED [533.38ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["f679b798-cd08-422c-a593-c53aa5a17274"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"f679b798-cd08-422c-a593-c53aa5a17274","outcome":"REJECTED","attempts":3}
+(pass) Wager Operations & Reference Invariants (Bloco C: WIN, LOSS, REFUND, ROLLBACK, Out-of-Order) > Out-of-Order References and Reprocessing Worker (Requirement 11) > should transition to REJECTED with REFERENCE_NOT_FOUND when max retry attempts are exhausted [171.18ms]
+
+ 8 pass
+ 0 fail
+ 53 expect() calls
+Ran 8 tests across 1 file. [3.75s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\wager-pending-replay-m09.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-pending-replay-m09.test.ts:
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critérios A, B e C: Aceite Pendente, Replay Imediato e Saldo Histórico Preservado > deve processar aceite, replay imediato e replay histórico após mutação para WIN [353.53ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critérios A, B e C: Aceite Pendente, Replay Imediato e Saldo Histórico Preservado > deve processar aceite, replay imediato e replay histórico após mutação para REFUND [153.19ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critérios A, B e C: Aceite Pendente, Replay Imediato e Saldo Histórico Preservado > deve processar aceite, replay imediato e replay histórico após mutação para ROLLBACK [134.60ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["9a14b59b-9cdc-4110-a5c2-3a0ea607a4aa","02eeb01a-f1a0-4906-9b2b-1ac9d045287f"]}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"9a14b59b-9cdc-4110-a5c2-3a0ea607a4aa","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"02eeb01a-f1a0-4906-9b2b-1ac9d045287f","attempts":1}
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério D: Reprocessamento sem Referência e Invariância do Replay > deve aplicar backoff no retry sem que o replay altere attempts, nextAttemptAt ou snapshot (WIN) [140.84ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["5900d907-6bec-4999-aaa8-a7afa7ed59f3"]}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"5900d907-6bec-4999-aaa8-a7afa7ed59f3","attempts":1}
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério D: Reprocessamento sem Referência e Invariância do Replay > deve aplicar backoff no retry sem que o replay altere attempts, nextAttemptAt ou snapshot (REFUND) [124.62ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["f76b5122-e7b4-4bd8-b722-c3207d0547e0","761336f1-7f1e-4e17-973f-a25452dab580"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"f76b5122-e7b4-4bd8-b722-c3207d0547e0","outcome":"PROCESSED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"761336f1-7f1e-4e17-973f-a25452dab580","attempts":1}
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério E: Resolução com Referência Válida e Replay Terminal > deve resolver WIN pendente para PROCESSED e replay deve retornar resultado terminal sem efeitos colaterais [244.51ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["58bac85a-c55f-4161-90d7-ede816a1f38a","2f614cd1-1e7f-4e4d-a3e6-c3fe8d669f43"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"58bac85a-c55f-4161-90d7-ede816a1f38a","outcome":"PROCESSED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"2f614cd1-1e7f-4e4d-a3e6-c3fe8d669f43","attempts":1}
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério E: Resolução com Referência Válida e Replay Terminal > deve resolver REFUND pendente para PROCESSED e replay deve retornar resultado terminal sem efeitos colaterais [165.09ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["4aa256bf-38c2-43fc-a53e-737df7175218"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"4aa256bf-38c2-43fc-a53e-737df7175218","outcome":"PROCESSED","attempts":1}
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério E: Resolução com Referência Válida e Replay Terminal > deve resolver ROLLBACK pendente para PROCESSED e replay deve retornar resultado terminal sem efeitos colaterais [203.82ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["79cc525b-9158-4045-9bef-1209d8b5a6b7"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"79cc525b-9158-4045-9bef-1209d8b5a6b7","outcome":"REJECTED","attempts":5}
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério F: Resolução com Rejeição Terminal e Replay Consistente (422) > deve registrar REJECTED terminal com REFERENCE_NOT_FOUND ao esgotar tentativas e responder 422 no replay [130.07ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério F: Resolução com Rejeição Terminal e Replay Consistente (422) > deve registrar REJECTED terminal com REFERENCE_INCOMPATIBLE quando referência for incompatível (REFUND) [106.13ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério G: Payload Divergente em Estado Pendente e Terminal Dispara 409 > deve disparar HTTP 409 em payload divergente durante estado PENDING_REFERENCE sem corromper a pendência [91.05ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério G: Payload Divergente em Estado Pendente e Terminal Dispara 409 > deve disparar HTTP 409 em payload divergente durante estado terminal PROCESSED [73.27ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério H: Duplicatas Concorrentes Durante a Aceitação > deve persistir exatamente 1 pendência e emitir exatamente 1 evento na disputa concorrente [359.54ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Critério I: Falha antes do Commit e Reenvio Seguro > deve realizar rollback completo em falha antes do commit e permitir aceite único no reenvio [88.32ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 1. Snapshot nulo: deve retornar HTTP 500 genérico com código REPLAY_SNAPSHOT_UNAVAILABLE sem efeitos colaterais [111.12ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 2. Snapshot incompleto: deve rejeitar com REPLAY_SNAPSHOT_UNAVAILABLE (500) se faltar balance, transactionId ou status [123.87ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 3. Incompatibilidade de ID, status, moeda ou failureCode: deve retornar 500 sem normalizar ou alterar banco [180.81ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 4. Valor monetário inválido no snapshot: valores negativos ou não-canônicos disparam 500 sem mutação [94.95ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 5. Ausência de saldo histórico comprovável: recusa reconstrução por timestamp e não usa "0.00" ou saldo atual [106.03ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 6. Falha de infraestrutura propagada sem resposta financeira falsa [0.70ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":10,"transactionIds":["9a14b59b-9cdc-4110-a5c2-3a0ea607a4aa","02eeb01a-f1a0-4906-9b2b-1ac9d045287f","5900d907-6bec-4999-aaa8-a7afa7ed59f3","761336f1-7f1e-4e17-973f-a25452dab580","bd7407eb-39a3-48d3-97d1-60af49a045cd","0f9b2e54-ba96-4594-84ec-03e40c4dc773","2f614cd1-1e7f-4e4d-a3e6-c3fe8d669f43","bf72d258-2f57-4b7b-b8a3-dc34c6ba50cb","e883f24b-a1d7-42a1-b534-35a6786bfdd7","de21947a-67bc-40fa-a536-463e024371da"]}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"9a14b59b-9cdc-4110-a5c2-3a0ea607a4aa","attempts":2}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"02eeb01a-f1a0-4906-9b2b-1ac9d045287f","attempts":2}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"5900d907-6bec-4999-aaa8-a7afa7ed59f3","attempts":2}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"761336f1-7f1e-4e17-973f-a25452dab580","attempts":2}
+{"level":"error","event":"PENDING_REFERENCE_OPERATIONALLY_BLOCKED","workerId":"worker","transactionId":"bd7407eb-39a3-48d3-97d1-60af49a045cd","reason":"Replay snapshot is unavailable. Repeating the operation will not recover historical state; operational analysis is required."}
+{"level":"error","event":"PENDING_REFERENCE_OPERATIONALLY_BLOCKED","workerId":"worker","transactionId":"0f9b2e54-ba96-4594-84ec-03e40c4dc773","reason":"Replay snapshot is unavailable. Repeating the operation will not recover historical state; operational analysis is required."}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"2f614cd1-1e7f-4e4d-a3e6-c3fe8d669f43","attempts":2}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"bf72d258-2f57-4b7b-b8a3-dc34c6ba50cb","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"e883f24b-a1d7-42a1-b534-35a6786bfdd7","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"de21947a-67bc-40fa-a536-463e024371da","attempts":1}
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 7. Reagendamento em WinProcessor e ReversalProcessor: recusa registros legados/sem snapshot sem alterar banco [444.67ms]
+(pass) M09: Replay de PENDING_REFERENCE e Transições Terminais (PostgreSQL Real Descartável) > Remoção de Fallbacks Inseguros e Validação Estrita de Snapshots > 8. Snapshots válidos mantêm replay 202, 200, 422, saldo histórico e zero efeitos colaterais [205.74ms]
+
+ 22 pass
+ 0 fail
+ 469 expect() calls
+Ran 22 tests across 1 file. [5.98s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\wager-reversals-m07.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-reversals-m07.test.ts:
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.1: REFUND de BET: crédito integral, saldo, versão, ledger e outbox [231.89ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.2: ROLLBACK de BET: crédito integral, saldo, versão, ledger e outbox [156.91ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.3: ROLLBACK de WIN: débito integral, saldo, versão, ledger e outbox [134.37ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.4: ROLLBACK de REFUND: débito integral, saldo, versão, ledger e outbox [262.97ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.5.1: Referência não PROCESSED (REJECTED) gera REFERENCE_NOT_PROCESSED sem alterar saldo ou ledger [167.78ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.5.2: Referência FAILED gera REFERENCE_NOT_PROCESSED auditável [104.54ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.5.3 a 1.5.10: Incompatibilidades (tipo, provider, player, wallet, moeda, rodada, valor) geram REFERENCE_INCOMPATIBLE [504.54ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.6: Débito de reversão sem saldo usa REVERSAL_INSUFFICIENT_FUNDS (sem alterar saldo, versão ou ledger) [190.95ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.7: Overflow segue a política Money existente sem efeitos parciais [119.87ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 1. Operações e Referências Existentes > 1.8: Preserva interpretação documentada: 1 REFUND + 1 ROLLBACK na mesma BET, e múltiplas WINs permitidas pela migration 004 [287.73ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 2. Replay Terminal > 2.1: Replay de reversão processada após outras operações mudarem o saldo retorna saldo histórico sem novos movimentos [146.79ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 2. Replay Terminal > 2.2: Replay de reversão rejeitada por saldo insuficiente continua rejeitada mesmo após crédito na wallet [147.44ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 2. Replay Terminal > 2.3: Mesma chave com payload diferente dispara 409 (IdempotencyConflictError) [91.49ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 2. Replay Terminal > 2.4: Mesmo provider/externalTransactionId sob outra chave dispara 409 (IdempotencyConflictError) [95.23ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 2. Replay Terminal > 2.5: Nova operação tentando reverter novamente a mesma referência e tipo gera REVERSAL_ALREADY_PROCESSED [118.82ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 3. Concorrência Real em Banco Descartável > 3.1: 50 duplicatas da mesma reversão em paralelo -> exatamente 1 efeito e 49 replays idênticos [767.98ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 3. Concorrência Real em Banco Descartável > 3.2: Reversões distintas do mesmo tipo sobre a mesma referência disputando em paralelo -> 1 processada, demais rejeitadas sem movimento [164.48ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 3. Concorrência Real em Banco Descartável > 3.3: Dois ROLLBACKs de referências distintas disputando saldo -> nunca negativo, resultados e ledger consistentes [197.13ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 3. Concorrência Real em Banco Descartável > 3.4: Disputa concorrente entre pelo menos TRÊS processos OS independentes com handshake READY pelo fluxo imediato [1016.60ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 3. Concorrência Real em Banco Descartável > 3.5: Confirmação de proteção de unicidade e não-malclassificação de outras constraints 23505 [31.74ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 4. Atomicidade e Injeção de Falhas > 4.1: Falha após wallet_save desfaz tudo, limpa hooks e permite reenvio com efeito único [183.10ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 4. Atomicidade e Injeção de Falhas > 4.2: Falha após tx_save desfaz tudo, limpa hooks e permite reenvio com efeito único [135.12ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 4. Atomicidade e Injeção de Falhas > 4.3: Falha após ledger_save desfaz tudo, limpa hooks e permite reenvio com efeito único [150.90ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 4. Atomicidade e Injeção de Falhas > 4.4: Falha após outbox_save desfaz tudo, limpa hooks e permite reenvio com efeito único [142.46ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 5. Testes HTTP Reais (POST /wagering/transactions) > 5.1: HTTP 200 OK em REFUND e ROLLBACK processados com sucesso [103.28ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 5. Testes HTTP Reais (POST /wagering/transactions) > 5.2: HTTP 422 Unprocessable Entity auditável quando reversão é REJECTED (ex: REVERSAL_INSUFFICIENT_FUNDS) [99.90ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 5. Testes HTTP Reais (POST /wagering/transactions) > 5.3: HTTP 409 Conflict em Idempotency-Key com payload diferente [94.88ms]
+(pass) M07: REFUND e ROLLBACK Imediatos — Provas Formais e Invariantes > 5. Testes HTTP Reais (POST /wagering/transactions) > 5.4: HTTP Replay idempotente com 200 OK e idempotentReplay: true [97.76ms]
+
+ 28 pass
+ 0 fail
+ 364 expect() calls
+Ran 28 tests across 1 file. [7.84s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\wager-reversals-m08.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-reversals-m08.test.ts:
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 1: REFUND chega antes de BET válida → um crédito correto > Caminho A (Referência já existente): BET processada primeiro, REFUND depois [211.02ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["898eebfe-5a30-444e-b073-e2bca8882f7a"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"898eebfe-5a30-444e-b073-e2bca8882f7a","outcome":"PROCESSED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 1: REFUND chega antes de BET válida → um crédito correto > Caminho B (Referência recebida posteriormente): REFUND chega primeiro, BET depois, reprocessamento manual [221.33ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 2: ROLLBACK chega antes de WIN válida → um débito correto > Caminho A (Referência já existente): WIN processada primeiro, ROLLBACK depois [133.83ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["217e1889-a04f-4893-a144-e9df4277a4f0"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"217e1889-a04f-4893-a144-e9df4277a4f0","outcome":"PROCESSED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 2: ROLLBACK chega antes de WIN válida → um débito correto > Caminho B (Referência recebida posteriormente): ROLLBACK chega primeiro, WIN depois, reprocessamento manual [178.63ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 3: Valor divergente → rejeição sem movimento > Caminho A (Referência já existente): BET de 25.00, REFUND submetido com 30.00 [119.87ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["c4a38325-f9b9-4e3e-a386-71ff66c67395"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"c4a38325-f9b9-4e3e-a386-71ff66c67395","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 3: Valor divergente → rejeição sem movimento > Caminho B (Referência recebida posteriormente): REFUND de 30.00 chega primeiro, BET de 25.00 chega depois [167.22ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 4: REFUND referenciando WIN → rejeição sem movimento > Caminho A (Referência já existente): WIN processada, REFUND referenciando WIN [146.36ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["b9a7789b-812f-4ca0-a771-cf207016fe1e"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"b9a7789b-812f-4ca0-a771-cf207016fe1e","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 4: REFUND referenciando WIN → rejeição sem movimento > Caminho B (Referência recebida posteriormente): REFUND chega primeiro referenciando WIN futura [208.63ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["d083a752-0fc3-4126-8886-ce3e5aaa9ae3"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"d083a752-0fc3-4126-8886-ce3e5aaa9ae3","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 5: Referência de outra carteira/player/rodada → rejeição > 5a (Rodada divergente): Caminho imediato e reprocessado [244.10ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 5: Referência de outra carteira/player/rodada → rejeição > 5b (Outra carteira / player): Caminho imediato e fora de ordem > 5b - Caminho Imediato: Reversão na Wallet 2 de BET pertencente à Wallet 1 é rejeitada imediatamente [182.26ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["5151b794-5263-4d9c-8216-13c86951d0b4"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"5151b794-5263-4d9c-8216-13c86951d0b4","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 5: Referência de outra carteira/player/rodada → rejeição > 5b (Outra carteira / player): Caminho imediato e fora de ordem > 5b - Caminho Fora de Ordem: Reversão chega na Wallet 2 antes da BET na Wallet 1, reprocessamento rejeita com REFERENCE_INCOMPATIBLE [197.43ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 6: Conflito de moeda → rejeição, usando fixture adequada > Caminho A (Imediato): Referência em USD existente não pode ser revertida por reversão em BRL [131.98ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["c006056f-815b-45ea-b534-4b03d8ed3489"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"c006056f-815b-45ea-b534-4b03d8ed3489","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 6: Conflito de moeda → rejeição, usando fixture adequada > Caminho B (Fora de ordem): Reversão em BRL cria pendência antes da inserção da referência USD, reprocessador rejeita sem movimento [237.68ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 7: Referência REJECTED/FAILED → rejeição auditável > Caminho A1 (Imediato - Referência REJECTED): Reversão de BET previamente rejeitada resulta em REFERENCE_NOT_PROCESSED [116.94ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["7473c173-aa41-478a-84cb-67636a1dffb9"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"7473c173-aa41-478a-84cb-67636a1dffb9","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 7: Referência REJECTED/FAILED → rejeição auditável > Caminho B1 (Fora de ordem - Referência REJECTED): REFUND chega primeiro, BET é rejeitada depois, reprocessamento marca auditável [135.76ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 7: Referência REJECTED/FAILED → rejeição auditável > Caminho A2 (Imediato - Referência FAILED): Reversão de BET em status FAILED resulta em REFERENCE_NOT_PROCESSED [87.40ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["9016fb70-ac42-4d16-be7a-a06fc520d416"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"9016fb70-ac42-4d16-be7a-a06fc520d416","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 7: Referência REJECTED/FAILED → rejeição auditável > Caminho B2 (Fora de ordem - Referência FAILED): REFUND chega primeiro, BET falha depois, reprocessamento marca auditável [124.35ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 8: Reversão do mesmo tipo já processada → nenhum efeito adicional > Caminho A (Imediato): Segundo REFUND para mesma BET é rejeitado sem efeito financeiro adicional [139.37ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["0d882aae-7c2d-442a-a8ce-d56ddd909862","1c5b2542-a441-4eda-8723-cd28832f4d7e"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"0d882aae-7c2d-442a-a8ce-d56ddd909862","outcome":"PROCESSED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"1c5b2542-a441-4eda-8723-cd28832f4d7e","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 8: Reversão do mesmo tipo já processada → nenhum efeito adicional > Caminho B (Fora de ordem): Dois REFUNDs chegam antes da BET, apenas o primeiro é processado [212.79ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 8: Reversão do mesmo tipo já processada → nenhum efeito adicional > Não impõe exclusividade global entre REFUND e ROLLBACK: BET pode ter um REFUND e um ROLLBACK se documentado [237.91ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 9: ROLLBACK sem saldo → código específico, sem ledger > Caminho A (Imediato): ROLLBACK de WIN quando saldo insuficiente resulta em REVERSAL_INSUFFICIENT_FUNDS [135.08ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["3f9106ec-72b1-4950-bc57-124c78a50b99"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"3f9106ec-72b1-4950-bc57-124c78a50b99","outcome":"REJECTED","attempts":1}
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Cenário 9: ROLLBACK sem saldo → código específico, sem ledger > Caminho B (Fora de ordem): ROLLBACK chega primeiro, WIN e drenagem chegam depois, reprocessador rejeita com REVERSAL_INSUFFICIENT_FUNDS [185.53ms]
+(pass) M08: Validações Financeiras de Reversões Fora de Ordem e Imediatas > Sensibilidade dos Seletores da Outbox (Discriminação de Ausência vs Presença) > comprova que seletores encontram eventos reais (payload.triggerTransactionId / payload.transactionId) e discriminam ausência [101.34ms]
+
+ 23 pass
+ 0 fail
+ 460 expect() calls
+Ran 23 tests across 1 file. [5.33s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\wager-win-loss-m06.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-win-loss-m06.test.ts:
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 1. WIN Válida: Crédito, Versão, Ledger, Outbox e Reconciliação > deve creditar exatamente o valor informado, incrementar version uma vez, gerar ledger CREDIT e 2 outbox events na mesma transação [188.49ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN com valor zero ("0.00") com 400 Bad Request e sem efeitos parciais [38.56ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN com valor negativo ("-10.00") com 400 Bad Request [33.95ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar formatos não canônicos ("10", "10.5", " 10.00 ") com 400 Bad Request [40.70ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN com moeda incompatível com a carteira (422 Unprocessable Entity) [44.34ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 2. Entradas Inválidas de WIN: Valor Zero/Negativo, Formato, Moeda e Vínculo Player > deve rejeitar WIN para wallet que não pertence ao player informado (400 Bad Request) [78.66ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 3. Crédito no Limite Money e Rejeição de Overflow > deve creditar com sucesso quando a WIN atinge exatamente o limite Money ("9999999999999999.99") [84.98ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 3. Crédito no Limite Money e Rejeição de Overflow > deve rejeitar crédito adicional que cause overflow com erro de domínio e ausência de alterações parciais [66.81ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 4. LOSS Válida: Sem Mutação de Saldo/Versão/UpdatedAt, Sem Ledger e Somente WagerTransactionProcessed > deve persistir PROCESSED, não alterar saldo/version/updatedAt, não gerar ledger e emitir somente WagerTransactionProcessed [75.09ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 4. LOSS Válida: Sem Mutação de Saldo/Versão/UpdatedAt, Sem Ledger e Somente WagerTransactionProcessed > deve aceitar LOSS com valor zero ("0.00") conforme política documentada sem alterar carteira [54.97ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 4. LOSS Válida: Sem Mutação de Saldo/Versão/UpdatedAt, Sem Ledger e Somente WagerTransactionProcessed > LOSS nunca movimenta saldo mesmo quando submetida com valor positivo alto [58.05ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 5. Entradas Inválidas de LOSS > deve rejeitar LOSS com valor negativo ("-5.00") com 400 Bad Request [28.43ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 5. Entradas Inválidas de LOSS > deve rejeitar LOSS com tentativa de fornecer referenceExternalTransactionId com 400 Bad Request [33.05ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Replay de WIN: repetir retorna transactionId e saldo originais com idempotentReplay=true, mesmo após alteração posterior do saldo [112.31ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Replay de LOSS: repetir retorna transactionId e saldo originais com idempotentReplay=true [68.37ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Conflito de Payload (409): Mesma idempotency-key com payload divergente retorna 409 Conflict [72.52ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 6. Replay e Conflitos de Idempotência para WIN e LOSS > Conflito de Identificador Externo: Reutilizar providerId e externalTransactionId sob outra chave retorna 409 Conflict [68.39ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 7. Concorrência Real: 50 WIN Idênticas, 50 LOSS Idênticas e WIN Distintas Simultâneas > 50 WIN idênticas concorrentes: exatamente um crédito, version incrementada em 1 e 1 transação financeira [734.57ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 7. Concorrência Real: 50 WIN Idênticas, 50 LOSS Idênticas e WIN Distintas Simultâneas > 50 LOSS idênticas concorrentes: exatamente uma transação, um evento e zero movimentos de saldo [664.39ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 7. Concorrência Real: 50 WIN Idênticas, 50 LOSS Idênticas e WIN Distintas Simultâneas > WIN distintas concorrentes na mesma wallet: soma exata, sem lost update e com versão correta [385.19ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-wallet_save e permitir reenvio único [81.13ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-tx_save e permitir reenvio único [101.12ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-ledger_save e permitir reenvio único [83.33ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > WIN: deve reverter integralmente quando a falha ocorre pós-outbox_save e permitir reenvio único [82.34ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > LOSS: deve reverter integralmente quando a falha ocorre pós-tx_save e permitir reenvio único [93.08ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 8. Falhas Injetadas e Rollback Integral Auditado por Identificadores > LOSS: deve reverter integralmente quando a falha ocorre pós-outbox_save e permitir reenvio único [75.25ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.1: WIN com referência válida a uma BET processada é executada com sucesso e persiste o vínculo [101.19ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.2: WIN com referência a BET ausente ou ainda não processada gera PENDING_REFERENCE (202 Accepted) e outbox de pendência [70.12ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.3: WIN com referência a BET de outra rodada ou outra carteira é rejeitada com 422 e REFERENCE_INCOMPATIBLE [112.62ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.4: WIN com referência a transação que não é BET (ex: referenciando uma WIN anterior) é rejeitada com 422 e REFERENCE_INCOMPATIBLE [79.41ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 9. Referência Opcional de WIN: Validação de BET, Compatibilidade e Rejeição Auditável > 9.5: WIN com referência a BET que foi REJECTED é rejeitada com 422 e REFERENCE_NOT_PROCESSED [68.17ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["e2c8732b-8c12-408a-b7ec-9ce9c5921e72"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"e2c8732b-8c12-408a-b7ec-9ce9c5921e72","outcome":"PROCESSED","attempts":1}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.1: WIN chega antes da BET → PENDING_REFERENCE (202); BET chega; execução manual resolve com um crédito [156.13ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["3ff172e2-968f-4730-8f13-e025f0baba23","60c8c510-7ff5-496e-99fe-299cea7a1474"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"3ff172e2-968f-4730-8f13-e025f0baba23","outcome":"REJECTED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"60c8c510-7ff5-496e-99fe-299cea7a1474","attempts":1}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.2: Referência incompatível (BET em outra carteira/player) → reprocessador rejeita sem crédito [233.40ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":1,"transactionIds":["cb5187ad-1e58-4aab-a6a5-2b0904aa02f8"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"cb5187ad-1e58-4aab-a6a5-2b0904aa02f8","outcome":"REJECTED","attempts":1}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.3: Referência rejeitada (BET REJECTED por saldo insuficiente) → reprocessador rejeita sem crédito [114.21ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.4: Duas WIN distintas vinculadas à mesma BET sequencialmente → ambas processam, créditos exatos, version, ledger, outbox e replay [165.62ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.5: Duas WIN distintas vinculadas à mesma BET concorrentemente → ambas processam, créditos exatos sem lost update [125.55ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["7f86e6c0-1737-4496-aa40-321b4df3cc68","0b3d2926-16a5-44e4-ad87-32f10a31979e"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"7f86e6c0-1737-4496-aa40-321b4df3cc68","outcome":"PROCESSED","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"0b3d2926-16a5-44e4-ad87-32f10a31979e","outcome":"PROCESSED","attempts":1}
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 10. WIN com Referência Fora de Ordem, Múltiplas WINs na Mesma BET e Resolução > 10.6: Duas WINs pendentes para a mesma BET → ambas chegam antes da BET e ambas resolvem uma única vez [208.46ms]
+(pass) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > 11. Validação da Migration 004 Up/Down/Up e Recusa Segura em Banco Descartável > deve executar up/down/up com sucesso e recusar down com segurança quando existem dados incompatíveis [2343.94ms]
+
+ 38 pass
+ 0 fail
+ 579 expect() calls
+Ran 38 tests across 1 file. [9.10s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\wallet-opening.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wallet-opening.test.ts:
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 1. Abertura Positiva: Saldo, Versão, OPENING, CREDIT e Eventos na Mesma Transação SQL > deve criar wallet, transação interna OPENING, lançamento CREDIT e eventos na outbox na mesma transação [113.00ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 2. Abertura Zero: Ausência dos Movimentos e Eventos Indevidos > deve abrir com saldo zero explícito sem OPENING, ledger ou outbox de balance change [26.51ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 2. Abertura Zero: Ausência dos Movimentos e Eventos Indevidos > deve abrir com initialBalance ausente (undefined) como saldo zero sem movimentos [27.44ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 3. Concorrência HTTP: 20 POST /wallets Simultâneos para o Mesmo PlayerId + Currency > deve retornar exatamente 1 resposta 201 e 19 respostas 409 com code DUPLICATE_WALLET e conferir o banco [266.18ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 4. Rollback Completo com Falhas Injetadas e Reenvio Válido > deve fazer rollback integral após wallet_save, conferir ausência por identificador e permitir reenvio único [60.56ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 4. Rollback Completo com Falhas Injetadas e Reenvio Válido > deve fazer rollback integral após tx_save (OPENING), conferir ausência por identificador e permitir reenvio único [59.98ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 4. Rollback Completo com Falhas Injetadas e Reenvio Válido > deve fazer rollback integral após ledger_save, conferir ausência por identificador e permitir reenvio único [61.14ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 4. Rollback Completo com Falhas Injetadas e Reenvio Válido > deve fazer rollback integral após outbox_save, conferir ausência por identificador e permitir reenvio único [64.67ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 5. Conflitos Específicos e Não-Malclassificação de Outras Constraints > deve converter somente violação de uq_wallets_player_currency em DuplicateWalletError [37.78ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 5. Conflitos Específicos e Não-Malclassificação de Outras Constraints > não deve converter qualquer 23505 em DuplicateWalletError quando a constraint for outra [12.04ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 6. Validação Defensiva do Caso de Uso (CreateWalletUseCase) > 1. UUID em maiúsculas é persistido em minúsculas [33.94ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 6. Validação Defensiva do Caso de Uso (CreateWalletUseCase) > 2. Mesmo UUID com variações de caixa/espaços representa o mesmo jogador e gera DuplicateWalletError na segunda abertura [36.78ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 6. Validação Defensiva do Caso de Uso (CreateWalletUseCase) > 3. UUID inválido é rejeitado antes da persistência [2.47ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 6. Validação Defensiva do Caso de Uso (CreateWalletUseCase) > 4. Amount " 10.00" ou "10.00 " é rejeitado sem efeitos no banco [5.33ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 6. Validação Defensiva do Caso de Uso (CreateWalletUseCase) > 5. Amount "10.00" e abertura zero continuam funcionando [60.07ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 6. Validação Defensiva do Caso de Uso (CreateWalletUseCase) > deve rejeitar null, false, 0, "", arrays, números e objetos incompletos no caso de uso sem efeitos colaterais [22.36ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 6. Validação Defensiva do Caso de Uso (CreateWalletUseCase) > deve rejeitar moedas diferentes de BRL pela restrição operacional [2.12ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 7. Reconciliação das Carteiras Abertas: Saldo Igual ao Ledger > deve reconciliar carteira aberta com saldo positivo: consistente com 1 lançamento [45.93ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 7. Reconciliação das Carteiras Abertas: Saldo Igual ao Ledger > deve reconciliar carteira aberta com saldo zero: consistente com 0 lançamentos [31.09ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 8. Abertura no Limite Money e Rejeição Acima Dele > deve criar com sucesso no limite máximo NUMERIC(18,2) ("9999999999999999.99") [33.53ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 8. Abertura no Limite Money e Rejeição Acima Dele > deve rejeitar abertura com valor acima do limite ("10000000000000000.00") sem criar registros parciais [2.04ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets com contrato válido deve retornar 201 Created [30.11ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets com initialBalance ausente deve criar com saldo "0.00" [17.12ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets deve rejeitar initialBalance null, false, 0 e "" com 400 Bad Request [4.28ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets deve rejeitar string direta em initialBalance ("100.00") com 400 Bad Request [1.15ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets deve rejeitar initialBalance com amount como number com 400 Bad Request [1.10ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets deve rejeitar negative e formatos não canônicos com 400 Bad Request [8.94ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets deve rejeitar playerId inválido (não UUID) com 400 Bad Request [3.33ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wallets deve retornar 409 Conflict na duplicação sequencial com code DUPLICATE_WALLET [26.85ms]
+(pass) M03: Wallet Opening Stabilization & Real PostgreSQL Invariants Tests > 9. Testes HTTP do Contrato, Entradas Inválidas e Tentativa de OPENING Externa > POST /wagering/transactions deve rejeitar tentativa externa de submissão com kind="OPENING" com 400 Bad Request [24.27ms]
+
+ 30 pass
+ 0 fail
+ 318 expect() calls
+Ran 30 tests across 1 file. [3.18s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\observability\m18-http.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-http.test.ts:
+(pass) M18 isolated Nest HTTP and real PostgreSQL > logs only allowed fields, preserves correlation, measures normalized routes including errors/404 [41.37ms]
+(pass) M18 isolated Nest HTTP and real PostgreSQL > liveness and real SELECT 1 readiness do not mutate financial rows [11.78ms]
+(pass) M18 isolated Nest HTTP and real PostgreSQL > bounds readiness with an exhausted existing pool and recovers without leaking borrowers [177.61ms]
+Connection Error: error: terminating connection due to administrator command
+Connection Error: error: terminating connection due to administrator command
+(pass) M18 isolated Nest HTTP and real PostgreSQL > returns generic 503 when PostgreSQL rejects connections, keeps liveness, closes resources [56.38ms]
+
+ 4 pass
+ 0 fail
+ 80 expect() calls
+Ran 4 tests across 1 file. [2.06s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\unit\migrator-robustness.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\migrator-robustness.test.ts:
+Transient connection error (Connection terminated due to connection timeout). Retrying in 30ms (attempt 1/3)...
+Transient connection error (Connection terminated due to connection timeout). Retrying in 45ms (attempt 2/3)...
+(pass) DatabaseMigrator Robustness & Failure Behavior > should timeout and exhaust configured attempts against TCP server that accepts connection without handshake response [545.24ms]
+(pass) DatabaseMigrator Robustness & Failure Behavior > should run real CLI in child process, exit non-zero and terminate within adequate bounded margin when connection is unavailable [125.92ms]
+(pass) DatabaseMigrator Robustness & Failure Behavior > should reject invalid constructor options before creating pool [0.96ms]
+(pass) DatabaseMigrator Robustness & Failure Behavior > should not allow customConfig spread to overwrite validated timeout with undefined [0.08ms]
+Transient connection error (connect ECONNREFUSED 127.0.0.1:54399). Retrying in 50ms (attempt 1/3)...
+Transient connection error (connect ECONNREFUSED 127.0.0.1:54399). Retrying in 75ms (attempt 2/3)...
+(pass) DatabaseMigrator Robustness & Failure Behavior > should terminate within documented bounded time when database connection is unavailable [130.44ms]
+(pass) DatabaseMigrator Robustness & Failure Behavior > should fail SQL execution errors immediately without retry, issuing ROLLBACK [1.17ms]
+(pass) DatabaseMigrator Robustness & Failure Behavior > should ensure migrator.close() drains and closes pool in finally block [0.33ms]
+
+ 7 pass
+ 0 fail
+ 38 expect() calls
+Ran 7 tests across 1 file. [858.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\unit\money.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\money.test.ts:
+(pass) Money Value Object > Basic Factory & Creation > should create valid Money with two decimal places [0.44ms]
+(pass) Money Value Object > Basic Factory & Creation > should create zero Money correctly [0.10ms]
+(pass) Money Value Object > Boundary Tests: "0.00", "0.01" and "9999999999999999.99" > should correctly handle "0.00" [0.04ms]
+(pass) Money Value Object > Boundary Tests: "0.00", "0.01" and "9999999999999999.99" > should correctly handle "0.01" [0.05ms]
+(pass) Money Value Object > Boundary Tests: "0.00", "0.01" and "9999999999999999.99" > should correctly handle exact NUMERIC(18,2) maximum boundary "9999999999999999.99" [0.06ms]
+(pass) Money Value Object > Boundary Tests: "0.00", "0.01" and "9999999999999999.99" > should reject the first value above the limit ("10000000000000000.00") without SQL error [0.36ms]
+(pass) Money Value Object > Boundary Tests: "0.00", "0.01" and "9999999999999999.99" > should reject addition when sum exceeds the limit ("9999999999999999.99" + "0.01") [0.11ms]
+(pass) Money Value Object > Boundary Tests: "0.00", "0.01" and "9999999999999999.99" > should reject addition when adding two large numbers exceeds the limit [0.06ms]
+(pass) Money Value Object > Precision Above Number.MAX_SAFE_INTEGER > should perform exact operations well above Number.MAX_SAFE_INTEGER without precision loss [0.12ms]
+(pass) Money Value Object > Internal Negative Values & Serialization (Reconciliation deltas) > should produce internal negative money on subtraction and serialize correctly [0.74ms]
+(pass) Money Value Object > Internal Negative Values & Serialization (Reconciliation deltas) > should rehydrate signed negative values for reconciliation/ledger differences [0.11ms]
+(pass) Money Value Object > Internal Negative Values & Serialization (Reconciliation deltas) > should allow negative boundary down to MIN_SIGNED_LIMIT ("-9999999999999999.99") [0.11ms]
+(pass) Money Value Object > Immutability of Operands > should remain frozen and not mutate operands after operations or failed operations [0.13ms]
+(pass) Money Value Object > Currency Conflicts > should throw CurrencyMismatchError on arithmetic between different currencies [0.43ms]
+(pass) Money Value Object > Currency Conflicts > should return false on equals between different currencies without throwing [0.07ms]
+(pass) Money Value Object > Invalid Inputs & Incorrect Types > should reject non-string inputs in Money.create [0.19ms]
+(pass) Money Value Object > Invalid Inputs & Incorrect Types > should reject non-string currency in Money.create [0.06ms]
+(pass) Money Value Object > Invalid Inputs & Incorrect Types > should reject negative values in create factory [0.09ms]
+(pass) Money Value Object > Invalid Inputs & Incorrect Types > should reject NaN, Infinity, scientific notation, and non-canonical strings [0.74ms]
+(pass) Money Value Object > Invalid Inputs & Incorrect Types > should reject invalid currency codes [0.21ms]
+(pass) Money Value Object > Invalid Inputs & Incorrect Types > should reject non-bigint input in fromCents factory [0.10ms]
+
+ 21 pass
+ 0 fail
+ 104 expect() calls
+Ran 21 tests across 1 file. [16.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\unit\outbox-contract-m14.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\outbox-contract-m14.test.ts:
+(pass) M14 domain contract validation > accepts four actual v1 contracts without mutating the envelope [0.79ms]
+(pass) M14 domain contract validation > blocks unknown type [0.07ms]
+(pass) M14 domain contract validation > blocks unknown version [0.03ms]
+(pass) M14 domain contract validation > blocks missing payload [0.02ms]
+(pass) M14 domain contract validation > blocks null payload [0.02ms]
+(pass) M14 domain contract validation > blocks array [0.01ms]
+(pass) M14 domain contract validation > blocks empty [0.02ms]
+(pass) M14 domain contract validation > blocks identity [0.02ms]
+(pass) M14 domain contract validation > blocks player [0.02ms]
+(pass) M14 domain contract validation > blocks currency [0.12ms]
+(pass) M14 domain contract validation > blocks mismatch [0.03ms]
+(pass) M14 domain contract validation > blocks numeric money [0.03ms]
+(pass) M14 domain contract validation > blocks scale [0.03ms]
+(pass) M14 domain contract validation > blocks negative [0.03ms]
+(pass) M14 domain contract validation > blocks overflow [0.08ms]
+(pass) M14 domain contract validation > blocks metadata [0.02ms]
+(pass) M14 domain contract validation > blocks correlation [0.01ms]
+(pass) M14 domain contract validation > blocks causation [0.01ms]
+(pass) M14 domain contract validation > blocks timestamp [0.02ms]
+(pass) M14 domain contract validation > blocks balance version [0.07ms]
+(pass) M14 domain contract validation > blocks transaction identity [0.04ms]
+[Nest] 16508  - 18/10/2026, 01:55:10    WARN [PublishOutboxEventsUseCase] Outbox message 892d2937-27f8-45f7-8381-c1c85ec830a6 is invalid: INVALID_PAYLOAD. Isolating event.
+[Nest] 16508  - 18/10/2026, 01:55:10    WARN [PublishOutboxEventsUseCase] Outbox message 892d2937-27f8-45f7-8381-c1c85ec830a6 is invalid: INVALID_PAYLOAD. Isolating event.
+(pass) M14 domain contract validation > counts blocked only after persistence confirms authority [2.75ms]
+(pass) M14 domain contract validation > does not destroy a third-party client [0.22ms]
+
+ 23 pass
+ 0 fail
+ 33 expect() calls
+Ran 23 tests across 1 file. [247.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\unit\payload-hash.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\payload-hash.test.ts:
+(pass) Idempotency Payload Hash Canonicalization Tests > 1. should produce the EXACT same hash when keys are passed in a different order (recursive canonical sorting) [0.68ms]
+(pass) Idempotency Payload Hash Canonicalization Tests > 2. should produce DIFFERENT hashes when altering only amount [0.10ms]
+(pass) Idempotency Payload Hash Canonicalization Tests > 2. should produce DIFFERENT hashes when altering only currency [0.07ms]
+(pass) Idempotency Payload Hash Canonicalization Tests > 2. should produce DIFFERENT hashes when altering only referenceExternalTransactionId [0.10ms]
+(pass) Idempotency Payload Hash Canonicalization Tests > should exclude transport metadata and produce the same hash regardless of correlationId or idempotency key header [0.09ms]
+(pass) Idempotency Payload Hash Canonicalization Tests > canonicalStringify should sort keys recursively and preserve array item order [0.15ms]
+
+ 6 pass
+ 0 fail
+ 10 expect() calls
+Ran 6 tests across 1 file. [19.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\unit\test-runner.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\test-runner.test.ts:
+(pass) Official cross-platform test runner > runs remaining files and exits nonzero after a real failing child test [157.53ms]
+
+ 1 pass
+ 0 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [171.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\unit\wallet-ledger-entry.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\wallet-ledger-entry.test.ts:
+(pass) WalletLedgerEntry Entity > should create valid CREDIT ledger entry and verify arithmetic invariant [0.55ms]
+(pass) WalletLedgerEntry Entity > should create valid DEBIT ledger entry and verify arithmetic invariant [0.08ms]
+(pass) WalletLedgerEntry Entity > should throw InvalidWagerOperationError on arithmetic mismatch for CREDIT [0.36ms]
+(pass) WalletLedgerEntry Entity > should throw InvalidWagerOperationError on arithmetic mismatch for DEBIT [0.10ms]
+(pass) WalletLedgerEntry Entity > should throw CurrencyMismatchError if amount currency differs from entry currency [0.91ms]
+
+ 5 pass
+ 0 fail
+ 12 expect() calls
+Ran 5 tests across 1 file. [11.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\unit\wallet.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\wallet.test.ts:
+(pass) Wallet Aggregate > should create wallet with zero balance and no ledger entry or opening transaction [0.61ms]
+(pass) Wallet Aggregate > should create wallet with positive balance and generate OPENING tx and CREDIT ledger [0.60ms]
+(pass) Wallet Aggregate > should debit funds, increment version, and return DEBIT ledger entry [0.21ms]
+(pass) Wallet Aggregate > should throw InsufficientBalanceError when debit exceeds balance without mutating wallet [0.23ms]
+(pass) Wallet Aggregate > should reject debit with currency mismatch [0.29ms]
+(pass) Wallet Aggregate > should reject debit with zero amount [0.91ms]
+(pass) Wallet Aggregate > should credit funds, increment version, and return CREDIT ledger entry [0.21ms]
+
+ 7 pass
+ 0 fail
+ 37 expect() calls
+Ran 7 tests across 1 file. [21.00ms]
+[test-runner] 27 files; 0 failed

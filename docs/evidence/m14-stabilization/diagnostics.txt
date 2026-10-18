@@ -1,0 +1,6 @@
+Observed during Linux sequential validation (no PostgreSQL settings changed):
+- First concurrency case failed with SQLSTATE 55P03, wallet SELECT FOR UPDATE, default lock timeout 5000 ms; elapsed test 6040.81 ms.
+- PostgreSQL pg_stat_activity sample in exclusive m14-stabilization cluster: active postgres maintenance session waiting IPC/CheckpointDone; other sessions were idle/ClientRead.
+- Later query for concurr_% databases showed zero active connections.
+- docker stats sample: PostgreSQL 0.70% CPU, 92.31 MiB; LocalStack 14.96% CPU, 434.4 MiB; test runner 30.16% CPU, 30.68 MiB; memory limit displayed 7.733 GiB.
+These are point-in-time observations, not proof of a specific hardware or memory bottleneck. Test timeouts and database durability settings were not relaxed.

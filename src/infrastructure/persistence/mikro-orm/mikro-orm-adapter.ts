@@ -796,6 +796,8 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
           lease_owner = NULL,
           lease_expires_at = NULL
       WHERE id = ? AND lease_token = ?
+        AND published_at IS NULL AND is_operationally_blocked = FALSE
+        AND lease_expires_at > clock_timestamp()
       RETURNING id;
     `;
     const res = await em.execute<any[]>(query, [id, leaseToken]);
@@ -818,6 +820,8 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
           lease_owner = NULL,
           lease_expires_at = NULL
       WHERE id = ? AND lease_token = ?
+        AND published_at IS NULL AND is_operationally_blocked = FALSE
+        AND lease_expires_at > clock_timestamp()
       RETURNING id;
     `;
     const res = await em.execute<any[]>(query, [retryDelayMs, errorMessage, id, leaseToken]);
@@ -840,12 +844,15 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
           lease_owner = NULL,
           lease_expires_at = NULL
       WHERE id = ? AND lease_token = ?
+        AND published_at IS NULL AND is_operationally_blocked = FALSE
+        AND lease_expires_at > clock_timestamp()
       RETURNING id;
     `;
     const res = await em.execute<any[]>(query, [reason, errorMessage ?? null, id, leaseToken]);
     return Array.isArray(res) && res.length > 0;
   }
 
+  // Safe relinquishment accepts expired matching tokens; never mutates delivery/retry state.
   public async releaseLease(id: string, leaseToken: string): Promise<boolean> {
     const em = this.em;
     const query = `
@@ -853,7 +860,7 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
       SET lease_token = NULL,
           lease_owner = NULL,
           lease_expires_at = NULL
-      WHERE id = ? AND lease_token = ?
+      WHERE id = ? AND lease_token = ? AND published_at IS NULL
       RETURNING id;
     `;
     const res = await em.execute<any[]>(query, [id, leaseToken]);

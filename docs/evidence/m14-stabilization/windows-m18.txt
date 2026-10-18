@@ -1,0 +1,14 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-http.test.ts:
+(pass) M18 isolated Nest HTTP and real PostgreSQL > logs only allowed fields, preserves correlation, measures normalized routes including errors/404 [51.52ms]
+(pass) M18 isolated Nest HTTP and real PostgreSQL > liveness and real SELECT 1 readiness do not mutate financial rows [78.65ms]
+(pass) M18 isolated Nest HTTP and real PostgreSQL > bounds readiness with an exhausted existing pool and recovers without leaking borrowers [283.49ms]
+Connection Error: Connection ended unexpectedly
+Connection Error: Connection ended unexpectedly
+(pass) M18 isolated Nest HTTP and real PostgreSQL > returns generic 503 when PostgreSQL rejects connections, keeps liveness, closes resources [150.38ms]
+
+ 4 pass
+ 0 fail
+ 80 expect() calls
+Ran 4 tests across 1 file. [6.38s]

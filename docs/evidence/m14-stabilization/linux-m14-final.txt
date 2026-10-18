@@ -1,0 +1,60 @@
+ Container m14-stabilization-postgres-1 Running 
+ Container m14-stabilization-postgres-1 Waiting 
+ Container m14-stabilization-postgres-1 Healthy 
+ Container m14-stabilization-migrate-1 Starting 
+ Container m14-stabilization-migrate-1 Started 
+ Container m14-stabilization-migrate-1 Waiting 
+ Container m14-stabilization-migrate-1 Exited 
+ Container m14-stabilization-test-runner-run-7818c4cbfe5d Creating 
+ Container m14-stabilization-test-runner-run-7818c4cbfe5d Created 
+$ bun run scripts/run-tests.ts tests/integration/outbox-publisher-m14.test.ts
+
+tests/integration/outbox-publisher-m14.test.ts:
+
+[test-runner] /app/tests/integration/outbox-publisher-m14.test.ts
+bun test v1.4.3 (c6da4a4d3)
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > A. Evento de transação não confirmada não é publicado [2523.88ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > B. Publicação preserva integralmente o envelope e os identificadores FIFO [1089.48ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > C. Dois publishers concorrentes não possuem simultaneamente o mesmo claim válido [1784.22ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > D. Falha antes do envio permite recuperação [1589.55ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > E. Crash real após claim: outro processo retoma após expiração [7745.07ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > F. Crash real após confirmação SQS e antes de marcar published_at: recuperação republica sem perda, preservando eventId [3612.50ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > G. Token obsoleto não confirma publicação nem modifica a posse atual [1356.19ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > H. Falha/indisponibilidade do SQS mantém evento não publicado e reagenda [1325.72ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > I. Evento inválido não impede publicação dos demais [1624.92ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: send, execution ends before SQS and ORM [1721.28ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: cancel, execution ends before SQS and ORM [1928.29ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: ack, execution ends before SQS and ORM [1290.72ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/valid: unauthorized updates mutate nothing [1292.64ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/wrong: unauthorized updates mutate nothing [1094.07ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/expired: unauthorized updates mutate nothing [1127.94ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/reclaimed: unauthorized updates mutate nothing [1440.98ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/published: unauthorized updates mutate nothing [1470.05ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/blocked: unauthorized updates mutate nothing [2158.90ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/valid: unauthorized updates mutate nothing [1201.04ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/wrong: unauthorized updates mutate nothing [1193.58ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/expired: unauthorized updates mutate nothing [1054.71ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/reclaimed: unauthorized updates mutate nothing [1209.89ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/published: unauthorized updates mutate nothing [1240.33ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/blocked: unauthorized updates mutate nothing [1601.41ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/valid: unauthorized updates mutate nothing [1036.56ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/wrong: unauthorized updates mutate nothing [1032.88ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/expired: unauthorized updates mutate nothing [1376.35ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/reclaimed: unauthorized updates mutate nothing [1054.88ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/published: unauthorized updates mutate nothing [1252.41ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/blocked: unauthorized updates mutate nothing [1049.85ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > M. Send accepted after lease expiry stays unpublished and republishes identical identity [1225.07ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > N. releaseLease permits expired matching token only, without authorizing publication [1122.88ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid payload blocks only its event and preserves data [1121.86ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid money blocks only its event and preserves data [1210.86ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid currency blocks only its event and preserves data [1099.75ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid type blocks only its event and preserves data [1099.61ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid version blocks only its event and preserves data [1204.34ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > O. Persisted invalid metadata blocks only its event and preserves data [1147.17ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > K. Publicação não altera saldo, versão, transações ou ledger [1311.08ms]
+
+ 39 pass
+ 0 fail
+ 214 expect() calls
+Ran 39 tests across 1 file. [70.00s]
+[test-runner] 1 files; 0 failed
