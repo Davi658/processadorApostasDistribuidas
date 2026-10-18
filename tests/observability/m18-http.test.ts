@@ -108,9 +108,22 @@ describe('M18 principal AppModule HTTP and real PostgreSQL', () => {
     expect(records.some(record => record.status === 422)).toBe(true);
     expect(records.some(record => record.status === 404)).toBe(true);
     for (const record of records) {
-      expect(Object.keys(record).sort()).toEqual(['component', 'correlationId', 'durationMs', 'method', 'operation', 'result', 'route', 'status']);
+      expect(Object.keys(record).sort()).toEqual([
+        'component',
+        'correlationId',
+        'durationMs',
+        'messageId',
+        'method',
+        'operation',
+        'providerId',
+        'result',
+        'route',
+        'status',
+        'walletId',
+      ]);
       expect(record.durationMs).toBeGreaterThanOrEqual(0);
     }
+    expect(records.some(record => record.walletId !== null)).toBe(true);
     expect(lines.join('')).not.toMatch(/9876\.54|secret|Bearer|private-error|unused-key/);
     const response = await fetch(`${url}/metrics`);
     expect(response.headers.get('content-type')).toContain('version=0.0.4');
@@ -120,6 +133,12 @@ describe('M18 principal AppModule HTTP and real PostgreSQL', () => {
     expect(metrics).toContain('http_requests_total{method="GET",route="/wallets/:walletId",status="404"} 2');
     expect(metrics).toContain('http_request_duration_seconds_bucket');
     expect(metrics).toContain('le="+Inf"} 13');
+    expect(metrics).toContain('financial_transactions_total');
+    expect(metrics).toContain('financial_transaction_duration_seconds');
+    expect(metrics).toContain('sqs_dlq_messages_visible{queue="wager-transactions-dlq.fifo"} 0');
+    expect(metrics).toContain('sqs_dlq_messages_total{queue="wager-transactions-dlq.fifo"} 0');
+    expect(metrics).toContain('outbox_delay_seconds');
+    expect(metrics).toContain('outbox_pending_events_total');
     expect(metrics).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-|trace-m18|fallback-m18|secret|9876\.54/);
   });
 

@@ -94,7 +94,16 @@ test('rollback produces no durable result, commit and inbox replay preserve all 
   expect(lines.join('')).not.toMatch(/123\.45|secret|ReceiptHandle|MessageBody|balance/);
   const metrics = await (await fetch(`${url}/metrics`)).text();
   expect(metrics).toContain('component="consumer",operation="inbox",result="duplicate"} 2');
+  expect(metrics).toContain('financial_transactions_total{status="PROCESSED",kind="BET"}');
+  expect(metrics).toContain('financial_transaction_duration_seconds');
+  expect(metrics).toContain('sqs_dlq_messages_visible{queue="wager-transactions-dlq.fifo"} 0');
+  expect(metrics).toContain('outbox_delay_seconds');
+  expect(metrics).toContain('outbox_pending_events_total');
   expect(metrics).not.toContain(command.commandId); expect(metrics).not.toContain(command.idempotencyKey);
+  const inboxEvents = events().filter(e => e.component === 'consumer' && e.operation === 'inbox');
+  expect(inboxEvents.some(e => e.walletId === wallet.id)).toBe(true);
+  expect(inboxEvents.some(e => e.providerId === 'm18')).toBe(true);
+  expect(inboxEvents.some(e => typeof e.messageId === 'string')).toBe(true);
 });
 
 test('reference metrics count confirmed resolutions only and disclose missing historical correlation', async () => {
