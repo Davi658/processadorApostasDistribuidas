@@ -55,8 +55,24 @@ async function main() {
 
     const count = Number(process.env.WORKER_SUBMISSIONS ?? 1);
     if (!Number.isSafeInteger(count) || count < 1 || count > 50) throw new Error('INVALID_SUBMISSIONS');
-    const results = await Promise.all(Array.from({ length: count }, () => processWagerUseCase.execute(idempotencyKey, payload)));
-    console.log(JSON.stringify({ ok: true, data: results[0], results }));
+    // Submit the complete parallel wave before examining results. A transient
+    // lock failure is an at-least-once retry, not a successful financial result.
+    const wave = await Promise.allSettled(Array.from({ length: count }, () => processWagerUseCase.execute(idempotencyKey, payload)));
+    let retries = 0;
+    const results = [];
+    for (let result of wave) {
+      for (let attempt = 0; result.status === 'rejected' && attempt < 2; attempt++) {
+        const code = result.reason?.code;
+        if (!['55P03', '40P01', '40001'].includes(code)) throw result.reason;
+        retries++;
+        console.log(`TRANSIENT_RETRY ${JSON.stringify({ code, attempt: attempt + 1 })}`);
+        try { result = { status: 'fulfilled', value: await processWagerUseCase.execute(idempotencyKey, payload) }; }
+        catch (reason) { result = { status: 'rejected', reason }; }
+      }
+      if (result.status === 'rejected') throw result.reason;
+      results.push(result.value);
+    }
+    console.log(JSON.stringify({ ok: true, data: results[0], results, retries }));
   } catch (err: any) {
     console.log(JSON.stringify({ ok: false, error: err.message, code: err.code }));
   } finally {

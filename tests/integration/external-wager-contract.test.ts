@@ -60,7 +60,12 @@ test('real SQS redelivery after process death at committed external inbox barrie
     await consumer.beforeApplicationShutdown(); await client.send(new DeleteQueueCommand({ QueueUrl: queue })); client.destroy();
   }
 }, 30000);
-afterAll(async () => { await uow?.close(); await sql?.end(); await db?.closeAndDrop(); });
+afterAll(async () => {
+  console.log('delivery external cleanup: UoW'); await uow?.close();
+  console.log('delivery external cleanup: SQL'); await sql?.end();
+  console.log('delivery external cleanup: database'); await db?.closeAndDrop();
+  console.log('delivery external cleanup: complete');
+});
 test('external logical identity, financial replay, content conflict and rollback preserve exact records', async () => {
   const wallet = await create.execute({ playerId: crypto.randomUUID(), initialBalance: { amount: '100.00', currency: 'BRL' } });
   const e = { messageId: 'msg-123', type: 'WagerTransactionRequested', occurredAt: '2026-07-29T15:00:00.000Z', data: {

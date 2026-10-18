@@ -501,6 +501,7 @@ describe('High-Concurrency Invariants with Real PostgreSQL', () => {
       for (const process of processes) {
         if (!process.ok) throw new Error(`Worker failed: ${process.code}: ${process.error}`);
       }
+      console.log(`M20 initialSubmissions=50 processes=3 transientRetries=${processes.reduce((n, p) => n + p.retries, 0)}`);
       const results = processes.flatMap(r => r.results.map((data: any) => ({ ok: true, data })));
       expect(results.length).toBe(50);
       expect(new Set(results.map(r => r.data.transactionId)).size).toBe(1);
