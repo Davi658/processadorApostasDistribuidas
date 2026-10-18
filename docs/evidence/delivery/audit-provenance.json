@@ -1,0 +1,19 @@
+{
+  "intermediateLinuxAudit": {
+    "run": "final-validation/linux-official.txt",
+    "sourceCommit": "0873f8a3501f04d3eb76fda3e973529924150e90",
+    "runFailedElsewhere": true,
+    "file": "final-validation/linux-m16-audit/broker-financial-audit.json"
+  },
+  "windowsAudit": {
+    "run": "verification-final/windows-official.txt",
+    "sourceCommit": "fdf9fb9fff6ca1eb8a6194a2d26620d85637f86e",
+    "file": "windows-m16-audit.json"
+  },
+  "finalLinux": {
+    "failed": 0,
+    "sourceCommit": "fdf9fb9fff6ca1eb8a6194a2d26620d85637f86e",
+    "run": "verification-final/linux-official.txt",
+    "passed": 495
+  }
+}

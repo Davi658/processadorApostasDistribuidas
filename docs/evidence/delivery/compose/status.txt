@@ -1,0 +1,6 @@
+NAME                                           IMAGE                         COMMAND                  SERVICE      CREATED              STATUS                      PORTS
+delivery-compose-final-20261018-app-1          delivery-final-app:20261018   "/usr/local/bin/dock…"   app          52 seconds ago       Up 9 seconds (healthy)      127.0.0.1:3094->3000/tcp
+delivery-compose-final-20261018-localstack-1   localstack/localstack:4.0.3   "docker-entrypoint.sh"   localstack   About a minute ago   Up 50 seconds (healthy)     127.0.0.1:45694->4566/tcp
+delivery-compose-final-20261018-migrate-1      delivery-final-app:20261018   "/usr/local/bin/dock…"   migrate      53 seconds ago       Exited (0) 19 seconds ago   
+delivery-compose-final-20261018-postgres-1     postgres:16.6-alpine          "docker-entrypoint.s…"   postgres     About a minute ago   Up 50 seconds (healthy)     127.0.0.1:55594->5432/tcp
+delivery-compose-final-20261018-queues-1       localstack/localstack:4.0.3   "/bin/sh -c 'tr -d '…"   queues       53 seconds ago       Exited (0) 20 seconds ago   

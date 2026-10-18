@@ -1,0 +1,6 @@
+on
+on
+app_user
+bind /docker-entrypoint-initdb.d/10-runtime.sql
+
+{"/var/lib/postgresql/data":""}

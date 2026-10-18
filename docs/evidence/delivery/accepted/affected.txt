@@ -1,0 +1,111 @@
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\concurrency.test.ts:
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation [1382.06ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Two concurrent BETs of 80.00 on 100.00 balance: exactly ONE processed, ONE rejected, final balance 20.00 [121.39ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected [166.45ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier [1290.69ms]
+497 |     writeFileSync(barrierPath, 'RELEASE');
+498 | 
+499 |     try {
+500 |       const processes = await Promise.all([w1.resultPromise, w2.resultPromise, w3.resultPromise]);
+501 |       for (const process of processes) {
+502 |         if (!process.ok) throw new Error(`Worker failed: ${process.code}: ${process.error}`);
+                                         ^
+error: Worker failed: 55P03: select "w0".* from "wallets" as "w0" where "w0"."id" = '86a827ae-85f9-426c-a284-8e05051c263d' limit 1 for update - canceling statement due to lock timeout
+      at <anonymous> (D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts:502:36)
+(fail) High-Concurrency Invariants with Real PostgreSQL > 50 duplicate submissions across THREE independent OS application processes using synchronization barrier [6459.95ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409 [2550.70ms]
+
+ 5 pass
+ 1 fail
+ 202 expect() calls
+Ran 6 tests across 1 file. [29.70s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\delivery-independent-wallets.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\delivery-independent-wallets.test.ts:
+(pass) three independent wallets hold financial locks concurrently in three OS processes, reconcile and match transaction IDs [5206.08ms]
+
+ 1 pass
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [6.31s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\external-wager-contract.test.ts:
+{"component":"consumer","correlationId":"683a77ed-2eb8-4455-b744-15f6c9e7fe9d","durationMs":0,"messageId":"a26a630f-e561-4f6d-93bd-ee436990e0de","operation":"renewal","providerId":"delivery-crash","result":"confirmed","walletId":"e395c8fa-dc43-4bd3-b69d-c8a6f4261433"}
+{"component":"consumer","correlationId":"683a77ed-2eb8-4455-b744-15f6c9e7fe9d","durationMs":0,"messageId":"a26a630f-e561-4f6d-93bd-ee436990e0de","operation":"renewal","providerId":"delivery-crash","result":"confirmed","walletId":"e395c8fa-dc43-4bd3-b69d-c8a6f4261433"}
+{"component":"consumer","correlationId":"683a77ed-2eb8-4455-b744-15f6c9e7fe9d","durationMs":854.5448000000006,"messageId":"a26a630f-e561-4f6d-93bd-ee436990e0de","operation":"inbox","providerId":"delivery-crash","result":"duplicate","walletId":"e395c8fa-dc43-4bd3-b69d-c8a6f4261433","commandId":"external-crash-308a62ef-b9b3-49ec-aec6-67458a799454"}
+{"component":"consumer","correlationId":"683a77ed-2eb8-4455-b744-15f6c9e7fe9d","durationMs":854.5853999999999,"messageId":"a26a630f-e561-4f6d-93bd-ee436990e0de","operation":"transaction","providerId":"delivery-crash","result":"durable","walletId":"e395c8fa-dc43-4bd3-b69d-c8a6f4261433","commandId":"external-crash-308a62ef-b9b3-49ec-aec6-67458a799454"}
+{"component":"consumer","correlationId":"683a77ed-2eb8-4455-b744-15f6c9e7fe9d","durationMs":862.9686000000002,"messageId":"a26a630f-e561-4f6d-93bd-ee436990e0de","operation":"delete","providerId":"delivery-crash","result":"confirmed","walletId":"e395c8fa-dc43-4bd3-b69d-c8a6f4261433","commandId":"external-crash-308a62ef-b9b3-49ec-aec6-67458a799454"}
+(pass) real SQS redelivery after process death at committed external inbox barrier preserves exact records [4625.01ms]
+(pass) external logical identity, financial replay, content conflict and rollback preserve exact records [6237.35ms]
+(fail) (unnamed) [30000.01ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+
+ 2 pass
+ 1 fail
+ 19 expect() calls
+Ran 3 tests across 1 file. [42.64s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-http.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-http.test.ts:
+(pass) M18 principal AppModule HTTP and real PostgreSQL > logs only allowed fields, preserves correlation, measures normalized routes including errors/404 [79.77ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > liveness and real SELECT 1 readiness do not mutate financial rows [11.98ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > bounds readiness with an exhausted existing pool and recovers without leaking borrowers [180.41ms]
+Connection Error: error: terminating connection due to administrator command
+Connection Error: error: terminating connection due to administrator command
+(pass) M18 principal AppModule HTTP and real PostgreSQL > returns generic 503 when PostgreSQL rejects connections, keeps liveness, closes resources [219.09ms]
+
+ 4 pass
+ 0 fail
+ 96 expect() calls
+Ran 4 tests across 1 file. [24.86s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-messaging.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-messaging.test.ts:
+(pass) broker confirmation survives failed local mark; retry is distinct from confirmed local result [898.77ms]
+(pass) rollback produces no durable result, commit and inbox replay preserve all financial state [936.84ms]
+(pass) reference metrics count confirmed resolutions only and disclose missing historical correlation [258.38ms]
+(pass) financial invocations include replay, technical failure and external rollback without claiming durability [196.19ms]
+(pass) real SQS unavailability returns generic 503 while liveness stays up, recovers and disabled dependencies skip probing [38.82ms]
+
+ 5 pass
+ 0 fail
+ 59 expect() calls
+Ran 5 tests across 1 file. [9.42s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\delivery-metrics.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\delivery-metrics.test.ts:
+(pass) bounded financial categories; invocation metrics never claim durable transactions [3.75ms]
+(pass) outbox publication samples cannot overwrite database backlog gauges [0.87ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [15.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\external-wager-contract.test.ts:
+(pass) challenge example accepts opaque messageId and takes financial key only from data [1.71ms]
+(pass) external payload cannot obtain financial identity from transport or envelope messageId [0.56ms]
+
+ 2 pass
+ 0 fail
+ 11 expect() calls
+Ran 2 tests across 1 file. [24.00ms]
+[test-runner] 7 files; 2 failed

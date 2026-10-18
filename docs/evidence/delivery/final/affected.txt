@@ -1,0 +1,117 @@
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\concurrency.test.ts:
+420 |       }
+421 |       return connection;
+422 |     } catch (error) {
+423 |       let convertedError = error;
+424 |       if (error instanceof TimeoutError) {
+425 |         convertedError = new KnexTimeoutError(
+                               ^
+KnexTimeoutError: Knex: Timeout acquiring a connection. The pool is probably full. Are you missing a .transacting(trx) call?
+      at acquireConnection (D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\knex\lib\client.js:425:26)
+      at async acquireConnection (D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\knex\lib\execution\transaction.js:266:46)
+(fail) High-Concurrency Invariants with Real PostgreSQL > 50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation [1115.41ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Two concurrent BETs of 80.00 on 100.00 balance: exactly ONE processed, ONE rejected, final balance 20.00 [724.52ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected [209.81ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier [1096.43ms]
+492 | 
+493 |     writeFileSync(barrierPath, 'RELEASE');
+494 | 
+495 |     try {
+496 |       const processes = await Promise.all([w1.resultPromise, w2.resultPromise, w3.resultPromise]);
+497 |       expect(processes.every(r => r.ok)).toBe(true);
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts:497:42)
+(fail) High-Concurrency Invariants with Real PostgreSQL > 50 duplicate submissions across THREE independent OS application processes using synchronization barrier [2553.97ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409 [104.33ms]
+
+ 4 pass
+ 2 fail
+ 41 expect() calls
+Ran 6 tests across 1 file. [10.65s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\delivery-independent-wallets.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\delivery-independent-wallets.test.ts:
+(pass) three independent wallets hold financial locks concurrently in three OS processes, reconcile and match transaction IDs [5615.34ms]
+
+ 1 pass
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [6.28s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\external-wager-contract.test.ts:
+(pass) external logical identity, financial replay, content conflict and rollback preserve exact records [310.77ms]
+
+ 1 pass
+ 0 fail
+ 12 expect() calls
+Ran 1 test across 1 file. [4.05s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-http.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-http.test.ts:
+(pass) M18 principal AppModule HTTP and real PostgreSQL > logs only allowed fields, preserves correlation, measures normalized routes including errors/404 [74.74ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > liveness and real SELECT 1 readiness do not mutate financial rows [14.00ms]
+(pass) M18 principal AppModule HTTP and real PostgreSQL > bounds readiness with an exhausted existing pool and recovers without leaking borrowers [179.97ms]
+Connection Error: Connection ended unexpectedly
+Connection Error: Connection ended unexpectedly
+(pass) M18 principal AppModule HTTP and real PostgreSQL > returns generic 503 when PostgreSQL rejects connections, keeps liveness, closes resources [345.91ms]
+
+ 4 pass
+ 0 fail
+ 96 expect() calls
+Ran 4 tests across 1 file. [5.41s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-messaging.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-messaging.test.ts:
+(pass) broker confirmation survives failed local mark; retry is distinct from confirmed local result [181.82ms]
+(pass) rollback produces no durable result, commit and inbox replay preserve all financial state [242.60ms]
+(pass) reference metrics count confirmed resolutions only and disclose missing historical correlation [756.54ms]
+(pass) financial invocations include replay, technical failure and external rollback without claiming durability [175.44ms]
+(pass) real SQS unavailability returns generic 503 while liveness stays up, recovers and disabled dependencies skip probing [46.85ms]
+
+ 5 pass
+ 0 fail
+ 57 expect() calls
+Ran 5 tests across 1 file. [5.40s]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\delivery-metrics.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\delivery-metrics.test.ts:
+(pass) bounded financial categories; invocation metrics never claim durable transactions [3.77ms]
+(pass) outbox publication samples cannot overwrite database backlog gauges [0.67ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [16.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\external-wager-contract.test.ts:
+(pass) challenge example accepts opaque messageId and takes financial key only from data [1.83ms]
+(pass) external payload cannot obtain financial identity from transport or envelope messageId [0.33ms]
+
+ 2 pass
+ 0 fail
+ 11 expect() calls
+Ran 2 tests across 1 file. [27.00ms]
+[test-runner] 7 files; 1 failed

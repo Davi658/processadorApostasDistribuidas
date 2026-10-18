@@ -1,0 +1,10 @@
+{
+  "composeFile": "docker-compose.yml",
+  "sourceCommit": "fdf9fb9fff6ca1eb8a6194a2d26620d85637f86e",
+  "project": "delivery-compose-final-20261018",
+  "postgresPort": 55594,
+  "apiPort": 3094,
+  "existingPostgresVolumes": [],
+  "testStorageOverrideApplied": false,
+  "sqsPort": 45694
+}

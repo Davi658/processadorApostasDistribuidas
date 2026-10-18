@@ -1,0 +1,7 @@
+Diagnostic after the Linux M10 setup timeout (60 seconds, zero scenarios ran):
+- The disposable m10_worker_1792334675806_w1600v database existed.
+- Querying schema_migrations returned relation does not exist (psql diagnostic failure, not a passing check).
+- pg_stat_activity later observed WALSync I/O wait in another isolated test database.
+- pg_stat_bgwriter: checkpoints_req=160, checkpoint_write_time=35877 ms, checkpoint_sync_time=48399 ms.
+The evidence places the M10 stall before migrations completed; it does not prove the precise blocked client call retroactively.
+The regression override uses its own tmpfs data mount and keeps PostgreSQL fsync and synchronous_commit defaults. It does not replace the final named-volume composition or its restart/persistence proof. Setup phase tracing is added; no test, assertion or timeout is removed or relaxed.

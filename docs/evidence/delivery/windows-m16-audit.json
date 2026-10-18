@@ -1,0 +1,390 @@
+{
+  "platform": "win32",
+  "database": "m16_1792335484703_7lfnrq",
+  "queueUrl": "http://localstack:4566/queue/us-east-1/000000000000/m16-c45b7e60-3f16-44f8-a8fd-473d2eb94f56.fifo",
+  "activeTransactionsBeforeClose": 0,
+  "snapshots": [
+    {
+      "walletId": "ea351811-0ffc-466a-9fa7-cc54d17894d3",
+      "transactionIds": [
+        "aedc3022-1f34-4bc7-9560-e43a5c05c8c4",
+        "b6c7b024-025d-4457-aef7-f81f70eeee68"
+      ],
+      "ledgerIds": [
+        "5fc241a0-3fc3-4a37-9c38-703db00bd6c3",
+        "affbe44d-e5e0-406d-a4f6-894911dc17a0"
+      ],
+      "eventIds": [
+        "31aa093c-4fb3-4d64-8a2d-4d0fa573a17f",
+        "8ea239d8-cbf0-4be9-a8a4-623ae6886290",
+        "8f60607d-ba38-45c8-a409-9777ecc40288",
+        "e252eed4-0ec6-40af-b86a-eb41e93765ab"
+      ],
+      "commandIds": [
+        "7989f8bd-260d-46e4-b8b1-abc7a404f4b1"
+      ],
+      "fullStateSha256": "ef53d78efefe10eef893146a55d94c6aceee63abf766921966cbd8ba4b16b420"
+    },
+    {
+      "walletId": "ea351811-0ffc-466a-9fa7-cc54d17894d3",
+      "transactionIds": [
+        "aedc3022-1f34-4bc7-9560-e43a5c05c8c4",
+        "b6c7b024-025d-4457-aef7-f81f70eeee68"
+      ],
+      "ledgerIds": [
+        "5fc241a0-3fc3-4a37-9c38-703db00bd6c3",
+        "affbe44d-e5e0-406d-a4f6-894911dc17a0"
+      ],
+      "eventIds": [
+        "31aa093c-4fb3-4d64-8a2d-4d0fa573a17f",
+        "8ea239d8-cbf0-4be9-a8a4-623ae6886290",
+        "8f60607d-ba38-45c8-a409-9777ecc40288",
+        "e252eed4-0ec6-40af-b86a-eb41e93765ab"
+      ],
+      "commandIds": [
+        "7989f8bd-260d-46e4-b8b1-abc7a404f4b1"
+      ],
+      "fullStateSha256": "ef53d78efefe10eef893146a55d94c6aceee63abf766921966cbd8ba4b16b420"
+    },
+    {
+      "walletId": "01a6237f-0306-45da-b8de-00380252e61d",
+      "transactionIds": [
+        "085332a5-efd1-4825-926f-3e029e9f20db",
+        "766a7572-7e6e-40c8-93e7-fa4d87e49b71"
+      ],
+      "ledgerIds": [
+        "0c93b26f-2444-4f9e-beee-e9420f502151",
+        "f77a4dc7-21bb-49fb-8934-b0e5ad368d90"
+      ],
+      "eventIds": [
+        "21be44e6-da00-4f4b-9680-2b323022b993",
+        "ae2b107b-9c65-4cd6-8deb-2236ecee874c",
+        "bcdc2747-60aa-4ca1-9830-78794e95f95f",
+        "f5f44afb-184b-4d4e-bf86-a7b1f1dd64eb"
+      ],
+      "commandIds": [
+        "1f5b9f94-c636-4862-b9d4-e4b8a8f5e3f4"
+      ],
+      "fullStateSha256": "a0cc0b427cf69bee794d44dea258bc48c38cbbe11416645aa518f1d7a5926a57"
+    },
+    {
+      "walletId": "01a6237f-0306-45da-b8de-00380252e61d",
+      "transactionIds": [
+        "085332a5-efd1-4825-926f-3e029e9f20db",
+        "766a7572-7e6e-40c8-93e7-fa4d87e49b71"
+      ],
+      "ledgerIds": [
+        "0c93b26f-2444-4f9e-beee-e9420f502151",
+        "f77a4dc7-21bb-49fb-8934-b0e5ad368d90"
+      ],
+      "eventIds": [
+        "21be44e6-da00-4f4b-9680-2b323022b993",
+        "ae2b107b-9c65-4cd6-8deb-2236ecee874c",
+        "bcdc2747-60aa-4ca1-9830-78794e95f95f",
+        "f5f44afb-184b-4d4e-bf86-a7b1f1dd64eb"
+      ],
+      "commandIds": [
+        "1f5b9f94-c636-4862-b9d4-e4b8a8f5e3f4"
+      ],
+      "fullStateSha256": "a0cc0b427cf69bee794d44dea258bc48c38cbbe11416645aa518f1d7a5926a57"
+    },
+    {
+      "walletId": "9def36a0-5746-431d-887c-27ec63139356",
+      "transactionIds": [
+        "fa8eff9e-04f5-474a-b3e4-3262ce403f3e"
+      ],
+      "ledgerIds": [
+        "783773df-5f1d-4c98-9939-2da66cce7dce"
+      ],
+      "eventIds": [
+        "70a06c29-0e09-4b0a-a3a0-3932cafddc2f",
+        "eafbbef2-f5a2-4a7b-bdea-7a711f733d2a"
+      ],
+      "commandIds": [],
+      "fullStateSha256": "5baf971f1064a34066d82aadc3b2652a0bc447064bae11c94994524c2cdf34b6"
+    },
+    {
+      "walletId": "9def36a0-5746-431d-887c-27ec63139356",
+      "transactionIds": [
+        "fa8eff9e-04f5-474a-b3e4-3262ce403f3e"
+      ],
+      "ledgerIds": [
+        "783773df-5f1d-4c98-9939-2da66cce7dce"
+      ],
+      "eventIds": [
+        "70a06c29-0e09-4b0a-a3a0-3932cafddc2f",
+        "eafbbef2-f5a2-4a7b-bdea-7a711f733d2a"
+      ],
+      "commandIds": [],
+      "fullStateSha256": "5baf971f1064a34066d82aadc3b2652a0bc447064bae11c94994524c2cdf34b6"
+    },
+    {
+      "walletId": "9def36a0-5746-431d-887c-27ec63139356",
+      "transactionIds": [
+        "fa8eff9e-04f5-474a-b3e4-3262ce403f3e"
+      ],
+      "ledgerIds": [
+        "783773df-5f1d-4c98-9939-2da66cce7dce"
+      ],
+      "eventIds": [
+        "70a06c29-0e09-4b0a-a3a0-3932cafddc2f",
+        "eafbbef2-f5a2-4a7b-bdea-7a711f733d2a"
+      ],
+      "commandIds": [],
+      "fullStateSha256": "5baf971f1064a34066d82aadc3b2652a0bc447064bae11c94994524c2cdf34b6"
+    },
+    {
+      "walletId": "9def36a0-5746-431d-887c-27ec63139356",
+      "transactionIds": [
+        "fa8eff9e-04f5-474a-b3e4-3262ce403f3e"
+      ],
+      "ledgerIds": [
+        "783773df-5f1d-4c98-9939-2da66cce7dce"
+      ],
+      "eventIds": [
+        "70a06c29-0e09-4b0a-a3a0-3932cafddc2f",
+        "eafbbef2-f5a2-4a7b-bdea-7a711f733d2a"
+      ],
+      "commandIds": [],
+      "fullStateSha256": "5baf971f1064a34066d82aadc3b2652a0bc447064bae11c94994524c2cdf34b6"
+    },
+    {
+      "walletId": "9def36a0-5746-431d-887c-27ec63139356",
+      "transactionIds": [
+        "01a4291e-0dc5-4ba5-ab84-b7842751dd53",
+        "fa8eff9e-04f5-474a-b3e4-3262ce403f3e"
+      ],
+      "ledgerIds": [
+        "783773df-5f1d-4c98-9939-2da66cce7dce"
+      ],
+      "eventIds": [
+        "70a06c29-0e09-4b0a-a3a0-3932cafddc2f",
+        "eafbbef2-f5a2-4a7b-bdea-7a711f733d2a",
+        "fe50bca1-1be0-4a37-a1b7-77d0eef11537"
+      ],
+      "commandIds": [
+        "c505a95f-1474-46f4-a384-1f5286fe7ddd"
+      ],
+      "fullStateSha256": "4727e0e20b89646cf1f0290870e52caa73f9d53a850d34572ac122dc9d242f8e"
+    },
+    {
+      "walletId": "9def36a0-5746-431d-887c-27ec63139356",
+      "transactionIds": [
+        "01a4291e-0dc5-4ba5-ab84-b7842751dd53",
+        "fa8eff9e-04f5-474a-b3e4-3262ce403f3e"
+      ],
+      "ledgerIds": [
+        "783773df-5f1d-4c98-9939-2da66cce7dce"
+      ],
+      "eventIds": [
+        "70a06c29-0e09-4b0a-a3a0-3932cafddc2f",
+        "eafbbef2-f5a2-4a7b-bdea-7a711f733d2a",
+        "fe50bca1-1be0-4a37-a1b7-77d0eef11537"
+      ],
+      "commandIds": [
+        "c505a95f-1474-46f4-a384-1f5286fe7ddd"
+      ],
+      "fullStateSha256": "4727e0e20b89646cf1f0290870e52caa73f9d53a850d34572ac122dc9d242f8e"
+    },
+    {
+      "walletId": "9dbe069e-c3dc-4f67-aaf3-a5dac975ccbe",
+      "transactionIds": [
+        "0cc906b2-c6cc-4944-97df-7c17b0a8ff17",
+        "cf9724a8-8313-4098-a5b3-cd651b1c14b6"
+      ],
+      "ledgerIds": [
+        "926081d3-2354-4a7e-8e13-2103d71ce0f3",
+        "e3031a66-c026-438a-a00a-86cc0a406d85"
+      ],
+      "eventIds": [
+        "0d90d03b-f997-496f-ae6f-d3266c234ab8",
+        "1e8d6282-4fe7-4af1-b196-4d61d149c27a",
+        "5957a12e-7fc2-4699-8d00-2ce528c355ff",
+        "ea497d79-ae63-4fd4-b187-ea02a4aa4fda"
+      ],
+      "commandIds": [
+        "558238ca-ff38-4fe9-9206-79906425f2af"
+      ],
+      "fullStateSha256": "d6e34a4890a8c8f6ad548d241972dc939833e8a6f18e15de954c8e0a545bfd31"
+    },
+    {
+      "walletId": "9dbe069e-c3dc-4f67-aaf3-a5dac975ccbe",
+      "transactionIds": [
+        "0cc906b2-c6cc-4944-97df-7c17b0a8ff17",
+        "cf9724a8-8313-4098-a5b3-cd651b1c14b6"
+      ],
+      "ledgerIds": [
+        "926081d3-2354-4a7e-8e13-2103d71ce0f3",
+        "e3031a66-c026-438a-a00a-86cc0a406d85"
+      ],
+      "eventIds": [
+        "0d90d03b-f997-496f-ae6f-d3266c234ab8",
+        "1e8d6282-4fe7-4af1-b196-4d61d149c27a",
+        "5957a12e-7fc2-4699-8d00-2ce528c355ff",
+        "ea497d79-ae63-4fd4-b187-ea02a4aa4fda"
+      ],
+      "commandIds": [
+        "558238ca-ff38-4fe9-9206-79906425f2af"
+      ],
+      "fullStateSha256": "d6e34a4890a8c8f6ad548d241972dc939833e8a6f18e15de954c8e0a545bfd31"
+    },
+    {
+      "walletId": "7a66f23d-c1cd-412a-a06b-3c8147942c42",
+      "transactionIds": [
+        "20b70498-d500-4b25-adaf-31222262f1d8",
+        "cc94c944-9bbb-40ae-9ca5-6fb7f019870d"
+      ],
+      "ledgerIds": [
+        "4d2657da-2f12-4510-aaf2-272a1373baed"
+      ],
+      "eventIds": [
+        "320b796e-2955-4b4a-b963-2090c6b55503",
+        "418556be-b684-40e8-84f0-af4acfe91a7b",
+        "b87001f9-b9d2-4229-bcce-2245c132af35"
+      ],
+      "commandIds": [
+        "8d09090f-41b5-4006-bcfa-165f5f781efe"
+      ],
+      "fullStateSha256": "ecc6b05fb18e15daedcbf7128699ea3703865708b9df8a98b7677936c435e026"
+    },
+    {
+      "walletId": "7a66f23d-c1cd-412a-a06b-3c8147942c42",
+      "transactionIds": [
+        "20b70498-d500-4b25-adaf-31222262f1d8",
+        "cc94c944-9bbb-40ae-9ca5-6fb7f019870d"
+      ],
+      "ledgerIds": [
+        "4d2657da-2f12-4510-aaf2-272a1373baed"
+      ],
+      "eventIds": [
+        "320b796e-2955-4b4a-b963-2090c6b55503",
+        "418556be-b684-40e8-84f0-af4acfe91a7b",
+        "b87001f9-b9d2-4229-bcce-2245c132af35"
+      ],
+      "commandIds": [
+        "8d09090f-41b5-4006-bcfa-165f5f781efe"
+      ],
+      "fullStateSha256": "ecc6b05fb18e15daedcbf7128699ea3703865708b9df8a98b7677936c435e026"
+    },
+    {
+      "walletId": "2b2194b2-18b2-49e4-b933-1988f1fe9af7",
+      "transactionIds": [
+        "79e56081-7b47-4112-8103-22aaa4d4f123"
+      ],
+      "ledgerIds": [
+        "e6fbe8b8-3c58-4d24-aa0d-0531c7b9d33a"
+      ],
+      "eventIds": [
+        "60732bdf-74a0-4ad2-9fb3-58623373eb38",
+        "cfe2489b-596b-4257-9c9e-0aef7431d4c1"
+      ],
+      "commandIds": [],
+      "fullStateSha256": "460afb3a4dce79de723c3932a9f37d9adaf91cc3e2410b3e69458831c0127e8e"
+    },
+    {
+      "walletId": "2b2194b2-18b2-49e4-b933-1988f1fe9af7",
+      "transactionIds": [
+        "79e56081-7b47-4112-8103-22aaa4d4f123"
+      ],
+      "ledgerIds": [
+        "e6fbe8b8-3c58-4d24-aa0d-0531c7b9d33a"
+      ],
+      "eventIds": [
+        "60732bdf-74a0-4ad2-9fb3-58623373eb38",
+        "cfe2489b-596b-4257-9c9e-0aef7431d4c1"
+      ],
+      "commandIds": [],
+      "fullStateSha256": "460afb3a4dce79de723c3932a9f37d9adaf91cc3e2410b3e69458831c0127e8e"
+    },
+    {
+      "walletId": "ba841dab-d3c7-4282-8964-7d45bafae76d",
+      "transactionIds": [
+        "30c3d503-5294-4027-8a16-a9372f109dc7",
+        "748394fd-86a3-4e65-bdde-3a95d63ed7ad"
+      ],
+      "ledgerIds": [
+        "6d1a600d-66e4-4c1d-b518-045c3f6bb8c5",
+        "ef1f812d-bd6b-408c-be63-fae0c6d5c361"
+      ],
+      "eventIds": [
+        "b4d8d132-aad1-4cb7-8b35-e92adf199415",
+        "e4353c74-cd84-4bbe-bfd4-a19de831823f",
+        "f134412a-d704-4ae0-a26a-67ad0894d083",
+        "f8d8c3b4-5b78-4797-a289-42a67e345b6f"
+      ],
+      "commandIds": [
+        "6bb957ee-5449-4f1a-808c-62bd92d69746"
+      ],
+      "fullStateSha256": "8217adbb6f572716275b30e6340d0033504266c83527534c8647ae1ae2daa140"
+    },
+    {
+      "walletId": "ba841dab-d3c7-4282-8964-7d45bafae76d",
+      "transactionIds": [
+        "30c3d503-5294-4027-8a16-a9372f109dc7",
+        "748394fd-86a3-4e65-bdde-3a95d63ed7ad"
+      ],
+      "ledgerIds": [
+        "6d1a600d-66e4-4c1d-b518-045c3f6bb8c5",
+        "ef1f812d-bd6b-408c-be63-fae0c6d5c361"
+      ],
+      "eventIds": [
+        "b4d8d132-aad1-4cb7-8b35-e92adf199415",
+        "e4353c74-cd84-4bbe-bfd4-a19de831823f",
+        "f134412a-d704-4ae0-a26a-67ad0894d083",
+        "f8d8c3b4-5b78-4797-a289-42a67e345b6f"
+      ],
+      "commandIds": [
+        "6bb957ee-5449-4f1a-808c-62bd92d69746"
+      ],
+      "fullStateSha256": "8217adbb6f572716275b30e6340d0033504266c83527534c8647ae1ae2daa140"
+    },
+    {
+      "walletId": "ba841dab-d3c7-4282-8964-7d45bafae76d",
+      "transactionIds": [
+        "30c3d503-5294-4027-8a16-a9372f109dc7",
+        "748394fd-86a3-4e65-bdde-3a95d63ed7ad"
+      ],
+      "ledgerIds": [
+        "6d1a600d-66e4-4c1d-b518-045c3f6bb8c5",
+        "ef1f812d-bd6b-408c-be63-fae0c6d5c361"
+      ],
+      "eventIds": [
+        "b4d8d132-aad1-4cb7-8b35-e92adf199415",
+        "e4353c74-cd84-4bbe-bfd4-a19de831823f",
+        "f134412a-d704-4ae0-a26a-67ad0894d083",
+        "f8d8c3b4-5b78-4797-a289-42a67e345b6f"
+      ],
+      "commandIds": [
+        "6bb957ee-5449-4f1a-808c-62bd92d69746"
+      ],
+      "fullStateSha256": "8217adbb6f572716275b30e6340d0033504266c83527534c8647ae1ae2daa140"
+    }
+  ],
+  "brokerProofs": [
+    {
+      "source": "http://localstack:4566/queue/us-east-1/000000000000/m16-source-19bc7c4e-ecff-4f90-88d2-3b9578999e74.fifo",
+      "dlq": "http://localstack:4566/queue/us-east-1/000000000000/m16-dlq-bbbeb23b-5eae-42a9-a3a1-5abc93ac100b.fifo",
+      "attributes": {
+        "FifoQueue": "true",
+        "RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:m16-dlq-bbbeb23b-5eae-42a9-a3a1-5abc93ac100b.fifo\",\"maxReceiveCount\":2}"
+      }
+    },
+    {
+      "persistent": false,
+      "dlqMessageId": "30c5f4ef-0d46-43b8-b4d9-de4a2967bc41",
+      "originalBodySha256": "40b5cafe045b9c9e31a1c3fdcfbc89f934906ff06a6276b55c2a0e517be21655",
+      "deadBodySha256": "40b5cafe045b9c9e31a1c3fdcfbc89f934906ff06a6276b55c2a0e517be21655"
+    },
+    {
+      "persistent": true,
+      "dlqMessageId": "360a6a23-db76-46d0-b4c2-ab2bd985ac25",
+      "originalBodySha256": "a2394e97295bbfb7fcd23591dd66ac090b13b2cba2058e016b563b739968bfc8",
+      "deadBodySha256": "a2394e97295bbfb7fcd23591dd66ac090b13b2cba2058e016b563b739968bfc8"
+    },
+    {
+      "pendingLongPollCancelled": true,
+      "receivesBeforeStop": 1,
+      "receivesAfterStop": 1
+    }
+  ]
+}

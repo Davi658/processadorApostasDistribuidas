@@ -1,0 +1,6 @@
+ Container delivery-validation-20261018-postgres-1 Running 
+ Container delivery-validation-20261018-localstack-1 Running 
+ Container delivery-validation-20261018-postgres-1 Waiting 
+ Container delivery-validation-20261018-localstack-1 Waiting 
+ Container delivery-validation-20261018-postgres-1 Healthy 
+ Container delivery-validation-20261018-localstack-1 Healthy 

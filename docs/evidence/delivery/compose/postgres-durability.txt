@@ -1,0 +1,12 @@
+on
+on
+001_initial_schema
+002_reinforce_schema_and_outbox
+003_protect_terminals_and_composite_fk
+004_restrict_reversal_unique_index
+005_pending_reference_worker_lease
+006_terminal_transaction_protection
+007_ledger_finite_values
+008_outbox_publisher_lease_and_retry
+009_command_inbox
+010_external_inbox_identity

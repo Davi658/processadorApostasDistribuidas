@@ -1,0 +1,156 @@
+ Image delivery-final-tests:20261018 Building 
+ Image delivery-final-app:20261018 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.75kB 0.0s done
+#1 DONE 0.0s
+
+#2 [app internal] load build definition from Dockerfile
+#2 transferring dockerfile: 878B done
+#2 DONE 0.8s
+
+#2 [app internal] load build definition from Dockerfile
+#2 DONE 0.8s
+
+#3 [app internal] load metadata for docker.io/oven/bun:1.4.3
+#3 DONE 4.6s
+
+#4 [test-runner internal] load .dockerignore
+#4 transferring context: 200B done
+#4 DONE 1.8s
+
+#4 [app internal] load .dockerignore
+#4 DONE 1.8s
+
+#5 [test-runner internal] load build context
+#5 transferring context: 15.41kB 0.0s done
+#5 ...
+
+#6 [app internal] load build context
+#6 transferring context: 8.90kB 0.0s done
+#6 DONE 2.8s
+
+#7 [test-runner dependencies 1/4] FROM docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#7 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#7 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 2.2s done
+#7 DONE 3.2s
+
+#5 [test-runner internal] load build context
+#5 DONE 3.3s
+
+#7 [app dependencies 1/4] FROM docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#7 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 2.2s done
+#7 DONE 3.2s
+
+#8 [app dependencies 3/4] COPY package.json bun.lock ./
+#8 CACHED
+
+#9 [app dependencies 4/4] RUN bun install --frozen-lockfile
+#9 CACHED
+
+#10 [app base 3/6] COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
+#10 CACHED
+
+#11 [app base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#11 CACHED
+
+#12 [app dependencies 2/4] WORKDIR /app
+#12 CACHED
+
+#13 [app base 5/6] COPY --chown=bun:bun src ./src
+#13 CACHED
+
+#14 [app base 6/6] COPY --chown=bun:bun infra ./infra
+#14 ...
+
+#13 [test-runner base 5/6] COPY --chown=bun:bun src ./src
+#13 CACHED
+
+#14 [test-runner base 6/6] COPY --chown=bun:bun infra ./infra
+#14 DONE 4.9s
+
+#14 [app base 6/6] COPY --chown=bun:bun infra ./infra
+#14 DONE 4.9s
+
+#15 [test-runner base 3/6] COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
+#15 CACHED
+
+#16 [test-runner base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#16 CACHED
+
+#12 [test-runner dependencies 2/4] WORKDIR /app
+#12 CACHED
+
+#17 [test-runner dependencies 4/4] RUN bun install --frozen-lockfile
+#17 CACHED
+
+#18 [test-runner base 5/6] COPY --chown=bun:bun src ./src
+#18 CACHED
+
+#19 [test-runner base 6/6] COPY --chown=bun:bun infra ./infra
+#19 CACHED
+
+#20 [test-runner dependencies 3/4] COPY package.json bun.lock ./
+#20 CACHED
+
+#21 [test-runner tester 1/3] RUN mkdir -p /app/docs/evidence /app/.data && chown -R bun:bun /app/docs /app/.data
+#21 ...
+
+#22 [app] exporting to image
+#22 exporting layers
+#22 exporting layers 8.2s done
+#22 exporting manifest sha256:fd976ccdfd9fce0559430d7667d26225f39ea7d29b87e98b107dfeebccbe9952
+#22 ...
+
+#21 [test-runner tester 1/3] RUN mkdir -p /app/docs/evidence /app/.data && chown -R bun:bun /app/docs /app/.data
+#21 DONE 12.1s
+
+#22 [app] exporting to image
+#22 ...
+
+#23 [test-runner tester 2/3] COPY --chown=bun:bun scripts ./scripts
+#23 ...
+
+#22 [app] exporting to image
+#22 exporting manifest sha256:fd976ccdfd9fce0559430d7667d26225f39ea7d29b87e98b107dfeebccbe9952 4.4s done
+#22 exporting config sha256:8596f008941c7e53f7dd9a1e167fd7596f79701af16ce083b46b4a3d61b0be21
+#22 exporting config sha256:8596f008941c7e53f7dd9a1e167fd7596f79701af16ce083b46b4a3d61b0be21 37.1s done
+#22 exporting attestation manifest sha256:316e743f885c5df5cbe351057a63700608a0fe7decc7f2177cddd35f6a8e0dfa
+#22 exporting attestation manifest sha256:316e743f885c5df5cbe351057a63700608a0fe7decc7f2177cddd35f6a8e0dfa 3.1s done
+#22 exporting manifest list sha256:7627b3c9b9f821eb4f18f8949285dd2619af7bacf1ad751738621012d57814ff
+#22 exporting manifest list sha256:7627b3c9b9f821eb4f18f8949285dd2619af7bacf1ad751738621012d57814ff 3.1s done
+#22 naming to docker.io/library/delivery-final-app:20261018
+#22 naming to docker.io/library/delivery-final-app:20261018 0.8s done
+#22 unpacking to docker.io/library/delivery-final-app:20261018
+#22 unpacking to docker.io/library/delivery-final-app:20261018 4.5s done
+#22 ...
+
+#23 [test-runner tester 2/3] COPY --chown=bun:bun scripts ./scripts
+#23 DONE 63.5s
+
+#22 [app] exporting to image
+#22 DONE 74.7s
+
+#24 [test-runner tester 3/3] COPY --chown=bun:bun tests ./tests
+#24 DONE 24.5s
+
+#25 [app] resolving provenance for metadata file
+#25 DONE 0.0s
+
+#26 [test-runner] exporting to image
+#26 exporting layers
+#26 exporting layers 0.9s done
+#26 exporting manifest sha256:e5fa2dd019b0aa4385eb3b054de467ad2469551d8a748dce2d1a70d7d1fbbfbe 0.1s done
+#26 exporting config sha256:179b1f059190c82768a3b90f64e347571a4fb2121c7ef9d1d61a0452fd8c4768
+#26 exporting config sha256:179b1f059190c82768a3b90f64e347571a4fb2121c7ef9d1d61a0452fd8c4768 0.2s done
+#26 exporting attestation manifest sha256:7c2f2aae66d3f6e8fa2fbe8ec5b238b5822df1edea518b098c873b025dc79129 0.1s done
+#26 exporting manifest list sha256:7b3624a7b4ee29abd33772c0a3ca00ef7e3e9c9801f946785deaa3eb8a6daffe
+#26 exporting manifest list sha256:7b3624a7b4ee29abd33772c0a3ca00ef7e3e9c9801f946785deaa3eb8a6daffe 0.1s done
+#26 naming to docker.io/library/delivery-final-tests:20261018 done
+#26 unpacking to docker.io/library/delivery-final-tests:20261018
+#26 unpacking to docker.io/library/delivery-final-tests:20261018 0.4s done
+#26 DONE 2.0s
+
+#27 [test-runner] resolving provenance for metadata file
+#27 DONE 0.1s
+ Image delivery-final-app:20261018 Built 
+ Image delivery-final-tests:20261018 Built 

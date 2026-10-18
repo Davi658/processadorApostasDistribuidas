@@ -1,0 +1,431 @@
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\concurrency.test.ts:
+{"component":"test_database","database":"concurr_1792335075289_d7dwmu","phase":"create_start","elapsedMs":0.22010000000000218}
+{"component":"test_database","database":"concurr_1792335075289_d7dwmu","phase":"create_confirmed","elapsedMs":67.02780000000007}
+{"component":"test_database","database":"concurr_1792335075289_d7dwmu","phase":"maintenance_closed","elapsedMs":67.47250000000008}
+{"component":"test_database","database":"concurr_1792335075289_d7dwmu","phase":"migrations_start","elapsedMs":67.75260000000003}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) High-Concurrency Invariants with Real PostgreSQL > (unnamed) [193.73ms]
+58 |     processBetUseCase = new ProcessBetUseCase(walletRepo, wagerRepo, ledgerRepo, outboxRepo, uow);
+59 |     reconcileWalletUseCase = new ReconcileWalletUseCase(walletRepo, ledgerRepo, uow);
+60 |   });
+61 | 
+62 |   afterAll(async () => {
+63 |     await uow.close();
+               ^
+TypeError: undefined is not an object (evaluating 'uow.close')
+      at <anonymous> (D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\concurrency.test.ts:63:11)
+(fail) High-Concurrency Invariants with Real PostgreSQL > (unnamed) [0.47ms]
+
+ 0 pass
+ 2 fail
+Ran 2 tests across 1 file. [776.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\concurrency\delivery-independent-wallets.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\concurrency\delivery-independent-wallets.test.ts:
+{"component":"test_database","database":"delivery_parallel_1792335076162_fmufoh","phase":"create_start","elapsedMs":0.21479999999996835}
+{"component":"test_database","database":"delivery_parallel_1792335076162_fmufoh","phase":"create_confirmed","elapsedMs":53.32510000000002}
+{"component":"test_database","database":"delivery_parallel_1792335076162_fmufoh","phase":"maintenance_closed","elapsedMs":53.74759999999992}
+{"component":"test_database","database":"delivery_parallel_1792335076162_fmufoh","phase":"migrations_start","elapsedMs":54.30579999999998}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) three independent wallets hold financial locks concurrently in three OS processes, reconcile and match transaction IDs [181.88ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [838.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\external-wager-contract.test.ts:
+{"component":"test_database","database":"delivery_external_1792335076850_cbu71p","phase":"create_start","elapsedMs":0.2085999999999899}
+{"component":"test_database","database":"delivery_external_1792335076850_cbu71p","phase":"create_confirmed","elapsedMs":45.64659999999998}
+{"component":"test_database","database":"delivery_external_1792335076850_cbu71p","phase":"maintenance_closed","elapsedMs":46.254899999999964}
+{"component":"test_database","database":"delivery_external_1792335076850_cbu71p","phase":"migrations_start","elapsedMs":46.739499999999964}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) (unnamed) [170.93ms]
+delivery external cleanup: UoW
+delivery external cleanup: SQL
+delivery external cleanup: database
+delivery external cleanup: complete
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [659.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\ledger-constraints-m12.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\ledger-constraints-m12.test.ts:
+{"component":"test_database","database":"m12_1792335077520_xs6tz5","phase":"create_start","elapsedMs":0.20240000000001146}
+{"component":"test_database","database":"m12_1792335077520_xs6tz5","phase":"create_confirmed","elapsedMs":46.517300000000034}
+{"component":"test_database","database":"m12_1792335077520_xs6tz5","phase":"maintenance_closed","elapsedMs":46.97120000000001}
+{"component":"test_database","database":"m12_1792335077520_xs6tz5","phase":"migrations_start","elapsedMs":47.26799999999997}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > (unnamed) [178.52ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [660.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\migrations.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\migrations.test.ts:
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) Reversible Migrations on Disposable Database > should successfully run UP and DOWN migrations incrementally on a newly created disposable database [172.68ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [214.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\pending-reference-worker-m10.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\pending-reference-worker-m10.test.ts:
+{"component":"test_database","database":"m10_worker_1792335078584_7j8o7q","phase":"create_start","elapsedMs":0.20029999999997017}
+{"component":"test_database","database":"m10_worker_1792335078584_7j8o7q","phase":"create_confirmed","elapsedMs":48.330299999999966}
+{"component":"test_database","database":"m10_worker_1792335078584_7j8o7q","phase":"maintenance_closed","elapsedMs":48.80809999999997}
+{"component":"test_database","database":"m10_worker_1792335078584_7j8o7q","phase":"migrations_start","elapsedMs":49.10089999999991}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) M10: Worker de Referências Pendentes e Concorrência Distribuída (PostgreSQL Real Descartável) > (unnamed) [175.04ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [811.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\terminal-protection-m11.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\terminal-protection-m11.test.ts:
+{"component":"test_database","database":"m11_1792335078823_4zyvh2","phase":"create_start","elapsedMs":0.2641999999999953}
+{"component":"test_database","database":"m11_1792335078823_4zyvh2","phase":"create_confirmed","elapsedMs":44.3408}
+{"component":"test_database","database":"m11_1792335078823_4zyvh2","phase":"maintenance_closed","elapsedMs":44.764399999999995}
+{"component":"test_database","database":"m11_1792335078823_4zyvh2","phase":"migrations_start","elapsedMs":44.9747}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) M11 terminal protection on disposable PostgreSQL with enabled triggers > (unnamed) [171.49ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [215.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\integration\wager-win-loss-m06.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\wager-win-loss-m06.test.ts:
+{"component":"test_database","database":"m06_win_loss_1792335079724_gc9rt4","phase":"create_start","elapsedMs":0.27369999999996253}
+{"component":"test_database","database":"m06_win_loss_1792335079724_gc9rt4","phase":"create_confirmed","elapsedMs":43.30079999999998}
+{"component":"test_database","database":"m06_win_loss_1792335079724_gc9rt4","phase":"maintenance_closed","elapsedMs":43.676199999999994}
+{"component":"test_database","database":"m06_win_loss_1792335079724_gc9rt4","phase":"migrations_start","elapsedMs":43.89029999999991}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) M06: WIN e LOSS — Suíte de Testes Reais HTTP e PostgreSQL em Banco Descartável > (unnamed) [195.69ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [909.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-http.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-http.test.ts:
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) M18 principal AppModule HTTP and real PostgreSQL > (unnamed) [177.62ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [1037.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\observability\m18-messaging.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\observability\m18-messaging.test.ts:
+{"component":"test_database","database":"m18_broker_1792335081669_y54rwq","phase":"create_start","elapsedMs":0.19700000000000273}
+{"component":"test_database","database":"m18_broker_1792335081669_y54rwq","phase":"create_confirmed","elapsedMs":40.773199999999974}
+{"component":"test_database","database":"m18_broker_1792335081669_y54rwq","phase":"maintenance_closed","elapsedMs":41.24530000000004}
+{"component":"test_database","database":"m18_broker_1792335081669_y54rwq","phase":"migrations_start","elapsedMs":41.516200000000026}
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: role "app_user" does not exist
+     length: 85,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "acl.c",
+    routine: "get_role_oid",
+       code: "42704"
+
+      at D:\processadorApostasDistribuidas\.worktrees\delivery-final\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) (unnamed) [175.10ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [848.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\delivery-metrics.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\delivery-metrics.test.ts:
+(pass) bounded financial categories; invocation metrics never claim durable transactions [3.02ms]
+(pass) outbox publication samples cannot overwrite database backlog gauges [0.32ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [12.00ms]
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\delivery-final\tests\unit\external-wager-contract.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\unit\external-wager-contract.test.ts:
+(pass) challenge example accepts opaque messageId and takes financial key only from data [1.49ms]
+(pass) external payload cannot obtain financial identity from transport or envelope messageId [0.30ms]
+
+ 2 pass
+ 0 fail
+ 11 expect() calls
+Ran 2 tests across 1 file. [20.00ms]
+[test-runner] 12 files; 10 failed

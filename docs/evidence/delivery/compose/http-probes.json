@@ -1,0 +1,9 @@
+{
+  "outboxPending": 0,
+  "failureModeLivenessProofs": "verification-final affected and official m18 suites",
+  "noUnprovenDlqCounter": true,
+  "durableBetCount": 3,
+  "metrics": 200,
+  "liveness": 200,
+  "readiness": 200
+}
