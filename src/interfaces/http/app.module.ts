@@ -1,3 +1,6 @@
+import { ConsumeWagerCommand } from '../../application/messaging/consume-wager-command';
+import { MikroOrmInboxRepository } from '../../infrastructure/persistence/mikro-orm/mikro-orm-inbox-repository';
+import { SqsWagerConsumer } from '../../infrastructure/messaging/sqs-wager-consumer.service';
 import { PersistenceModule } from '../../infrastructure/persistence/persistence.module';
 import { WageringQueryModule } from './wagering-query.module';
 import { Module } from '@nestjs/common';
@@ -23,6 +26,12 @@ import { OutboxPublisherWorkerModule } from '../../infrastructure/workers/outbox
   imports: [PersistenceModule, WageringQueryModule, OutboxPublisherWorkerModule],
   controllers: [WalletController, WageringController],
   providers: [
+    {
+      provide: SqsWagerConsumer,
+      useFactory: (uow: MikroOrmUnitOfWork, wagers: MikroOrmWagerTransactionRepository, process: ProcessWagerUseCase) =>
+        new SqsWagerConsumer(new ConsumeWagerCommand(uow, new MikroOrmInboxRepository(uow), wagers, process)),
+      inject: [MikroOrmUnitOfWork, MikroOrmWagerTransactionRepository, ProcessWagerUseCase],
+    },
     {
       provide: CreateWalletUseCase,
       useFactory: (

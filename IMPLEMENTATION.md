@@ -437,3 +437,7 @@ Base: `51c14400282749e972903929ef4517674c77bf0c`; branch `codex/m14-stabilizatio
 - Padrões: polling 5000 ms, lote 20, lease 30000 ms, request SQS 5000 ms; retry `min(1000 * 2^attempts, 60000)` ms, sem jitter nem limite terminal de tentativas. Claim ordena `next_attempt_at ASC NULLS FIRST, created_at ASC`, usa `clock_timestamp()` e expiração `<=`.
 - Envio concluído após expiração não autoriza marcar publicação. Evento permanece recuperável para republicar o mesmo eventId: entrega at-least-once exige consumidor idempotente. FIFO preserva ordem de aceitação pelo broker dentro do grupo, sem garantir ordem causal original entre publishers concorrentes.
 - Evidências atualizadas: `docs/evidence/m14-stabilization.md`. As seções anteriores descrevem o histórico dos marcos; os resultados desta estabilização são registrados separadamente.
+
+## M15 — consumidor de comandos
+
+Implementados envelope v1, validação FIFO, normalização compartilhada, inbox transacional reversível, replay pelo snapshot atual, receive/process/delete com SDK oficial e drenagem normal. Ativação: SQS_CONSUMER_ENABLED=true e WAGER_TRANSACTIONS_QUEUE_URL explícita. Inbox ACCEPTED é representada pela existência da associação; inclui rejeições persistidas e pendências. Não existe reserva confirmada separada. Colisões escapam da UoW externa e são reconciliadas em redelivery saudável. Consulte [contrato final M15](docs/messaging/M15-IMPLEMENTED.md) e [evidências](docs/evidence/m15-sqs-inbox.md). Retry avançado, renovação de visibilidade, DLQ e shutdown completo sob falhas permanecem em M16.

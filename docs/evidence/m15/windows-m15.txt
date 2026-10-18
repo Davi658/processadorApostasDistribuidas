@@ -1,0 +1,26 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\sqs-inbox-m15.test.ts:
+(pass) A: five operations via actual receive/delete, ledger and outbox identities [1219.07ms]
+(pass) B: normalization and hash match HTTP; FIFO and malformed input fail closed [36.82ms]
+(pass) C/E/F/G: atomic external commit, replay and original preservation [169.85ms]
+(pass) D: rejected and pending accepted without ledger movement [191.90ms]
+(pass) I: all write failure cuts roll back whole unit [584.95ms]
+[Nest] 14788  - 18/10/2026, 02:26:02    WARN [SqsWagerConsumer] SQS_COMMAND_NOT_ACKNOWLEDGED stage=TRANSACTION
+(pass) J/M: lost delete or commit confirmation leaves durable result recoverable [131.32ms]
+(pass) H: separate processes duplicate commands and HTTP/queue global key race [4043.66ms]
+(pass) K: real process crash with explicit pre/post commit barriers and recovery [2679.81ms]
+[Nest] 14788  - 18/10/2026, 02:26:08    WARN [SqsWagerConsumer] SQS_COMMAND_NOT_ACKNOWLEDGED stage=DELETE
+(pass) J: DeleteMessage failure after commit followed by actual redelivery [141.26ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker","count":2,"transactionIds":["8d27eac0-221d-40b7-a76f-78afa91a81ec","b23a5c75-2a2a-48b5-9288-d1643accae31"]}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker","transactionId":"8d27eac0-221d-40b7-a76f-78afa91a81ec","attempts":1}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker","transactionId":"b23a5c75-2a2a-48b5-9288-d1643accae31","outcome":"PROCESSED","attempts":1}
+(pass) L: worker resolves pending and inbox replay returns terminal snapshot [739.45ms]
+(pass) N: normal Nest shutdown drains transaction before ORM/client closure [478.82ms]
+(pass) H: different wallets contend on global key in separate HTTP/queue processes [2064.28ms]
+(pass) snapshot corruption fails closed without changing historical state [86.23ms]
+
+ 13 pass
+ 0 fail
+ 174 expect() calls
+Ran 13 tests across 1 file. [16.06s]

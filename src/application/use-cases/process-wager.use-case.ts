@@ -47,7 +47,7 @@ export class ProcessWagerUseCase {
       new WinProcessor(this.walletRepo, this.wagerRepo, this.ledgerRepo, this.outboxRepo);
   }
 
-  public async execute(idempotencyKey: string, dto: ProcessWagerDto): Promise<WagerResponseDto> {
+  public async execute(idempotencyKey: string, dto: ProcessWagerDto, options?: { externalTransaction?: boolean }): Promise<WagerResponseDto> {
     // 1. Independent Domain Validation (decoupled from HTTP transport)
     this.validateDomainRules(idempotencyKey, dto);
 
@@ -121,6 +121,8 @@ export class ProcessWagerUseCase {
         }
       });
     } catch (err: any) {
+      // The external owner must exit the aborted UoW before any reconciliation.
+      if (options?.externalTransaction) throw err;
       // 6. Safe 23505 race resolution outside aborted PostgreSQL transaction
       const uniqueConstraintCause = this.identifyWagerUniqueConstraint(err);
 

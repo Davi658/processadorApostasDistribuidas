@@ -1,3 +1,5 @@
+Atualização: M15 possui implementação e evidências nesta branch. Consulte [contrato final M15](M15-IMPLEMENTED.md); o texto abaixo preserva a proposta histórica.
+
 # M15/M16 — matriz de aceitação proposta
 
 Não representa testes executados ou funcionalidades entregues. Base estática: `13009c73dabf7b7be7193cababd4e74f19372397`. Aplicar após fechar as decisões D1–D8 do [handoff](IMPLEMENTATION-HANDOFF.md), seguindo [contrato de entrada](INPUT-CONTRACT.md) e [transação e ack](TRANSACTION-AND-ACK.md). M14 em desenvolvimento não é contrato aprovado.

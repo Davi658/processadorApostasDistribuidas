@@ -703,3 +703,7 @@ Base: `51c14400282749e972903929ef4517674c77bf0c`; branch `codex/m14-stabilizatio
 - Padrões: polling 5000 ms, lote 20, lease 30000 ms, request SQS 5000 ms; retry `min(1000 * 2^attempts, 60000)` ms, sem jitter nem limite terminal de tentativas. Claim ordena `next_attempt_at ASC NULLS FIRST, created_at ASC`, usa `clock_timestamp()` e expiração `<=`.
 - Envio concluído após expiração não autoriza marcar publicação. Evento permanece recuperável para republicar o mesmo eventId: entrega at-least-once exige consumidor idempotente. FIFO preserva ordem de aceitação pelo broker dentro do grupo, sem garantir ordem causal original entre publishers concorrentes.
 - Evidências atualizadas: `docs/evidence/m14-stabilization.md`. As seções anteriores descrevem o histórico dos marcos; os resultados desta estabilização são registrados separadamente.
+
+## M15 — SQS de comandos e inbox
+
+O consumidor opcional SqsWagerConsumer recebe da FIFO de comandos e usa ConsumeWagerCommand com a UoW compartilhada. A migration 009 adiciona command_inbox, identidade consumer/commandId e associação à transação financeira. ProcessWagerUseCase continua sendo o motor financeiro único. O delete depende do retorno confirmado da UoW externa; replay valida o snapshot atual persistido. Normalização compartilhada vive em application/validators/wager-input.validator.ts; o HTTP apenas adapta erros para 400. Contrato e limites: [M15](docs/messaging/M15-IMPLEMENTED.md).

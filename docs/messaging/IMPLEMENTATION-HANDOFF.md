@@ -1,3 +1,5 @@
+Atualização: M15 possui implementação e evidências nesta branch. Consulte [contrato final M15](M15-IMPLEMENTED.md); o texto abaixo preserva a proposta histórica.
+
 # M15/M16 — handoff para implementação futura
 
 Estado: **M15/M16 não implementados por esta tarefa**. Somente critérios e desenho proposto. Não há migrations Inbox, consumidor ou alterações de runtime nesta entrega. M14 pertence ao Antigravity e continua independente.
