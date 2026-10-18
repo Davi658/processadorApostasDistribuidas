@@ -1,3 +1,4 @@
+import { validateOutboxContract } from '../validation/outbox-contract';
 import { Logger } from '@nestjs/common';
 import type {
   ClaimedOutboxMessage,
@@ -26,9 +27,6 @@ export type OutboxPublishHookPoint =
   | 'after_sqs_send'
   | 'before_mark_published'
   | 'after_mark_published';
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class PublishOutboxEventsUseCase {
   private readonly logger = new Logger(PublishOutboxEventsUseCase.name);
@@ -73,33 +71,6 @@ export class PublishOutboxEventsUseCase {
     if (hook) {
       await hook(context);
     }
-  }
-
-  private validateEnvelope(event: ClaimedOutboxMessage): {
-    valid: boolean;
-    reason?: string;
-  } {
-    if (!event.id || !UUID_REGEX.test(event.id)) {
-      return { valid: false, reason: 'INVALID_EVENT_ID_UUID' };
-    }
-    if (!event.aggregateId || typeof event.aggregateId !== 'string' || event.aggregateId.trim() === '') {
-      return { valid: false, reason: 'MISSING_AGGREGATE_ID' };
-    }
-    if (!event.eventType || typeof event.eventType !== 'string' || event.eventType.trim() === '') {
-      return { valid: false, reason: 'MISSING_EVENT_TYPE' };
-    }
-    if (typeof event.version !== 'number' || !Number.isInteger(event.version) || event.version < 1) {
-      return { valid: false, reason: 'INVALID_VERSION' };
-    }
-    if (!event.occurredAt || isNaN(Date.parse(event.occurredAt))) {
-      return { valid: false, reason: 'INVALID_OCCURRED_AT' };
-    }
-    try {
-      JSON.stringify(event.payload);
-    } catch {
-      return { valid: false, reason: 'UNSERIALIZABLE_PAYLOAD' };
-    }
-    return { valid: true };
   }
 
   public calculateBackoffDelayMs(attempts: number): number {
@@ -149,18 +120,19 @@ export class PublishOutboxEventsUseCase {
       }
 
       // 1. Envelope validation: isolate invalid events without blocking the whole batch
-      const validation = this.validateEnvelope(event);
+      const validation = validateOutboxContract(event);
       if (!validation.valid) {
         this.logger.warn(
           `Outbox message ${event.id} is invalid: ${validation.reason}. Isolating event.`
         );
-        await this.outboxRepo.markOperationallyBlocked(
+        const blocked = await this.outboxRepo.markOperationallyBlocked(
           event.id,
           event.leaseToken,
           validation.reason!,
           `Validation failed: ${validation.reason}`
         );
-        result.blocked++;
+        if (blocked) result.blocked++;
+        else result.staleLease++;
         continue;
       }
 

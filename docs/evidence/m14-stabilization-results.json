@@ -1,0 +1,196 @@
+{
+  "base": "51c14400282749e972903929ef4517674c77bf0c",
+  "branch": "codex/m14-stabilization",
+  "worktree": "D:\\processadorApostasDistribuidas\\.worktrees\\m14-stabilization",
+  "final_commit": "Resolve HEAD after local commit; exact SHA reported in final response.",
+  "environment": {
+    "windows": "native Bun 1.4.3",
+    "linux": "oven/bun:1.4.3 Docker",
+    "postgres": "postgres:16.6-alpine",
+    "localstack": "localstack/localstack:4.0.3",
+    "project": "m14-stabilization",
+    "ports": [
+      15434,
+      14567,
+      13014
+    ],
+    "cleanup_exit_code": 0
+  },
+  "commands": [
+    {
+      "command": "./infra/m14-validation.ps1 typecheck",
+      "platform": "Windows",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\typecheck.txt"
+    },
+    {
+      "command": "docker compose -p m14-stabilization -f docker-compose.local.yml -f infra/m14-validation.compose.yml --profile test run --rm test-runner bun run typecheck",
+      "platform": "Linux",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\linux-typecheck.txt"
+    },
+    {
+      "command": "./infra/m14-validation.ps1 m14",
+      "platform": "Windows",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\windows-m14-verified.txt",
+      "passed": 39,
+      "failed": 0,
+      "assertions": 214
+    },
+    {
+      "command": "./infra/m14-validation.ps1 linux-m14",
+      "platform": "Linux",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\linux-m14-final.txt",
+      "passed": 39,
+      "failed": 0,
+      "assertions": 214
+    },
+    {
+      "command": "./infra/m14-validation.ps1 official",
+      "platform": "Windows",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\windows-official-sequential.txt",
+      "passed": 455,
+      "failed": 0,
+      "assertions": 5454
+    },
+    {
+      "command": "./infra/m14-validation.ps1 linux-official",
+      "platform": "Linux",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\linux-official-postcheckpoint.txt",
+      "passed": 455,
+      "failed": 0,
+      "assertions": 5454
+    },
+    {
+      "command": "./infra/m14-validation.ps1 build",
+      "platform": "Docker",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\build-final-integrated.txt"
+    },
+    {
+      "command": "./infra/m14-validation.ps1 smoke",
+      "platform": "Windows to Linux API",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\smoke.txt"
+    },
+    {
+      "command": "./infra/m14-validation.ps1 down",
+      "platform": "Docker",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\cleanup.txt"
+    },
+    {
+      "command": "bun test tests/observability/m18-http.test.ts",
+      "platform": "Windows",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\windows-m18.txt",
+      "passed": 4,
+      "failed": 0,
+      "assertions": 80
+    },
+    {
+      "command": "./infra/m14-validation.ps1 m14 (initial SQL fixture failure)",
+      "platform": "Windows",
+      "exit_code": 1,
+      "log": "docs\\evidence\\m14-stabilization\\windows-m14.txt"
+    },
+    {
+      "command": "./infra/m14-validation.ps1 official (initial M18 fixed connection failure)",
+      "platform": "Windows",
+      "exit_code": 1,
+      "log": "docs\\evidence\\m14-stabilization\\windows-official.txt",
+      "passed": 445,
+      "failed": 2,
+      "assertions": 5338
+    },
+    {
+      "command": "./infra/m14-validation.ps1 linux-official (initial M18 fixed connection failure)",
+      "platform": "Linux",
+      "exit_code": 1,
+      "log": "docs\\evidence\\m14-stabilization\\linux-official.txt",
+      "passed": 451,
+      "failed": 2,
+      "assertions": 5374
+    },
+    {
+      "command": "./infra/m14-validation.ps1 official (simultaneous load)",
+      "platform": "Windows",
+      "exit_code": 1,
+      "log": "docs\\evidence\\m14-stabilization\\windows-official-final.txt",
+      "passed": 412,
+      "failed": 4,
+      "assertions": 5002
+    },
+    {
+      "command": "./infra/m14-validation.ps1 linux-official (stopped own container during simultaneous load)",
+      "platform": "Linux",
+      "exit_code": 137,
+      "log": "docs\\evidence\\m14-stabilization\\linux-official-final.txt",
+      "passed": 125,
+      "failed": 0,
+      "assertions": 1218
+    },
+    {
+      "command": "./infra/m14-validation.ps1 linux-official (sequential before checkpoint)",
+      "platform": "Linux",
+      "exit_code": 1,
+      "log": "docs\\evidence\\m14-stabilization\\linux-official-sequential.txt",
+      "passed": 405,
+      "failed": 4,
+      "assertions": 4948
+    },
+    {
+      "command": "docker exec m14-stabilization-postgres-1 psql -U migration_user -d postgres -c CHECKPOINT",
+      "platform": "Linux",
+      "exit_code": 0,
+      "log": "docs\\evidence\\m14-stabilization\\checkpoint.txt"
+    }
+  ],
+  "tested_source_sha256": {
+    "src/application/validation/outbox-contract.ts": "fd6db9810d0eaf4f25b911311111adb6e5f7f6ee7f014ff064c4b4fd87766126",
+    "src/application/use-cases/publish-outbox-events.use-case.ts": "3276c38aa04a23d5b81c5823536eb0ff0d6d31ca155bb7bf8a6dbc578ef20e73",
+    "src/infrastructure/messaging/sqs-outbox-queue-publisher.service.ts": "62c06a3513c791d7b18cf22214c7be43c138fdf77262e99a60ee2602bfbb225f",
+    "src/infrastructure/persistence/mikro-orm/mikro-orm-adapter.ts": "9f13c201f16e0aaa084d1c351303569f84e106fe8d9d728055287b286ae0b2a9",
+    "tests/integration/outbox-publisher-m14.test.ts": "c170de6edfc7a1cd523c3121f625670b16bfa723ffbb3363f9d9ba929140bbcb",
+    "tests/unit/outbox-contract-m14.test.ts": "bf31152223a957e3acbcf54354025ef71625c226c0f135c2a5466988dacb8a06",
+    "tests/concurrency/outbox-worker-runner.ts": "9821cdd494b4fa2c291fecc780f068ca8f38866c26ad5b27c99a22af8743383e",
+    "tests/observability/m18-http.test.ts": "68d05dcf2b05dda4db5f5de4fb3b070fa56e079cb52131ebd51d8420974f2bb3",
+    "infra/m14-validation.compose.yml": "f902713dabd16ca7390f7071b88a41dc913cbecf14fcc9b221c74f8df0df105b",
+    "infra/m14-validation.ps1": "cf2c51f31ba6bd2c0a9078a1c428ad7e673cfa0e74b39e3d2aea6069d37503b6",
+    "Dockerfile": "d3a695da4748471a8994dce234588ae694ac4bd8d11ac80ca0c57008621ee1fd",
+    "bun.lock": "3a2c9f2ea7dd461d24b35267b1945e83e9f344d59dc361449bd56cf6a5bc4e30"
+  },
+  "limitations": [
+    "Local PostgreSQL/LocalStack only; no production AWS validation.",
+    "Intermediate lock/checkpoint/setup timing failures retained; final suites passed without relaxed deadlines/assertions.",
+    "M18 product integration remains outside scope.",
+    "Windows process termination is not claimed to be POSIX SIGKILL.",
+    "FIFO acceptance order does not imply original causal order between concurrent publishers."
+  ],
+  "logs_sha256": {
+    "docs\\evidence\\m14-stabilization\\bootstrap-build-excerpt.txt": "c0f142ded44b8c73983d1c082d67d4ecf0b7d0a89cfdcfce6a05989a3ba50e0b",
+    "docs\\evidence\\m14-stabilization\\build-final-integrated.txt": "f8bc7c7c8a6c08a8a574d45d9e48210de1ce4fa1d66669a4416fd4c0c0704e5a",
+    "docs\\evidence\\m14-stabilization\\build.txt": "259ea3dbafdd69936906cb0521fc133a3fc6e6ace732259d43f7f56148f95335",
+    "docs\\evidence\\m14-stabilization\\checkpoint.txt": "6f336511fc18f1618eeb3c01fb4ae393d11aaceed5f9dc9b883a7d59b45e26f8",
+    "docs\\evidence\\m14-stabilization\\cleanup.txt": "70a5eca6c9f1c9e00e042f6bef9385e62099742b5983021f7f7bb5f428626bbd",
+    "docs\\evidence\\m14-stabilization\\diagnostics.txt": "5bbaf6011a5ac44076cc1f5584e351114b65efa3b83be9e3d6d1a81ab3641b1e",
+    "docs\\evidence\\m14-stabilization\\linux-m14-final.txt": "d59b31b96ad9cabbe3529a678ba48ad1a27c5cc3d735fc6d91a0c75afe133279",
+    "docs\\evidence\\m14-stabilization\\linux-official-final.txt": "a24fdf26e3d4a069edc2f3de18a6b2350552ab5bf960230f3fd4493150ee20b3",
+    "docs\\evidence\\m14-stabilization\\linux-official-postcheckpoint.txt": "ff6eb14d68cab7496e070178b06c5c29aab713f727da34df8d359fb335eea0e1",
+    "docs\\evidence\\m14-stabilization\\linux-official-sequential.txt": "3e7668d1a3d7135a53ed86545ea805556804d40d853a758203d313934667692e",
+    "docs\\evidence\\m14-stabilization\\linux-official.txt": "29669a4e6ce073995e859574b516dac1eda52ebcca9b242598f250b598dd18f3",
+    "docs\\evidence\\m14-stabilization\\linux-typecheck.txt": "7a9ea06090fa7ec652830b6701b30d8eafac4c2c1bf6db2160f232fcffc5cf37",
+    "docs\\evidence\\m14-stabilization\\smoke.txt": "0d7965320f9e445aef17f69cbc7b89a157d9241c85709fd3a00807a3d1e70145",
+    "docs\\evidence\\m14-stabilization\\typecheck.txt": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "docs\\evidence\\m14-stabilization\\windows-m14-verified.txt": "54f1a83639ad6dfa9281fd4d39bef6474773fe6a3b652804e6b120f567836f25",
+    "docs\\evidence\\m14-stabilization\\windows-m14.txt": "dbeb92a60464c89570c8f9dd1a8391fc77983284f127cd0138caba36011d864b",
+    "docs\\evidence\\m14-stabilization\\windows-m18.txt": "45493041906a67974f0b860791cfb661b85dbef97c38a20a35b8c491e1886e69",
+    "docs\\evidence\\m14-stabilization\\windows-official-final.txt": "23cfda0e6ae414348994433932d1689ada1a8ba1dd4d9b47039f4684268ec24c",
+    "docs\\evidence\\m14-stabilization\\windows-official-sequential.txt": "08f23b28fc9e55f104602106344a7fabddfd78e0f7e28f0268acabb631b8b2a7",
+    "docs\\evidence\\m14-stabilization\\windows-official.txt": "e390f3fb7f0ba1b8a1f5c750175b3620f98c0751e5d3b68aff7179127ac10827"
+  }
+}

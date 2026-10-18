@@ -69,7 +69,7 @@ async function main() {
   } catch (err: any) {
     console.log(JSON.stringify({ ok: false, error: err?.message, code: err?.code }));
   } finally {
-    await queuePublisher.onModuleDestroy();
+    await queuePublisher.beforeApplicationShutdown();
     await uow.close();
   }
 }

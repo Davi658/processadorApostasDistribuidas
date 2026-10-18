@@ -1,0 +1,8 @@
+Excerpt from initial bootstrap command tool output (not a complete redirected build log):
+#10 [dependencies 4/4] RUN bun install --frozen-lockfile
+#10 1.098 bun install v1.4.3 (c6da4a4d3)
+#10 36.04 267 packages installed [34.94s]
+#10 DONE 37.7s
+Initial command: docker compose -p m14-stabilization -f docker-compose.local.yml -f infra/m14-validation.compose.yml up -d postgres localstack queues migrate
+Exit code: 0.
+Subsequent runtime/tester builds reused this dependency layer; their complete logs are build.txt and build-final-integrated.txt.

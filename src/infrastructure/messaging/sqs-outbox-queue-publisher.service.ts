@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
+import { Injectable, BeforeApplicationShutdown, Logger, Optional } from '@nestjs/common';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import type { IntegrationEventEnvelope } from '../../domain/events/events';
 import type { OutboxQueuePublisherPort } from '../../application/ports/ports';
@@ -14,7 +14,7 @@ export interface SqsPublisherConfig {
 }
 
 @Injectable()
-export class SqsOutboxQueuePublisher implements OutboxQueuePublisherPort, OnModuleDestroy {
+export class SqsOutboxQueuePublisher implements OutboxQueuePublisherPort, BeforeApplicationShutdown {
   private readonly logger = new Logger(SqsOutboxQueuePublisher.name);
   private readonly client: SQSClient;
   private readonly queueUrl: string;
@@ -91,7 +91,9 @@ export class SqsOutboxQueuePublisher implements OutboxQueuePublisherPort, OnModu
     return { messageId: response.MessageId };
   }
 
-  public async onModuleDestroy(): Promise<void> {
+  // Nest awaits all OnModuleDestroy hooks (worker drain) before this phase.
+  // ORM closes later in OnApplicationShutdown. Never close a borrowed client.
+  public async beforeApplicationShutdown(): Promise<void> {
     if (this.ownsClient) {
       try {
         this.client.destroy();

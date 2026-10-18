@@ -1,0 +1,268 @@
+ Container m14-stabilization-postgres-1 Running 
+ Container m14-stabilization-postgres-1 Waiting 
+ Container m14-stabilization-postgres-1 Healthy 
+ Container m14-stabilization-migrate-1 Starting 
+ Container m14-stabilization-migrate-1 Started 
+ Container m14-stabilization-migrate-1 Waiting 
+ Container m14-stabilization-migrate-1 Exited 
+ Container m14-stabilization-test-runner-run-36a969756949 Creating 
+ Container m14-stabilization-test-runner-run-36a969756949 Created 
+$ bun run scripts/run-tests.ts
+
+[test-runner] /app/tests/concurrency/concurrency.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/concurrency/concurrency.test.ts:
+(pass) High-Concurrency Invariants with Real PostgreSQL > 50 simultaneous submissions of the same BET produces exactly ONE debit and consistent reconciliation [1353.32ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Two concurrent BETs of 80.00 on 100.00 balance: exactly ONE processed, ONE rejected, final balance 20.00 [100.96ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Disputed idempotency key between different wallets in parallel race: exactly one processed, one conflict, loser wallet unaffected [132.23ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat concurrency scenarios with at least THREE independent OS application processes using synchronization barrier [1134.19ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > Repeat duplicate submissions with at least THREE independent OS application processes using synchronization barrier [1020.30ms]
+(pass) High-Concurrency Invariants with Real PostgreSQL > mesmo identificador externo com chaves distintas em corrida paralela: um efeito e um conflito 409 [76.45ms]
+
+ 6 pass
+ 0 fail
+ 218 expect() calls
+Ran 6 tests across 1 file. [7.17s]
+
+[test-runner] /app/tests/integration/financial-outbox-m13.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/financial-outbox-m13.test.ts:
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.1 Abertura positiva: persiste exatamente 2 eventos (Processed + BalanceChanged) [336.68ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.2 Abertura zero: não persiste nenhum evento na outbox (0 eventos) [66.00ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.3 BET processado com movimento: persiste exatamente 2 eventos (Processed + BalanceChanged) [283.15ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.4 BET rejeitado por saldo insuficiente: persiste somente 1 evento (Rejected) [135.40ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.5 LOSS: persiste somente 1 evento (Processed) e nenhum evento de saldo [131.14ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.6 WIN com movimento: persiste 2 eventos (Processed + BalanceChanged) [164.51ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.7 WIN aceito como PENDING_REFERENCE: persiste 1 evento de pendência [154.72ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker_m13","count":1,"transactionIds":["918242cd-c92f-481d-9b4f-ce2f34bf4521"]}
+{"level":"info","event":"PENDING_REFERENCE_RESCHEDULED","workerId":"worker_m13","transactionId":"918242cd-c92f-481d-9b4f-ce2f34bf4521","attempts":1}
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.8 Reagendamento via worker: não duplica evento de pendência (0 novos eventos) [188.49ms]
+{"level":"info","event":"PENDING_REFERENCES_CLAIMED","workerId":"worker_m13","count":1,"transactionIds":["fe63a6d7-9bb0-47c0-8066-3570a95255e0"]}
+{"level":"info","event":"PENDING_REFERENCE_RESOLVED","workerId":"worker_m13","transactionId":"fe63a6d7-9bb0-47c0-8066-3570a95255e0","outcome":"PROCESSED","attempts":1}
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.9 Resolução posterior via worker: persiste exatamente os 2 eventos terminais [160.64ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.10 REFUND processado com movimento: persiste 2 eventos (Processed + BalanceChanged) [110.36ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.11 ROLLBACK de WIN (débito): persiste 2 eventos (Processed + BalanceChanged) [112.31ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.12 Replay e Conflito de idempotência: nenhum evento adicional é emitido [116.61ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.13 WIN rejeitado por referência incompatível: persiste somente 1 evento (Rejected) [91.32ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.14 REFUND aceito como PENDING_REFERENCE: persiste 1 evento de pendência [73.88ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.15 REFUND rejeitado: persiste 1 evento (Rejected) [108.62ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.16 ROLLBACK de BET (crédito): persiste 2 eventos (Processed + BalanceChanged) [113.48ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.17 ROLLBACK aceito como PENDING_REFERENCE: persiste 1 evento de pendência [64.83ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 1. Matriz de Auditoria e Contrato de Eventos > 1.18 ROLLBACK rejeitado por saldo insuficiente ao estornar WIN: persiste 1 evento (Rejected) [153.67ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.1 Valida campos do envelope, imutabilidade de IDs e estado inicial não publicado [61.74ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.2 Suporta correlationId não-UUID longo (até 255 chars) preservando conteúdo exato [51.80ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.3 listUnpublished e findById no OutboxRepositoryPort [57.24ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 2. Validação do Envelope, Tipagem Monetária e Reconstrução > 2.4 Reconstrução de evento sem regenerar identidade ou timestamp [0.89ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.1 Barreira MVCC: eventos e alterações financeiras NÃO ficam visíveis antes do commit [90.50ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.2 Falha após a primeira gravação de outbox: reverte saldo, versão, transação, ledger e outbox; reenvio tem sucesso [108.38ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.3 Falha após a última gravação de outbox: reverte tudo; reenvio gera exatamente o conjunto esperado [75.77ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.4 Concorrência de duplicatas: requisições concorrentes idênticas não multiplicam eventos [134.96ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.5 Falha técnica genérica antes do commit: nenhum evento financeiro ou de outbox é confirmado [72.37ms]
+(pass) M13: Financial Outbox & Transactional Event Persistence Suite > 3. Atomicidade Real PostgreSQL e Barreiras de Isolamento > 3.6 Timestamps iguais com ordenação de UUID contrária à emissão: identifica eventos por tipo e ID sem presumir ordenação de array ou UUID [66.73ms]
+
+ 28 pass
+ 0 fail
+ 218 expect() calls
+Ran 28 tests across 1 file. [6.66s]
+
+[test-runner] /app/tests/integration/http-endpoints.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/http-endpoints.test.ts:
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > POST /wallets should create a wallet with initial balance and return 201 with aligned contract [105.00ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > POST /wallets should allow opening with explicit zero balance "0.00" [20.26ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > POST /wallets should return 409 Conflict if wallet already exists for player and currency [47.42ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wallet Creation & Consultation Contracts > GET /wallets/:walletId should return 200 with wallet details or 404 if not found [45.57ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when amount is passed as a number instead of string [2.48ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when initialBalance is passed as null, 0, false or empty string [6.73ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when initialBalance contains non-canonical decimal like "00.00" [1.79ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when playerId is not a valid UUID [1.74ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > should return 400 when body contains unexpected properties [1.56ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when Idempotency-Key header is missing [3.90ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when Idempotency-Key is empty or whitespace only [2.19ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when Idempotency-Key exceeds 255 chars (256 chars) [2.09ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when kind is not in allowed kinds [2.73ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Runtime Input Validation (Requirement 3 & 4) > POST /wagering/transactions should return 400 when required fields are empty strings [2.68ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Idempotency-Key Lengths & Outbox Propagation (Requirement 1) > should accept 128, 129, and 255 char keys without truncation and persist in outbox with full length [182.28ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Idempotency-Key Lengths & Outbox Propagation (Requirement 1) > should propagate independent x-correlation-id header when provided [141.88ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Wagering BET Execution, Idempotency & Reconciliation Contracts > POST /wagering/transactions should process BET (200), reject on insufficient balance (422), and replay correctly [171.42ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Extended Wager Operations (WIN, LOSS, REFUND, ROLLBACK) > POST /wagering/transactions should handle WIN, LOSS, REFUND, and ROLLBACK correctly via HTTP [204.14ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > HTTP Extended Wager Operations (WIN, LOSS, REFUND, ROLLBACK) > POST /wagering/transactions should return 202 Accepted when reference is missing (PENDING_REFERENCE) [64.29ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Transient Error Handling (Requirement 5) > DomainExceptionFilter should map connection errors and PostgreSQL transient codes to 503 [3.67ms]
+(pass) HTTP Endpoints Real Integration & Validation Tests > Idempotency Key Payload Conflict & Replay Tests > 3. Via HTTP, mesma Idempotency-Key com valor diferente deve retornar 409 sem novo debito, ledger ou evento na outbox, e 4. Payload identico deve realizar replay com resultado original [124.44ms]
+
+ 21 pass
+ 0 fail
+ 126 expect() calls
+Ran 21 tests across 1 file. [3.35s]
+
+[test-runner] /app/tests/integration/ledger-constraints-m12.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/ledger-constraints-m12.test.ts:
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > binds transaction, wallet and currency with the composite FK, independently of duplicates [103.41ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects zero with the precise database diagnostic and no partial effects [20.14ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative with the precise database diagnostic and no partial effects [20.06ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects credit arithmetic with the precise database diagnostic and no partial effects [19.57ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects debit arithmetic with the precise database diagnostic and no partial effects [19.62ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects unknown type with the precise database diagnostic and no partial effects [17.52ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative before with the precise database diagnostic and no partial effects [17.79ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects negative after with the precise database diagnostic and no partial effects [19.27ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects amount overflow with the precise database diagnostic and no partial effects [17.68ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects before overflow with the precise database diagnostic and no partial effects [18.80ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects after overflow with the precise database diagnostic and no partial effects [17.32ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects NaN amount with the precise database diagnostic and no partial effects [17.03ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > rejects NaN before with the precise database diagnostic and no partial effects [17.52ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > keeps wallet balances finite, nonnegative and within NUMERIC capacity [27.21ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > preserves complete existing rows in incremental UP/DOWN/UP; invalid legacy data aborts UP without deletion [1870.13ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > accepts exact cent arithmetic at NUMERIC maximum and rejects a second entry for the operation [40.09ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > proves enabled UPDATE/DELETE trigger as admin and permission denial including TRUNCATE as app [59.75ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles zero entries and detects direct SQL balance drift exactly beyond safe number precision [182.04ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reports aggregate drift outside single-column Money limits as exact signed decimal strings [93.54ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles valid high turnover independently of timestamp/UUID order without intermediate Money overflow [58.30ms]
+(pass) M12 ledger constraints and exact reconciliation on disposable PostgreSQL > reconciles opening, BET, WIN, REFUND, ROLLBACK; LOSS, rejection and replay add no entries [703.67ms]
+
+ 21 pass
+ 0 fail
+ 147 expect() calls
+Ran 21 tests across 1 file. [6.07s]
+
+[test-runner] /app/tests/integration/m17-read-endpoints.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/m17-read-endpoints.test.ts:
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 1. GET /wagering/transactions/:transactionId > should return 200 with transaction details and money as { amount, currency } [78.35ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 1. GET /wagering/transactions/:transactionId > should return 404 Not Found when transaction does not exist [7.14ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 1. GET /wagering/transactions/:transactionId > should return 400 Bad Request when transactionId is not a valid UUID [5.73ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 2. GET /providers/:providerId/wagering/transactions/:externalTransactionId > should return 200 with transaction details when querying by provider and external ID [22.66ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 2. GET /providers/:providerId/wagering/transactions/:externalTransactionId > should return 404 Not Found when provider or external ID is unknown [7.06ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 2. GET /providers/:providerId/wagering/transactions/:externalTransactionId > should return 400 Bad Request when externalTransactionId is empty or whitespace [1.87ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 200 with empty items, nextCursor null, and hasMore false for empty wallet [19.50ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 404 Not Found when wallet does not exist [4.28ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 400 Bad Request when walletId is invalid [2.16ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > should return 400 Bad Request for invalid limit values [14.96ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > paginação sem repetição: should paginate deterministically across multiple pages without duplicates or omissions [167.72ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > timestamps iguais: should deterministically break ties with id ASC when multiple entries have identical created_at [94.27ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > cursor inválido: should reject malformed, non-base64, corrupted or invalid payload cursors with 400 Bad Request [14.35ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > cursor vinculado à carteira: should return 400 Bad Request when attempting to use a cursor generated for another wallet [12.18ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 3. GET /wallets/:walletId/ledger (Keyset Pagination & Invariants) > última página: querying past the end should return empty items and nextCursor null [30.08ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > 4. Ausência de Mutações & Sem Efeitos Financeiros > should strictly perform read-only queries with zero mutations on balances, ledger, transactions, or outbox [58.57ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > shares one UoW and existing repositories between command and query providers [2.65ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > isolates identical external IDs by provider and returns the identical transaction contract by ID [78.29ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > preserves every microsecond across pages, identical timestamps, UUID ties and exact large ledger amounts [112.78ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > rejects impossible dates and noncanonical cursor formats before any repository SQL [19.51ms]
+(pass) M17: Read Endpoints & Keyset Ledger Pagination > accepts default and maximum limits and rejects repeated query parameters [18.80ms]
+
+ 21 pass
+ 0 fail
+ 290 expect() calls
+Ran 21 tests across 1 file. [2.55s]
+
+[test-runner] /app/tests/integration/migrations.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/migrations.test.ts:
+(pass) Reversible Migrations on Disposable Database > should successfully run UP and DOWN migrations incrementally on a newly created disposable database [940.51ms]
+
+ 1 pass
+ 0 fail
+ 24 expect() calls
+Ran 1 test across 1 file. [993.00ms]
+
+[test-runner] /app/tests/integration/mikro-orm-uow-m05.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/mikro-orm-uow-m05.test.ts:
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > A. Identidade Transacional > deve compartilhar o mesmo EntityManager e a mesma conexão/transação PostgreSQL entre todos os repositórios [85.63ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > B. Isolamento e MVCC com Sincronização Explícita > deve manter duas execuções concorrentes em conexões/transações distintas e não vazar visibilidade não commitada [34.59ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após wallet_save [9.05ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após tx_save [20.00ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após ledger_save [20.91ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > C. Rollback Integral após Cada Gravação > deve reverter integralmente quando a falha ocorre após outbox_save [12.44ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.1: chamada interna não confirma independentemente antes da externa [17.03ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.2: falha externa desfaz integralmente o trabalho feito pela chamada interna [18.29ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.3: falha interna capturada pela camada externa não permite commit parcial (Rollback-Only) [11.54ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > D. Semântica de Aninhamento & Rollback-Only > D.4: chamada aninhada subsequente em contexto rollback-only é rejeitada com TransactionRollbackOnlyError preservando cause [3.74ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > E. Limpeza e Ausência de Vazamento de Contexto > deve limpar contexto após erro e permitir nova execução bem-sucedida sem resquícios [18.38ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em WalletRepository fora da transação sem persistir no PostgreSQL [1.88ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em WagerTransactionRepository fora da transação [2.29ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em WalletLedgerRepository fora da transação [1.21ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar gravação em OutboxRepository fora da transação [1.34ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve rejeitar lock pessimista fora da transação [0.36ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > F. Escrita sem UoW Rejeitada & Consultas Fora da Transação > deve permitir consultas simples fora da transação sem erros [50.22ms]
+(pass) M05: MikroORM & Unit of Work Stabilization Suite (Real Disposable PostgreSQL) > G. Ciclo da Aplicação NestJS Real e Liberação de Recursos > deve inicializar via app.init(), executar transação e encerrar via app.close() liberando conexões [2225.68ms]
+
+ 18 pass
+ 0 fail
+ 87 expect() calls
+Ran 18 tests across 1 file. [4.09s]
+
+[test-runner] /app/tests/integration/money-postgres-roundtrip.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/money-postgres-roundtrip.test.ts:
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for zero boundary: "0.00" [170.93ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for one cent boundary: "0.01" [106.81ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for regular decimal: "100.50" [44.05ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for near standard safe integer cents: "90071992547409.91" [62.85ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for above Number.MAX_SAFE_INTEGER cents: "9007199254740991.00" [40.26ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for one cent below NUMERIC(18,2) max limit: "9999999999999999.98" [28.92ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.1 Money → ORM → NUMERIC(18,2) → ORM → Money Round-Trip > should preserve exact value through round-trip for exact maximum NUMERIC(18,2) limit (16 integer + 2 dec): "9999999999999999.99" [39.73ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.2 Operation Refused by Limit Invariants: No Partial Mutations > should refuse WIN credit that causes overflow and leave zero partial mutations (balance, version, tx, ledger, outbox) [74.63ms]
+(pass) PostgreSQL Real Integration: Money Round-Trip & Boundary Overflow Invariants > 4.2 Operation Refused by Limit Invariants: No Partial Mutations > should reject wager input with amount exceeding NUMERIC(18,2) limit at domain entry without touching DB [39.18ms]
+
+ 9 pass
+ 0 fail
+ 108 expect() calls
+Ran 9 tests across 1 file. [2.82s]
+
+[test-runner] /app/tests/integration/outbox-publisher-m14.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests/integration/outbox-publisher-m14.test.ts:
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > A. Evento de transação não confirmada não é publicado [2077.53ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > B. Publicação preserva integralmente o envelope e os identificadores FIFO [1163.49ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > C. Dois publishers concorrentes não possuem simultaneamente o mesmo claim válido [1252.47ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > D. Falha antes do envio permite recuperação [1267.72ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > E. Crash real após claim: outro processo retoma após expiração [5843.70ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > F. Crash real após confirmação SQS e antes de marcar published_at: recuperação republica sem perda, preservando eventId [10829.88ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > G. Token obsoleto não confirma publicação nem modifica a posse atual [19431.63ms]
+593 |     );
+594 |     expect(dbRes.rows[0].published_at).toBeNull();
+595 |     expect(dbRes.rows[0].attempts).toBe(1);
+596 |     expect(dbRes.rows[0].lease_token).toBeNull();
+597 |     expect(dbRes.rows[0].last_error).not.toBeNull();
+598 |     expect(new Date(dbRes.rows[0].next_attempt_at).getTime()).toBeGreaterThan(Date.now());
+                                                                    ^
+error: expect(received).toBeGreaterThan(expected)
+
+Expected: > 1792288132985
+Received: 1792288129516
+
+      at <anonymous> (/app/tests/integration/outbox-publisher-m14.test.ts:598:63)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > H. Falha/indisponibilidade do SQS mantém evento não publicado e reagenda [19675.59ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > I. Evento inválido não impede publicação dos demais [12745.07ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: send, execution ends before SQS and ORM [3553.15ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: cancel, execution ends before SQS and ORM [8821.21ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: ack, execution ends before SQS and ORM [31749.45ms]
+  ^ this test timed out after 30000ms.
+
+# Unhandled error between tests
+-------------------------------
+719 |       const final = await adminPool.query('SELECT published_at FROM outbox_messages WHERE id=$1', [eventId]);
+720 |       if (phase === 'cancel') {
+721 |         expect(final.rows[0].published_at).toBeNull();
+722 |         const recovered = await publishUseCase.execute(1);
+723 |         expect(recovered.published).toBe(1);
+724 |       } else expect(final.rows[0].published_at).not.toBeNull();
+                                     ^
+TypeError: undefined is not an object (evaluating 'final.rows[0].published_at')
+      at <anonymous> (/app/tests/integration/outbox-publisher-m14.test.ts:724:32)
+-------------------------------
+
+error: script "test" was terminated by signal SIGTERM (Polite quit request)
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/valid: unauthorized updates mutate nothing [13417.12ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/wrong: unauthorized updates mutate nothing [27256.28ms]
+

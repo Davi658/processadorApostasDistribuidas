@@ -40,7 +40,7 @@ Ambiente: Windows, Bun e PostgreSQL 16.8 real em cluster exclusivo descartável,
 | **Frente M17** | Consultas por UUID e identidade externa, ledger keyset por microssegundos, integração AppModule/UoW única e validação independente de transporte | **CONCLUÍDO** | `tests/integration/m17-read-endpoints.test.ts` (21 testes) |
 | **Frente M12** | Ledger e Constraints (reconciliação bigint exata, checks incrementais de finitude reversíveis) | **CONCLUÍDO** | `tests/integration/ledger-constraints-m12.test.ts` (21 testes) |
 | **Frente M13** | Outbox Financeira (auditoria e contrato, matriz de eventos, envelope canônico sem float, correlationId até 255 chars, atomicidade real PostgreSQL com barreira MVCC pré/pós-commit, rollback integral de falhas após 1ª e última gravação de outbox com reenvio íntegro e concorrência sem multiplicação) | **CONCLUÍDO** | `tests/integration/financial-outbox-m13.test.ts` (27 testes) |
-| **Frente M14** | Publisher Concorrente da Outbox e SQS FIFO (entrega at-least-once, FIFO MessageGroupId=aggregateId, MessageDeduplicationId=eventId, lease PostgreSQL FOR UPDATE SKIP LOCKED, crash recovery de processos reais, shutdown coordenado NestJS e zero mutação financeira) | **CONCLUÍDO** | `tests/integration/outbox-publisher-m14.test.ts` (11 testes) |
+| **Frente M14** | Publisher Concorrente da Outbox e SQS FIFO (entrega at-least-once, FIFO MessageGroupId=aggregateId, MessageDeduplicationId=eventId, lease PostgreSQL FOR UPDATE SKIP LOCKED, crash recovery de processos reais, shutdown coordenado NestJS e zero mutação financeira) | **CONCLUÍDO** | `tests/integration/outbox-publisher-m14.test.ts` (39 testes de integração; mais 23 unitários de contratos/ownership) |
 
 
 
@@ -397,17 +397,17 @@ Em 17/10/2026, com base em `f73e308a94cf18a366021a4e44c70334ea65d47c` (HEAD de `
 
 #### 1. Arquitetura e Contrato de Entrega
 - **Entrega At-Least-Once:** O publisher garante entrega de eventos confirmados para a fila FIFO do SQS (`wager-events.fifo` no LocalStack). Consumidores downstream devem ser idempotentes contra duplicatas.
-- **Identificadores FIFO:** `MessageGroupId = aggregateId` (ordenação de eventos por carteira/agregado) e `MessageDeduplicationId = eventId` (deduplicação a nível de mensagem).
+- **Identificadores FIFO:** `MessageGroupId = aggregateId` (ordem de aceitação pelo broker dentro do grupo, sem garantia de ordem causal original entre publishers concorrentes) e `MessageDeduplicationId = eventId` (deduplicação a nível de mensagem).
 - **Janela de Deduplicação FIFO:** A janela de 5 minutos do SQS FIFO protege contra replays imediatos em falhas de rede, mas não é assumida como mecanismo permanente.
-- **Ordenação Efetiva:** Ordenação preservada por partição de chave no broker; não se assume ordenação causal global por timestamp/UUID.
+- **Ordenação Efetiva:** Ordem de aceitação pelo broker preservada dentro do grupo; publishers concorrentes podem inverter a ordem causal original no mesmo agregado.
 - **Preservação Integral do Envelope:** `eventId`, `eventType`, `version`, `occurredAt`, `aggregateId`, `correlationId`, `causationId` e `data` (com tipagem monetária `{ amount, currency }` estrita).
 
 #### 2. Mecanismo de Concorrência e Lease no PostgreSQL
 - **Migration Incremental 008 (`008_outbox_publisher_lease_and_retry.sql`):** Adiciona colunas operacionais `lease_token`, `lease_owner`, `lease_expires_at`, `attempts`, `next_attempt_at`, `last_error`, `is_operationally_blocked` e `operational_block_reason`. Totalmente reversível via `.down.sql`.
-- **Claim Atômico:** `claimUnpublishedEvents` seleciona até `batchSize` registros usando `FOR UPDATE SKIP LOCKED` e calcula elegibilidade e expiração estritamente pelo relógio do PostgreSQL (`NOW()`), prevenindo drift de relógio.
-- **Fencing de Leases Obsoletos:** `markPublished`, `recordFailure` e `releaseLease` validam o `lease_token`. Um worker antigo que exceder a validade do lease não consegue sobrescrever a nova reserva nem cometer alterações indevidas.
+- **Claim Atômico:** `claimUnpublishedEvents` seleciona até `batchSize` registros usando `FOR UPDATE SKIP LOCKED` e calcula elegibilidade e expiração estritamente pelo relógio do PostgreSQL (`clock_timestamp()`), prevenindo drift de relógio.
+- **Fencing de Leases Obsoletos:** `markPublished`, `recordFailure` e `markOperationallyBlocked` validam token, lease vigente e estado elegível; `releaseLease` só libera token correspondente não publicado, inclusive expirado, sem confirmar envio. Um worker antigo que exceder a validade do lease não consegue sobrescrever a nova reserva nem cometer alterações indevidas.
 - **Isolamento Fail-Closed (`is_operationally_blocked`):** Envelopes com JSON corrompido ou campos ausentes são isolados com `is_operationally_blocked = TRUE` sem abortar ou bloquear a fila.
-- **Backoff Exponencial:** Retentativas de erros transitórios agendadas com backoff exponencial limitado (`Math.min(1000 * 2^attempts, 30000)` ms).
+- **Backoff Exponencial:** Retentativas de erros transitórios agendadas com backoff exponencial limitado (`Math.min(1000 * 2^attempts, 60000)` ms).
 
 #### 3. Provas Formais de Recuperação de Crash Real
 - **Cenário E (Crash antes do envio):** Processo OS real com claim ativo é abatido por `SIGKILL`. O segundo worker retoma após expiração do lease no PostgreSQL e conclui a publicação.
@@ -427,3 +427,13 @@ Em 17/10/2026, com base em `f73e308a94cf18a366021a4e44c70334ea65d47c` (HEAD de `
 - Multi-stage Docker build: `docker build -t wagers-m14-isolated-app:bun-1.4.3 --target runtime .` e `--target tester` concluídos com sucesso.
 - Evidências versionadas em `docs/evidence/m14-outbox-publisher.md`.
 - Consumidor, inbox e DLQ permanecem estritamente fora de escopo (marcos M15/M16).
+
+
+### Estabilização M14 sobre main combinada (17/10/2026)
+Base: `51c14400282749e972903929ef4517674c77bf0c`; branch `codex/m14-stabilization`.
+- Shutdown: worker bloqueia novos claims e drena em `OnModuleDestroy`; após 5000 ms solicita cancelamento e continua aguardando encerramento efetivo. O limite de cancelamento de 5000 ms apenas emite diagnóstico, não autoriza fechar recursos. SQS próprio é destruído em `BeforeApplicationShutdown`, ORM em `OnApplicationShutdown`; cliente de terceiros pertence ao injetor externo. Confirmação SQS não pode ser revertida por cancelamento.
+- `markPublished`, `recordFailure` e `markOperationallyBlocked` exigem token correspondente, `lease_expires_at > clock_timestamp()`, `published_at IS NULL` e evento não bloqueado. Expiração sem substituição já revoga autorização. `releaseLease` aceita token correspondente expirado de evento não publicado: libera somente a posse, sem confirmar envio nem modificar retry. Token antigo após novo claim não libera a posse atual.
+- Validação por contratos v1 de `WalletBalanceChanged`, `WagerTransactionProcessed`, `WagerTransactionRejected` e `WagerTransactionPendingReference`, sem validadores HTTP. Identidade wallet/agregado, metadados, campos obrigatórios e Money canônico são conferidos sem regenerar identidade/timestamp nem modificar payload. Tipo/versão desconhecidos são bloqueios operacionais recuperáveis: corrigir contrato/dados sob procedimento operacional e desbloquear explicitamente; não descartar evento. `blocked` só aumenta após confirmação SQL.
+- Padrões: polling 5000 ms, lote 20, lease 30000 ms, request SQS 5000 ms; retry `min(1000 * 2^attempts, 60000)` ms, sem jitter nem limite terminal de tentativas. Claim ordena `next_attempt_at ASC NULLS FIRST, created_at ASC`, usa `clock_timestamp()` e expiração `<=`.
+- Envio concluído após expiração não autoriza marcar publicação. Evento permanece recuperável para republicar o mesmo eventId: entrega at-least-once exige consumidor idempotente. FIFO preserva ordem de aceitação pelo broker dentro do grupo, sem garantir ordem causal original entre publishers concorrentes.
+- Evidências atualizadas: `docs/evidence/m14-stabilization.md`. As seções anteriores descrevem o histórico dos marcos; os resultados desta estabilização são registrados separadamente.

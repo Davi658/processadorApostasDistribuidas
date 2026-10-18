@@ -1,0 +1,10 @@
+ Container m14-stabilization-postgres-1 Running 
+ Container m14-stabilization-postgres-1 Waiting 
+ Container m14-stabilization-postgres-1 Healthy 
+ Container m14-stabilization-migrate-1 Starting 
+ Container m14-stabilization-migrate-1 Started 
+ Container m14-stabilization-migrate-1 Waiting 
+ Container m14-stabilization-migrate-1 Exited 
+ Container m14-stabilization-test-runner-run-9b68055b9b74 Creating 
+ Container m14-stabilization-test-runner-run-9b68055b9b74 Created 
+$ tsc --noEmit

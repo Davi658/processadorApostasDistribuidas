@@ -1,0 +1,264 @@
+$ bun run scripts/run-tests.ts tests/integration/outbox-publisher-m14.test.ts
+
+[test-runner] D:\processadorApostasDistribuidas\.worktrees\m14-stabilization\tests\integration\outbox-publisher-m14.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+tests\integration\outbox-publisher-m14.test.ts:
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: inconsistent types deduced for parameter $2
+     length: 155,
+   severity: "ERROR",
+     detail: "text versus character varying",
+       hint: undefined,
+   position: "189",
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "parse_param.c",
+    routine: "variable_coerce_param_hook",
+       code: "42P08"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg\lib\client.js:694:17
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > A. Evento de transação não confirmada não é publicado [1036.26ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: current transaction is aborted, commands ignored until end of transaction block
+     length: 144,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "postgres.c",
+    routine: "exec_simple_query",
+       code: "25P02"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg-pool\index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > B. Publicação preserva integralmente o envelope e os identificadores FIFO [2.58ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > C. Dois publishers concorrentes não possuem simultaneamente o mesmo claim válido [1119.76ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: inconsistent types deduced for parameter $2
+     length: 155,
+   severity: "ERROR",
+     detail: "text versus character varying",
+       hint: undefined,
+   position: "185",
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "parse_param.c",
+    routine: "variable_coerce_param_hook",
+       code: "42P08"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg-pool\index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > D. Falha antes do envio permite recuperação [1021.05ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: inconsistent types deduced for parameter $2
+     length: 155,
+   severity: "ERROR",
+     detail: "text versus character varying",
+       hint: undefined,
+   position: "185",
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "parse_param.c",
+    routine: "variable_coerce_param_hook",
+       code: "42P08"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg-pool\index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > E. Crash real após claim: outro processo retoma após expiração [1112.53ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: inconsistent types deduced for parameter $2
+     length: 155,
+   severity: "ERROR",
+     detail: "text versus character varying",
+       hint: undefined,
+   position: "185",
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "parse_param.c",
+    routine: "variable_coerce_param_hook",
+       code: "42P08"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg-pool\index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > F. Crash real após confirmação SQS e antes de marcar published_at: recuperação republica sem perda, preservando eventId [1099.10ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: inconsistent types deduced for parameter $2
+     length: 155,
+   severity: "ERROR",
+     detail: "text versus character varying",
+       hint: undefined,
+   position: "185",
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "parse_param.c",
+    routine: "variable_coerce_param_hook",
+       code: "42P08"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg-pool\index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > G. Token obsoleto não confirma publicação nem modifica a posse atual [1126.91ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: inconsistent types deduced for parameter $2
+     length: 155,
+   severity: "ERROR",
+     detail: "text versus character varying",
+       hint: undefined,
+   position: "185",
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "parse_param.c",
+    routine: "variable_coerce_param_hook",
+       code: "42P08"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg-pool\index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > H. Falha/indisponibilidade do SQS mantém evento não publicado e reagenda [1033.02ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: inconsistent types deduced for parameter $2
+     length: 155,
+   severity: "ERROR",
+     detail: "text versus character varying",
+       hint: undefined,
+   position: "185",
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "parse_param.c",
+    routine: "variable_coerce_param_hook",
+       code: "42P08"
+
+      at D:\processadorApostasDistribuidas\node_modules\pg-pool\index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > I. Evento inválido não impede publicação dos demais [1036.95ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: send, execution ends before SQS and ORM [1159.12ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: cancel, execution ends before SQS and ORM [1182.43ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > J. Real Nest shutdown: ack, execution ends before SQS and ORM [1108.69ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/valid: unauthorized updates mutate nothing [1037.88ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/wrong: unauthorized updates mutate nothing [1032.23ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/expired: unauthorized updates mutate nothing [1038.57ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/reclaimed: unauthorized updates mutate nothing [1110.26ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/published: unauthorized updates mutate nothing [1048.84ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markPublished/blocked: unauthorized updates mutate nothing [1057.45ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/valid: unauthorized updates mutate nothing [1038.33ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/wrong: unauthorized updates mutate nothing [1031.86ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/expired: unauthorized updates mutate nothing [1042.90ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/reclaimed: unauthorized updates mutate nothing [1100.02ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/published: unauthorized updates mutate nothing [1040.14ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization recordFailure/blocked: unauthorized updates mutate nothing [1043.52ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/valid: unauthorized updates mutate nothing [1034.82ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/wrong: unauthorized updates mutate nothing [1046.37ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/expired: unauthorized updates mutate nothing [1040.14ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/reclaimed: unauthorized updates mutate nothing [1096.89ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/published: unauthorized updates mutate nothing [1045.80ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > L. PostgreSQL authorization markOperationallyBlocked/blocked: unauthorized updates mutate nothing [1036.36ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > M. Send accepted after lease expiry stays unpublished and republishes identical identity [1197.03ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > N. releaseLease permits expired matching token only, without authorizing publication [1133.88ms]
+(pass) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > K. Publicação não altera saldo, versão, transações ou ledger [1250.90ms]
+
+8 tests failed:
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > A. Evento de transação não confirmada não é publicado [1036.26ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > B. Publicação preserva integralmente o envelope e os identificadores FIFO [2.58ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > D. Falha antes do envio permite recuperação [1021.05ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > E. Crash real após claim: outro processo retoma após expiração [1112.53ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > F. Crash real após confirmação SQS e antes de marcar published_at: recuperação republica sem perda, preservando eventId [1099.10ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > G. Token obsoleto não confirma publicação nem modifica a posse atual [1126.91ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > H. Falha/indisponibilidade do SQS mantém evento não publicado e reagenda [1033.02ms]
+(fail) M14: Publisher Concorrente da Outbox e SQS FIFO LocalStack (PostgreSQL Real Descartável) > I. Evento inválido não impede publicação dos demais [1036.95ms]
+
+ 25 pass
+ 8 fail
+ 93 expect() calls
+Ran 33 tests across 1 file. [46.84s]
+[test-runner] 1 files; 1 failed
+error: script "test:m14" exited with code 1
