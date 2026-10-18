@@ -17,9 +17,10 @@ import { ReprocessPendingReferencesUseCase } from '../../application/use-cases/r
 import { PendingReferenceWorkerService } from '../../infrastructure/workers/pending-reference-worker.service';
 import { WalletController } from './controllers/wallet.controller';
 import { WageringController } from './controllers/wagering.controller';
+import { OutboxPublisherWorkerModule } from '../../infrastructure/workers/outbox-publisher-worker.module';
 
 @Module({
-  imports: [PersistenceModule, WageringQueryModule],
+  imports: [PersistenceModule, WageringQueryModule, OutboxPublisherWorkerModule],
   controllers: [WalletController, WageringController],
   providers: [
     {

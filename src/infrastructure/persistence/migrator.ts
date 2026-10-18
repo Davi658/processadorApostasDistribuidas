@@ -93,6 +93,7 @@ export class DatabaseMigrator {
       ...poolConfig,
       connectionTimeoutMillis: timeoutMs,
     });
+    this.pool.on('error', () => {});
   }
 
   private async ensureMigrationTable(client: pg.PoolClient): Promise<void> {

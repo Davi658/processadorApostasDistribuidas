@@ -662,3 +662,34 @@ As três rotas são `GET /wagering/transactions/:transactionId`, `GET /providers
 O SQL existente mantém parâmetros, `limit + 1`, ordenação ascendente `(created_at, id)` e predicado keyset. `TO_CHAR(... AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` conserva os microssegundos integralmente. O cursor é apenas codificado, sem assinatura criptográfica; a validação estrutural e o vínculo com walletId não conferem autenticidade ao conteúdo.
 
 O comando oficial `bun run test` descobre todos os `.test.ts` e executa cada arquivo em um processo Bun independente, sequencialmente, com timeout padrão de 30000 ms e propagação de qualquer falha como exit 1. É implementado em TypeScript sem dependência de PowerShell ou shell Linux. Um teste com filho deliberadamente falho comprova que o runner continua os demais arquivos e retorna falha. A validação local não equivale a uma execução em Linux ou em Docker; ambiente e resultados são registrados em `docs/evidence/m17-final.md`.
+
+## 15. M14 — Publisher Concorrente da Outbox e SQS FIFO (`wager-events.fifo`)
+
+### 15.1 Contrato de Entrega e Ordenação no SQS FIFO
+O publisher de outbox é responsável por transferir confiavelmente eventos da tabela `outbox_messages` do PostgreSQL para a fila FIFO do SQS (`wager-events.fifo` no LocalStack):
+1. **Entrega At-Least-Once:** A entrega fornecida é comprovadamente **at-least-once**. Retentativas de rede, interrupções inesperadas de processos e reinicializações de workers podem fazer com que uma mensagem já enviada ao broker seja retransmitida. Consumidores downstream devem ser estritamente idempotentes (ex.: tabela de Inbox ou deduplicação por `eventId`).
+2. **Preservação de Envelope:** O corpo de cada mensagem SQS contém o JSON canônico integral do evento: `eventId`, `eventType`, `version`, `occurredAt`, `aggregateId`, `correlationId`, `causationId` e `data`.
+3. **Identificadores FIFO:**
+   - `MessageDeduplicationId = eventId`: o identificador único do evento atua como chave de deduplicação na fila FIFO.
+   - `MessageGroupId = aggregateId`: particiona as mensagens pela identidade da carteira (`walletId`), garantindo ordem estrita de entrega entre eventos do mesmo agregado financeiro.
+4. **Isenção de Deduplicação Permanente pelo FIFO:** A janela de deduplicação de 5 minutos do SQS FIFO protege contra repetições de curtíssimo prazo decorrentes de retries imediatos ou crashes entre o envio e o `published_at`, mas **NÃO** é assumida como mecanismo definitivo de deduplicação de negócio. Mensagens retransmitidas além dessa janela geram nova entrega.
+5. **Ordenação Efetivamente Ofertada:** O sistema não oferece ordenação causal global arbitrária via timestamp e UUID distribuídos entre agregados distintos. A ordenação garantida é estritamente a ordenação sequencial por partição (`MessageGroupId = aggregateId`) fornecida pelo broker FIFO.
+
+### 15.2 Coordenação Concorrente por Lease Persistente e `FOR UPDATE SKIP LOCKED`
+Múltiplas instâncias do worker publisher concorrem pela fila de mensagens não publicadas sem contenção ou sobreposição:
+1. **Migration Incremental 008:** Adiciona colunas operacionais em `outbox_messages`: `lease_token`, `lease_owner`, `lease_expires_at`, `attempts`, `next_attempt_at`, `last_error`, `is_operationally_blocked` e `operational_block_reason`.
+2. **Claim Atômico:** Transação SQL curta seleciona até `batchSize` registros com `published_at IS NULL AND is_operationally_blocked = FALSE AND (lease_expires_at IS NULL OR lease_expires_at < NOW()) AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())` ordenados por `created_at ASC` com `FOR UPDATE SKIP LOCKED`.
+3. **Relógio Exclusivo no PostgreSQL (`NOW()`):** Toda a verificação de elegibilidade e cálculo de expiração de lease decorre do relógio do banco de dados, protegendo contra divergências temporais de relógio (clock drift) entre os nós da aplicação.
+4. **Fencing contra Leases Obsoletos (Stale Lease Protection):** Toda finalização (`markPublished`), registro de falha (`recordFailure`) ou liberação (`releaseLease`) exige `WHERE id = $1 AND lease_token = $2`. Se o lease expirar e outro worker assumir a linha com um novo token, o worker atrasado não consegue sobrescrever a nova reserva nem alterar indevidamente a linha.
+
+### 15.3 Tratamento de Falhas, Retentativas e Isolamento Fail-Closed
+1. **Backoff Exponencial Limitado:** Falhas transitórias de conexão com o broker agendam a próxima tentativa com backoff determinístico `Math.min(1000 * 2^attempts, 30000)` ms, incrementando `attempts` e persistindo `last_error`.
+2. **Isolamento Fail-Closed (`is_operationally_blocked`):** Eventos com payload corrompido ou envelope inválido são marcados com `is_operationally_blocked = TRUE` e `operational_block_reason = ...`. Como o predicado de claim exige `is_operationally_blocked = FALSE`, o item corrompido é excluído de buscas posteriores sem travar ou interromper a fila de eventos saudáveis.
+
+### 15.4 Ciclo de Vida NestJS e Shutdown Coordenado
+1. **Coordenação com o Ciclo da Aplicação:** `OutboxPublisherWorkerService` implementa `OnApplicationBootstrap`, `BeforeApplicationShutdown` e `OnModuleDestroy`.
+2. **Interrupção Imediata de Novos Claims:** No início do shutdown (`BeforeApplicationShutdown`), `isShuttingDown` é assinalado como `true`, rejeitando novos ciclos de claim.
+3. **Drenagem Segura de Lote In-Flight:** O encerramento aguarda o término do lote atual até o limite de tolerância configurado (`drainTimeoutMs`). Caso o tempo expire, o `AbortController` cancela operações cooperativas pendentes antes que o ORM e o cliente SQS sejam destruídos em `OnApplicationShutdown`.
+
+### 15.5 Imutabilidade Contábil
+O publisher atua exclusivamente na tabela `outbox_messages`. Em nenhum momento o processo de publicação, retentativa ou crash recovery efetua mutações nas tabelas `wallets`, `wager_transactions` ou `wallet_ledger_entries`. Saldo, versão e lançamentos contábeis permanecem rigorosamente imutáveis.
