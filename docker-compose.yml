@@ -1,22 +1,135 @@
+name: ${COMPOSE_PROJECT_NAME:-wagers-local}
+
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: betting_postgres
-    restart: unless-stopped
+    image: postgres:16.6-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_admin_secret
+      POSTGRES_USER: migration_user
+      POSTGRES_PASSWORD: local_migration_only
       POSTGRES_DB: betting_db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${LOCAL_POSTGRES_PORT:-5433}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - local_pgdata:/var/lib/postgresql/data
+      - ./infra/init-db.sql:/docker-entrypoint-initdb.d/10-runtime.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d betting_db"]
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -p 5432 -U migration_user -d betting_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  localstack:
+    image: localstack/localstack:4.0.3
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+      SQS_ENDPOINT_STRATEGY: path
+      LOCALSTACK_HOST: localstack:4566
+    ports:
+      - "127.0.0.1:${LOCAL_SQS_PORT:-4566}:4566"
+    healthcheck:
+      test: [CMD-SHELL, "awslocal sqs list-queues >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  queues:
+    image: localstack/localstack:4.0.3
+    # Normalize Windows checkouts without changing repository-wide Git settings.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /infra/bootstrap-sqs.sh | /bin/sh"]
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      SQS_ENDPOINT: http://localstack:4566
+    volumes:
+      - ./infra/bootstrap-sqs.sh:/infra/bootstrap-sqs.sh:ro
+    depends_on:
+      localstack:
+        condition: service_healthy
+    restart: "no"
+
+  migrate:
+    image: ${APP_IMAGE:-wagers-local-app:bun-1.4.3}
+    build:
+      context: .
+      target: runtime
+    command: [bun, run, src/infrastructure/persistence/migrator.ts, up]
+    environment:
+      MIGRATION_DB_HOST: postgres
+      MIGRATION_DB_PORT: "5432"
+      MIGRATION_DB_NAME: betting_db
+      MIGRATION_DB_USER: migration_user
+      MIGRATION_DB_PASSWORD: local_migration_only
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    image: ${APP_IMAGE:-wagers-local-app:bun-1.4.3}
+    build:
+      context: .
+      target: runtime
+    init: true
+    environment:
+      PORT: "3000"
+      APP_DB_HOST: postgres
+      APP_DB_PORT: "5432"
+      APP_DB_NAME: betting_db
+      APP_DB_USER: app_user
+      APP_DB_PASSWORD: local_runtime_only
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      SQS_ENDPOINT: http://localstack:4566
+      WAGER_TRANSACTIONS_QUEUE_URL: http://localstack:4566/queue/us-east-1/000000000000/wager-transactions.fifo
+      WAGER_TRANSACTIONS_DLQ_URL: http://localstack:4566/queue/us-east-1/000000000000/wager-transactions-dlq.fifo
+      OUTBOX_EVENTS_QUEUE_URL: http://localstack:4566/queue/us-east-1/000000000000/wager-events.fifo
+      SQS_CONSUMER_ENABLED: "true"
+      OUTBOX_PUBLISHER_ENABLED: "true"
+      PENDING_WORKER_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${LOCAL_API_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      queues:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, bun, run, infra/healthcheck.ts]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 40s
+
+  test-runner:
+    image: ${TEST_IMAGE:-wagers-local-test:bun-1.4.3}
+    build:
+      context: .
+      target: tester
+    profiles:
+      - test
+    environment:
+      MIGRATION_DB_HOST: postgres
+      MIGRATION_DB_PORT: "5432"
+      MIGRATION_DB_NAME: betting_db
+      MIGRATION_DB_USER: migration_user
+      MIGRATION_DB_PASSWORD: local_migration_only
+      APP_DB_HOST: postgres
+      APP_DB_PORT: "5432"
+      APP_DB_NAME: betting_db
+      APP_DB_USER: app_user
+      APP_DB_PASSWORD: local_runtime_only
+    command: [bun, run, test]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 
 volumes:
-  pgdata:
+  local_pgdata:

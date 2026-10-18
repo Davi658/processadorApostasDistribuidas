@@ -12,7 +12,7 @@ A verificação do ambiente local identificou:
 |---|---|---|---|
 | **Bun** | Bun 1.x | **Instalado** (v1.4.3) | Utilizado como runtime, gerenciador de pacotes e test runner |
 | **Git** | Git 2.x | **Instalado** (v2.52.0.windows.1) | Controle de versão local estrito |
-| **Docker & Compose** | Docker / Compose | **Não operacional nesta validação** | Arquivo `docker-compose.yml` e scripts nativos fornecidos |
+| **Docker & Compose** | Docker / Compose | **Operacional** | Arquivos `docker-compose.yml` (entrega padrão) e `docker-compose.local.yml` provisionam a plataforma completa com PostgreSQL, LocalStack SQS, migrações e trabalhadores distribuídos |
 | **PostgreSQL** | PostgreSQL Real | **Instalado e Operacional** (v16.8) | Binários em `~/.pgsql/pgsql`, cluster em `~/.pgsql_data`, porta 5432 |
 
 > [!NOTE]
@@ -27,13 +27,13 @@ A verificação do ambiente local identificou:
 - **Framework HTTP:** NestJS 11 (`@nestjs/core`, `@nestjs/common`, `@nestjs/testing` alinhados na versão 11)
 - **ORM & Unidade de Trabalho:** MikroORM 6.4 (PostgreSQL) com transação explícita e isolamento por `AsyncLocalStorage`
 - **Banco de Dados:** PostgreSQL 16.8
-- **Containerização:** Docker Compose (`docker-compose.yml`)
+- **Containerização:** Docker Compose (`docker-compose.yml` e `docker-compose.local.yml`)
 
 ---
 
 ## 3. Comandos Reproduzíveis
 
-### 3.1 Inicialização do Banco de Dados
+### 3.1 Inicialização da Plataforma e Banco de Dados
 
 #### Opção A: PostgreSQL Nativo Local (Scripts PowerShell inclusos)
 Para iniciar o serviço PostgreSQL local:
@@ -45,10 +45,12 @@ Para parar o serviço PostgreSQL local:
 powershell -ExecutionPolicy Bypass -File scripts/db-stop.ps1
 ```
 
-#### Opção B: Docker Compose (em ambientes com Docker disponível)
+#### Opção B: Docker Compose — Plataforma Completa (em ambientes com Docker disponível)
+Para inicializar toda a plataforma (PostgreSQL 16, LocalStack SQS FIFO, migrador automático e API com os trabalhadores distribuídos `SQS_CONSUMER_ENABLED`, `OUTBOX_PUBLISHER_ENABLED` e `PENDING_WORKER_ENABLED` ativados):
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
+*(ou via `docker-compose up -d` ou `docker compose -f docker-compose.local.yml up -d`)*
 
 ---
 

@@ -11,9 +11,17 @@ Nenhum push ou merge em `main` foi executado. As worktrees preexistentes e o vol
 
 ## Subir e parar
 
-O Compose suporta parametrização via variáveis de ambiente, permitindo execução padrão (`wagers-local`) ou em projetos isolados (ex: `wagers-integration`, `wagers-stab-isolated`):
+O Compose suporta execução direta via arquivo padrão de entrega (`docker-compose.yml`) ou com parametrização via `docker-compose.local.yml` (permitindo execução padrão `wagers-local` ou em projetos isolados como `wagers-integration`, `wagers-stab-isolated`):
+
+Ambos os arquivos habilitam explicitamente os trabalhadores de processamento distribuído (`SQS_CONSUMER_ENABLED=true`, `OUTBOX_PUBLISHER_ENABLED=true` e `PENDING_WORKER_ENABLED=true`).
 
 ```powershell
+# Execução direta com o compose de entrega padrão:
+docker compose config
+docker compose build
+docker compose up -d --wait --wait-timeout 180
+
+# Ou explicitando docker-compose.local.yml:
 docker compose -f docker-compose.local.yml config
 docker compose -f docker-compose.local.yml build
 docker compose -f docker-compose.local.yml up -d --wait --wait-timeout 180
@@ -87,6 +95,5 @@ Validações executadas em 2026-10-17:
 
 ### Documentação Exata dos Ambientes:
 - **Smoke test**: Executado dentro do contêiner da aplicação (`oven/bun:1.4.3` em Linux x86_64 na rede interna do Docker) e no host Windows via porta publicada `3002`.
-- **Suíte oficial de testes**: Executada no host Windows (`win32 x64`) com Bun 1.4.3 contra contêiner descartável PostgreSQL `16.6-alpine` na porta 5439 com tmpfs. O número oficial real de arquivos de teste é 24 (28 testes no M13).
-- **Limitações e Escopo**: Não inclui implementação de publisher, consumidor de fila SQS, inbox ou DLQ listener (funcionalidades reservadas para os marcos M14–M16). As variáveis e filas SQS permanecem preparadas para futuro consumo. Nenhum publisher, consumidor, inbox ou worker foi alterado fora do escopo desta infraestrutura.
+- **Processamento Distribuído**: Com a conclusão dos marcos M14 a M18, os três trabalhadores (`SQS_CONSUMER_ENABLED`, `OUTBOX_PUBLISHER_ENABLED` e `PENDING_WORKER_ENABLED`) estão totalmente integrados e são habilitados por padrão nas composições `docker-compose.yml` e `docker-compose.local.yml`.
 
