@@ -1,0 +1,10 @@
+{
+  "files": 35,
+  "failedFiles": 0,
+  "testsPassed": 495.0,
+  "assertions": 6049.0,
+  "exitCode": 0,
+  "runner": "bun run test -> scripts/run-tests.ts",
+  "environment": "Linux/amd64 container; Bun 1.4.3; PostgreSQL 16.6; LocalStack 4.0.3",
+  "base": "3c459a592cadc2251564e5068a2d6133e9adc86a"
+}

@@ -1,0 +1,6 @@
+NAME                                  IMAGE                              COMMAND                  SERVICE      CREATED              STATUS                      PORTS
+wagers-review-20261018-app-1          wagers-review-20261018-app:local   "/usr/local/bin/dock…"   app          59 seconds ago       Up 34 seconds (healthy)     127.0.0.1:3078->3000/tcp
+wagers-review-20261018-localstack-1   localstack/localstack:4.0.3        "docker-entrypoint.sh"   localstack   3 minutes ago        Up 56 seconds (healthy)     127.0.0.1:45678->4566/tcp
+wagers-review-20261018-migrate-1      wagers-review-20261018-app:local   "/usr/local/bin/dock…"   migrate      About a minute ago   Exited (0) 39 seconds ago
+wagers-review-20261018-postgres-1     postgres:16.6-alpine               "docker-entrypoint.s…"   postgres     3 minutes ago        Up 55 seconds (healthy)     127.0.0.1:55478->5432/tcp
+wagers-review-20261018-queues-1       localstack/localstack:4.0.3        "/bin/sh -c 'tr -d '…"   queues       About a minute ago   Exited (0) 35 seconds ago

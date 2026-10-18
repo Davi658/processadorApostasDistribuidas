@@ -1,0 +1,3503 @@
+[
+  {
+    "path": ".dockerignore",
+    "bytes": 158,
+    "sha256": "6efc6ee3cc68c2a112e6e5405791867afb66289cb36ef82e92ed2910c1386bb6",
+    "exactPathReferences": [
+      "docs/evidence/delivery/accepted/build.txt",
+      "docs/evidence/delivery/build.txt",
+      "docs/evidence/delivery/compose/build.txt",
+      "docs/evidence/delivery/final-validation/build.txt",
+      "docs/evidence/delivery/final/build.txt",
+      "docs/evidence/delivery/release/build.txt",
+      "docs/evidence/delivery/validated/build.txt",
+      "docs/evidence/delivery/verification-final/build.txt",
+      "docs/evidence/delivery/verification/build.txt",
+      "docs/evidence/m14-stabilization/build-final-integrated.txt",
+      "docs/evidence/m14-stabilization/build.txt"
+    ]
+  },
+  {
+    "path": ".env.example",
+    "bytes": 1239,
+    "sha256": "b1488d49d81e05bbb625513c60cfcaa1f467ef405363c6b6a69d96141dd9f1ae",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": ".gitignore",
+    "bytes": 247,
+    "sha256": "c2b4124ce5205168c2e34b05f6a37a38ef68898c7e132df1e66e396371317bc8",
+    "exactPathReferences": []
+  },
+  {
+    "path": "ARCHITECTURE.md",
+    "bytes": 89683,
+    "sha256": "0722375564cfdcb06bb582fa0ad380c9198522f91d4837a2009b1001f6244943",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m12-ledger-constraints.md",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "Dockerfile",
+    "bytes": 839,
+    "sha256": "ba0d85d853491ccac9cea2ee96a2d63cc3ce63ceadeb02679a916bb9fcc9f361",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/INVESTIGATION.md",
+      "docs/evidence/delivery/accepted/build.txt",
+      "docs/evidence/delivery/build.txt",
+      "docs/evidence/delivery/compose/build.txt",
+      "docs/evidence/delivery/final-validation/build.txt",
+      "docs/evidence/delivery/final/build.txt",
+      "docs/evidence/delivery/release/build.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/build.txt",
+      "docs/evidence/delivery/verification-final/build.txt",
+      "docs/evidence/delivery/verification/build.txt",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/build-final-integrated.txt",
+      "docs/evidence/m14-stabilization/build.txt",
+      "docs/evidence/m18/source-sha256.json",
+      "infra/README.md"
+    ]
+  },
+  {
+    "path": "IMPLEMENTATION.md",
+    "bytes": 64515,
+    "sha256": "11ae5f80327a65b86d7679ae99c2cb43c833b9256b86765789697fcf0878892e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m12-ledger-constraints.md",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "M18-INTEGRATION.md",
+    "bytes": 7858,
+    "sha256": "b06229e5b2db487ed7a544153974bb01d9131553d6feab741e8d4856e24b3999",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "README.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m18/FILES.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "README.md",
+    "bytes": 14536,
+    "sha256": "2f8764305f19ca090e7a48737c5b6c9334663d792548feb2ba62051fe00423b6",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "bun.lock",
+    "bytes": 61853,
+    "sha256": "3a2c9f2ea7dd461d24b35267b1945e83e9f344d59dc361449bd56cf6a5bc4e30",
+    "exactPathReferences": [
+      ".dockerignore",
+      ".gitignore",
+      "Dockerfile",
+      "docs/evidence/delivery/accepted/build.txt",
+      "docs/evidence/delivery/build.txt",
+      "docs/evidence/delivery/compose/build.txt",
+      "docs/evidence/delivery/final-validation/build.txt",
+      "docs/evidence/delivery/final/build.txt",
+      "docs/evidence/delivery/release/build.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/build.txt",
+      "docs/evidence/delivery/verification-final/build.txt",
+      "docs/evidence/delivery/verification/build.txt",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/build-final-integrated.txt",
+      "docs/evidence/m14-stabilization/build.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/evidence/m18/source-sha256.json",
+      "docs/messaging/M16-RELIABILITY.md"
+    ]
+  },
+  {
+    "path": "docker-compose.local.yml",
+    "bytes": 4186,
+    "sha256": "2a1e3bd8958cd395f4371a43a2418340eb86aa47c2b1715760a2cd65ad8d4dbf",
+    "exactPathReferences": [
+      "README.md",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/bootstrap-build-excerpt.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/INPUT-CONTRACT.md",
+      "docs/messaging/M16-RELIABILITY.md",
+      "infra/README.md",
+      "infra/m14-validation.ps1"
+    ]
+  },
+  {
+    "path": "docker-compose.yml",
+    "bytes": 4186,
+    "sha256": "2a1e3bd8958cd395f4371a43a2418340eb86aa47c2b1715760a2cd65ad8d4dbf",
+    "exactPathReferences": [
+      "README.md",
+      "docs/delivery/FINAL-MANUAL-TEST.md",
+      "docs/evidence/delivery/RESULTS.md",
+      "docs/evidence/delivery/attempts.jsonl",
+      "docs/evidence/delivery/compose/resources.json",
+      "docs/evidence/delivery/source-manifest.json",
+      "infra/README.md",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "docs/delivery/FINAL-MANUAL-TEST.md",
+    "bytes": 11578,
+    "sha256": "b4554b83d79c23fc4a436df69ffd3e291b6093e865150635b1981671d6a1fd6c",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "README.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/delivery/OBSERVABILITY.md",
+    "bytes": 3753,
+    "sha256": "59d0926b6bacb25dd17c56a81daf6291b37d1ee270f63ae9a3c5737e3c20adf0",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "M18-INTEGRATION.md",
+      "README.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/CHANGED-FILES.txt",
+    "bytes": 6992,
+    "sha256": "46f4a41a2a41d964b29b6503febf5327c5c94453222a10166360fccfc01dae71",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/INVESTIGATION.md",
+    "bytes": 6460,
+    "sha256": "f0f9585ae31fac2f0244e89e00260309a5c5d909b8fe02ed8c8a439a1f89f127",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/RESULTS.md",
+    "bytes": 11330,
+    "sha256": "37857ee462adb955c007d1e146ff24a139441bc7c5d5dae3bc7dada6036e6798",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "M18-INTEGRATION.md",
+      "README.md",
+      "docs/delivery/FINAL-MANUAL-TEST.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/accepted/affected.txt",
+    "bytes": 7530,
+    "sha256": "52f70a1de2ee830f89fd90cdb2f600edda08464c375a14ef978377e7f9dc27b7",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/accepted/attempts.jsonl",
+    "bytes": 1172,
+    "sha256": "483f4e8dd97af9cac12c19115bcf5dc38c703787815aba30c0218abbacd4c484",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/accepted/build.txt",
+    "bytes": 5064,
+    "sha256": "11ec836dc0ab81b3b18c1f1894891ee00d7a5cdf02a60343e4e9ceda229ae471",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/accepted/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/accepted/install.txt",
+    "bytes": 99,
+    "sha256": "b627d4db644faff6406435a0eb6f500ef6e5d4b7687602e6f867c7dd019a71ac",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/accepted/test-infra.txt",
+    "bytes": 372,
+    "sha256": "60ea4e64397af515f3e43e412c8ad6c31e709f8c1cd8e7eecf917fab09d8a9a8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/accepted/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/affected.txt",
+    "bytes": 3664,
+    "sha256": "a480be793f5cf950ab16a0a59fbe31b74d166c936b81377fcbe2ee9a9a9eb5aa",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/attempts.jsonl",
+    "bytes": 2149,
+    "sha256": "054dd0c99b51f7becbca3967f8175a9f30c116710c87e06be717835d9b8d09b5",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/audit-provenance.json",
+    "bytes": 632,
+    "sha256": "254c77fd03ff32e405883a85b9f250f476e0885073b648710687578de19e6178",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/build.txt",
+    "bytes": 4362,
+    "sha256": "f854f4dbe68530d120814e57b4bf427efa2d35665e973bcafd9ea3bd374f0a96",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/cleanup.json",
+    "bytes": 774,
+    "sha256": "54dede0f846e89e99e4aca25323c04a43234ac8a55fff0f843f154d34390a565",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose-first-up.txt",
+    "bytes": 2524,
+    "sha256": "8014c28b1da23ca78bb634342737922cd4a0905a8636014ec181e17f41574da7",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/app-logs.txt",
+    "bytes": 36445,
+    "sha256": "6ab680cbecae9bf9cd96c1684bd09881ea1db88222c4203cd43f297ba232cb05",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/app-stop-for-restart.txt",
+    "bytes": 119,
+    "sha256": "ea08470465be08a8dbb1cca87be786451ded2fe1125d91f0fcca498bc1481dfd",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/attempts.jsonl",
+    "bytes": 4297,
+    "sha256": "177685b2564183daf31fce250ee9258bf4f5ef4021cf45555df8e81e6e1505ca",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/bootstrap.txt",
+    "bytes": 3873,
+    "sha256": "a6fe2ffc1e589aafcec34d6dc6a6528d0fe4479d0d5c9ee2eaf1c2d3e37c9cc7",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/build.txt",
+    "bytes": 2783,
+    "sha256": "1de496bf1ea46a2075c4418ce89481267953a983921c1f553346043224b0b94f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/checks.json",
+    "bytes": 396,
+    "sha256": "d8119902f92e6d9fdec82cc4275cb2fb12407c83dcc29f4f46cec2a2358dad0a",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/deployed-source-hashes.txt",
+    "bytes": 834,
+    "sha256": "6c46b1ca56baa0bd44bd5b05214c3136b243df60425c2cfbfdc8c3d16b9df8d4",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/financial-e2e.txt",
+    "bytes": 1542,
+    "sha256": "50c3710ef0ee6465188a0e15d91009a24b4e55588e4946cb5df5c3cecddada93",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/first-up.txt",
+    "bytes": 2892,
+    "sha256": "d33568c84de06a53e30776ed673e8f0ba874bb4af53600611268a2cc1aa7d59c",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/http-probes.json",
+    "bytes": 233,
+    "sha256": "12032b092ff8848211ab7b59c70d4c32b529c442acdba23be694b4afd13579d5",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/metrics-after-restart.txt",
+    "bytes": 7811,
+    "sha256": "02340346af26794d314ad664987b325873a749593a641092a0b1a075c21bbe97",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/postgres-durability.txt",
+    "bytes": 322,
+    "sha256": "3407506befc636d94e83db9680a436052ba7cffa3a495e7c44ae22dd385f5c4e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/postgres-restart.txt",
+    "bytes": 131,
+    "sha256": "526fcf85c27bc309b5c76c9ce52004751367d79ef715d888561478b078efc4c2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/postgres-storage.txt",
+    "bytes": 502,
+    "sha256": "23f33a1031e39baaa7e20f94a20e46ba80f06a5aa5c01fe4b76b3fe791ff3fc3",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/resources.json",
+    "bytes": 298,
+    "sha256": "60a30c3042b674678b78e2d6b1ac541bca3586d3aeb746fbe09f30b8c3032a9e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/restart-persistence.txt",
+    "bytes": 561,
+    "sha256": "9d7cbce8255db697239323479a64e9382c78e77757c14db59ba5900d855a7332",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/restart-up.txt",
+    "bytes": 1635,
+    "sha256": "98a414fedca2fa74d608922668e929349094e7469325d69477e7bbef57c335c8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/runtime-image.txt",
+    "bytes": 88,
+    "sha256": "8bd5a0ceebc9eaab7b623b44974f9201f463063fa9ccfe8c0fda3209198b30d1",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/second-up-persistence.txt",
+    "bytes": 561,
+    "sha256": "9d7cbce8255db697239323479a64e9382c78e77757c14db59ba5900d855a7332",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/second-up.txt",
+    "bytes": 1575,
+    "sha256": "f55e3dddd426bc7e500b4677cef073245be662ada7681f909f03a5866138f238",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/status.txt",
+    "bytes": 1083,
+    "sha256": "89450f09b2388c506ca2a457934de77329405af6be8bf2c8af43091f335defab",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/compose/worker-flags.txt",
+    "bytes": 60,
+    "sha256": "6d7f9712b2a8ec50ce06d574eb394776b50f6c6dc16f74ce58e04add7aaf050d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/containers-after-cleanup.txt",
+    "bytes": 275,
+    "sha256": "92c7639e9095632054e10de7d442144306c8474f5bc63e30cae1a5c798840a47",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-test-counts.json",
+    "bytes": 451,
+    "sha256": "de710b3fe25b069b3114e23ae4b5afe32fbd5eae7fc9d2ed368ded7b64284677",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/affected.txt",
+    "bytes": 82251,
+    "sha256": "1864d036b5a05b5054ba2f7a6684e9a5d5558594582016ea31b09d61632cdd86",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/attempts.jsonl",
+    "bytes": 1818,
+    "sha256": "6f7593c7b25a181b9b59839cd4360822d39efda2c592203ca578984973a5a03e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/build.txt",
+    "bytes": 4681,
+    "sha256": "d5e540e001b0f9da2adba188096dfd5c4deb8a3b817eff1ff94242462593735e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/install.txt",
+    "bytes": 99,
+    "sha256": "39ed7da836cf4d7bd874b0dd1e8ad6151e78a50bc5c9862b96ae39175bb94000",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/linux-m16-audit/broker-financial-audit.json",
+    "bytes": 18432,
+    "sha256": "9ea8190cf2f8091043f22eb438ceee43e0e6068ebc15ef3e94936eb9c72496a0",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/linux-official.txt",
+    "bytes": 298617,
+    "sha256": "b063eca9b80376434e68b067c815ee875c039de754f10dc34e6bfdad3d1c2d8e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/test-infra.txt",
+    "bytes": 372,
+    "sha256": "60ea4e64397af515f3e43e412c8ad6c31e709f8c1cd8e7eecf917fab09d8a9a8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final-validation/windows-official.txt",
+    "bytes": 316945,
+    "sha256": "259a198f05daeb02d418d2d63d569ac9c37ac99f086b5647076caee1a350c470",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final/affected.txt",
+    "bytes": 6139,
+    "sha256": "7114381e6b3634233528bc66b0e0b2511fde59349476300ad9babb666f4354de",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final/attempts.jsonl",
+    "bytes": 1172,
+    "sha256": "8871e3a9d7d2842ddc8ed24fef0c0ebc48d8429288449f04f2fb463a0df2f536",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final/build.txt",
+    "bytes": 5690,
+    "sha256": "e88b8e4c1ffa8a1355903e1204a70fc0d10f854d49ac54bf855e0cf4632e8e0e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final/install.txt",
+    "bytes": 99,
+    "sha256": "0e3f28a088aa1fe5189c9904addddf30a740a4517a0ca4e0360ff1df39ddbdc8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final/test-infra.txt",
+    "bytes": 372,
+    "sha256": "60ea4e64397af515f3e43e412c8ad6c31e709f8c1cd8e7eecf917fab09d8a9a8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/final/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/install.txt",
+    "bytes": 99,
+    "sha256": "2f5a760ce74acf108d5d2c0f514aba88298ab37894be8f03bf7d76c737e03e9f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/intermediate-compose-stop.txt",
+    "bytes": 553,
+    "sha256": "deeb71beb01e3068965b97c6232f8eacb41418b296dd4a2972b949bdf9ffc6f4",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/linux-official.txt",
+    "bytes": 314740,
+    "sha256": "ec8238cd2912b942f8e1250e66d4fe3addb9fc65bb2998c262d13ef129aa31bd",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/linux-setup-investigation.txt",
+    "bytes": 867,
+    "sha256": "c66baf8a71cfdd9df96c7b45126a9a9f186ee9b44dad8f543e67c397539f63b8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/manifest-check.json",
+    "bytes": 161,
+    "sha256": "b34e78057d32120b52802fe6776d67ca625d85c2ddfb98c581e486dae24892c2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/manual-syntax.json",
+    "bytes": 171,
+    "sha256": "2da02986c429bf5715d1ae00645b4bef86d31b474644bf6619a26eda7a7cd74b",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/previous-regression-stop.txt",
+    "bytes": 250,
+    "sha256": "7d26699a57795239324dc22d082b8f754980b8a7759fab48c60696a683174412",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/provenance.json",
+    "bytes": 784,
+    "sha256": "6f7956b765e6a8c05a863e9b07f152a6acacfde352beabe36d46e3bebd88d69a",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/regression-final-stop.txt",
+    "bytes": 274,
+    "sha256": "2d2a3628b11e6e2df8f977cf66e6398d8625642ca9d1982621c626345045ec21",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/regression-postgres-settings.txt",
+    "bytes": 102,
+    "sha256": "83f5c241f39bef7a9f659afb3c2fac70ba8bdd5938778ef54008e8466098f7c7",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/affected.txt",
+    "bytes": 6403,
+    "sha256": "4ac709a94b419a4391437d61cc073fd8476304b193adb502a9e8b417a77d1a16",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/attempts.jsonl",
+    "bytes": 1325,
+    "sha256": "5c4d559602a12ab3ccddd7a5608d4b875bbe11d8e63ca8ef1070b9483af5d109",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/build.txt",
+    "bytes": 4816,
+    "sha256": "bcce2f8a754774cd015da8208e121e06020e8894e755a165ce79cb164dcfc7db",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/install.txt",
+    "bytes": 99,
+    "sha256": "eaa256f9b05c2d1086b59332faeb3c39430911df48bea9d15b5b6bedb81b6d58",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/test-infra.txt",
+    "bytes": 372,
+    "sha256": "60ea4e64397af515f3e43e412c8ad6c31e709f8c1cd8e7eecf917fab09d8a9a8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/release/windows-official.txt",
+    "bytes": 324607,
+    "sha256": "9754914f5a9ed5c92b2076f2fcc7770555fae2ebd0b2f60273ff10e16c0e88cb",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/retained-volumes.txt",
+    "bytes": 127,
+    "sha256": "dbd1ffab49f7f4de0c10a32fb4936917e291ffe3ed387f8093e81e45abf86af3",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/source-manifest.json",
+    "bytes": 25038,
+    "sha256": "6af4ff00535c0e6ab18175f732b3a07b0507975ec07da9275b11c71760b216a7",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/targeted-investigation.txt",
+    "bytes": 3854,
+    "sha256": "eed1d03e9d3ecab682e37caa573e744bfabc3ac9b56669e8282fc5586a7e5012",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/test-infra.txt",
+    "bytes": 1216,
+    "sha256": "e22bbdd39761736a414d2c7c893f8f8891ad9bfaa24f2a64ee1641cbdb495317",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/tmpfs-bootstrap-attempt-stop.txt",
+    "bytes": 250,
+    "sha256": "b64530ad24f7a27711e33b83885ef3b5f3199b692af1b08bc6bde569afe83bcf",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/validated/affected.txt",
+    "bytes": 7172,
+    "sha256": "fced4cb40e2b01f75257a9c680d3c90d72d9ee376da8e68afb8ac3a198b9119c",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/validated/attempts.jsonl",
+    "bytes": 1172,
+    "sha256": "e4cd8114a797c7006317ddac532ba1fdf9c44f55d6932fd13541d1c55c10921f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/validated/build.txt",
+    "bytes": 5115,
+    "sha256": "c968687a67f78763a04b598d17be44ed77f886b93455b4b6d82805d6364b5fe3",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/validated/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/validated/install.txt",
+    "bytes": 99,
+    "sha256": "b2f67fb0c618589d3abf3ab49ce676222c82ad33e985c18252493c0177cd7e4b",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/validated/test-infra.txt",
+    "bytes": 372,
+    "sha256": "60ea4e64397af515f3e43e412c8ad6c31e709f8c1cd8e7eecf917fab09d8a9a8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/validated/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/affected.txt",
+    "bytes": 114384,
+    "sha256": "2651173a88c6126182503422d61bde07d0bc9d6053d9b878fb97871ecd0feaac",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/attempts.jsonl",
+    "bytes": 2091,
+    "sha256": "1bb329e276134e5982b92bd15445396e3394dcde19c121b34c28af23ebc2088e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/build.txt",
+    "bytes": 5886,
+    "sha256": "8f75be074738e05347d7fae3091a02847dfa241c37038006d44dec263bd99941",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/financial-smoke.txt",
+    "bytes": 3882,
+    "sha256": "c0f19bea002a9278470fa58c520a61d78ddbccc6bfc9a4edbfc7245516573ccd",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/install.txt",
+    "bytes": 99,
+    "sha256": "e0bec0f86616f3530cd2cc85ece955c68ee4eda1c1ff17499fe4f123ab760f89",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/linux-official.txt",
+    "bytes": 349314,
+    "sha256": "bd915058e97712e35101fc7c1c63ed6954f63c1a0aa789160af2b5ec8019b9e5",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/test-infra.txt",
+    "bytes": 1070,
+    "sha256": "2b86582b2be67df66193eaf3d816f4678ccc00bda3f385e5e9574e2991054773",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification-final/windows-official.txt",
+    "bytes": 350947,
+    "sha256": "2423a9c96f82f55b5243c861625f6d6d3de1ccc9360aaee1f2110391cac7a8ef",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification/affected.txt",
+    "bytes": 19375,
+    "sha256": "71cc1f6bd222af267555543d6f28a1079fd367e617dd96fce417680db53a8e34",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification/attempts.jsonl",
+    "bytes": 1418,
+    "sha256": "71693e3edba9519ffd9467412680d0a360506ea85f3119efebf9caf1da503c55",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification/build.txt",
+    "bytes": 4956,
+    "sha256": "c90046d320bf0a9fde5e1b9b2e98438d4053278aa26d8d155c7e08d44757050f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification/config.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification/install.txt",
+    "bytes": 99,
+    "sha256": "c87a82596f0e861ae10231068cac9df8dd90cc2178f4549c3109769c447e199f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification/test-infra.txt",
+    "bytes": 974,
+    "sha256": "69dc71f8f7449b40ab1ecc7563a14206d3025da5de74cec498c84758bf27bb84",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/verification/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/windows-m16-audit.json",
+    "bytes": 13568,
+    "sha256": "bbbd29e40ab31c540bf5efd11c5d711f75babb9ac76e802bcbb774f4da660e68",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/delivery/windows-official.txt",
+    "bytes": 314268,
+    "sha256": "4108ac980aa65211a07f0b0c7a2fa2186aa0b8092bb4f47e49a4b05d54119dc9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m10-shutdown.md",
+    "bytes": 8595,
+    "sha256": "7921f5d259bc99030370c717452b15634a0bec391d493898182ff9dfec0ab3df",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "docs/evidence/m10-shutdown.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m10-validation-logs/results.json",
+    "bytes": 4155,
+    "sha256": "4ff008448ce3bd3660b22e307415148f559d7704afa42d0f2194573aa63ac140",
+    "exactPathReferences": [
+      "docs/evidence/m10-shutdown.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m11-integrated-validation-results.json",
+    "bytes": 19870,
+    "sha256": "44630306b7a69a764d88053e49bd7819fd916d40560d77b8750af21971ad8758",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m11-integrated-validation.md",
+    "bytes": 8990,
+    "sha256": "4d2651f3b67629fdbccff2ccc732b2db5df5fd788261408006659ae5dcac4af1",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m12-ledger-constraints-results.json",
+    "bytes": 11132,
+    "sha256": "cca0902d36e1c3cba9f57a694a7c521014e3a44e5cef72ca3f0b4ff3a0c371d5",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m12-ledger-constraints.md",
+    "bytes": 9856,
+    "sha256": "598e98caee05dda8bdfd21d444df932abc831a3fd9464446f84155aaa8c309a8",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m13-financial-outbox-results.json",
+    "bytes": 2726,
+    "sha256": "4410981b52f312e86ad3bbc1ff12f2851e347e00e60d5112733d0bb071f3e90f",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m13-financial-outbox.md",
+    "bytes": 8885,
+    "sha256": "5cee3cb4236fcf92c36313801c8ca34e6b376179b6f9d1e81dc2c7506489cd98",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m14-outbox-publisher-results.json",
+    "bytes": 2355,
+    "sha256": "18e9cd119287429c07335bf5d106af6da79f0e6ea9da72de1091314e118580e0",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-outbox-publisher.md",
+    "bytes": 10809,
+    "sha256": "bbf56383337edc6d0746acf4bdc8a0398a1d88407a3c1b9b064c17756f1e040e",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m14-stabilization-results.json",
+    "bytes": 9588,
+    "sha256": "76ef437be78daec854c75cd8405ce38b509c8179f079cf5009cff6cc44ad59dc",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization.md",
+    "bytes": 10951,
+    "sha256": "2c4c6799df1c8e546c947bfb41d8905337f4efd653a21f9508fd05f1830e4424",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/bootstrap-build-excerpt.txt",
+    "bytes": 554,
+    "sha256": "15aee57e1c05d9d81fb408da7f2240e0eb882784c75b2c1fc2fd96382c2d8600",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/build-final-integrated.txt",
+    "bytes": 4574,
+    "sha256": "f8bc7c7c8a6c08a8a574d45d9e48210de1ce4fa1d66669a4416fd4c0c0704e5a",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/build.txt",
+    "bytes": 5197,
+    "sha256": "259ea3dbafdd69936906cb0521fc133a3fc6e6ace732259d43f7f56148f95335",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/checkpoint.txt",
+    "bytes": 12,
+    "sha256": "6f336511fc18f1618eeb3c01fb4ae393d11aaceed5f9dc9b883a7d59b45e26f8",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/cleanup.txt",
+    "bytes": 1176,
+    "sha256": "70a5eca6c9f1c9e00e042f6bef9385e62099742b5983021f7f7bb5f428626bbd",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/diagnostics.txt",
+    "bytes": 783,
+    "sha256": "5acf687a32a791a53d02ef06e24e2720157014d1195a2cdb07998b3f5b738d3a",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/linux-m14-final.txt",
+    "bytes": 8331,
+    "sha256": "d59b31b96ad9cabbe3529a678ba48ad1a27c5cc3d735fc6d91a0c75afe133279",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/linux-official-final.txt",
+    "bytes": 33472,
+    "sha256": "a24fdf26e3d4a069edc2f3de18a6b2350552ab5bf960230f3fd4493150ee20b3",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+    "bytes": 126778,
+    "sha256": "ff6eb14d68cab7496e070178b06c5c29aab713f727da34df8d359fb335eea0e1",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+    "bytes": 118695,
+    "sha256": "3e7668d1a3d7135a53ed86545ea805556804d40d853a758203d313934667692e",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/linux-official.txt",
+    "bytes": 127073,
+    "sha256": "29669a4e6ce073995e859574b516dac1eda52ebcca9b242598f250b598dd18f3",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/linux-typecheck.txt",
+    "bytes": 499,
+    "sha256": "7a9ea06090fa7ec652830b6701b30d8eafac4c2c1bf6db2160f232fcffc5cf37",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/smoke.txt",
+    "bytes": 723,
+    "sha256": "0d7965320f9e445aef17f69cbc7b89a157d9241c85709fd3a00807a3d1e70145",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/windows-m14-verified.txt",
+    "bytes": 7906,
+    "sha256": "54f1a83639ad6dfa9281fd4d39bef6474773fe6a3b652804e6b120f567836f25",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/windows-m14.txt",
+    "bytes": 15545,
+    "sha256": "dbeb92a60464c89570c8f9dd1a8391fc77983284f127cd0138caba36011d864b",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/windows-m18.txt",
+    "bytes": 839,
+    "sha256": "45493041906a67974f0b860791cfb661b85dbef97c38a20a35b8c491e1886e69",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/windows-official-final.txt",
+    "bytes": 108862,
+    "sha256": "23cfda0e6ae414348994433932d1689ada1a8ba1dd4d9b47039f4684268ec24c",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/windows-official-sequential.txt",
+    "bytes": 128613,
+    "sha256": "08f23b28fc9e55f104602106344a7fabddfd78e0f7e28f0268acabb631b8b2a7",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m14-stabilization/windows-official.txt",
+    "bytes": 129240,
+    "sha256": "e390f3fb7f0ba1b8a1f5c750175b3620f98c0751e5d3b68aff7179127ac10827",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m15-sqs-inbox.md",
+    "bytes": 9748,
+    "sha256": "2bb91dd022b915b84589acc5ba30aea8583501eb48e2cd550e8fb7bb2e419785",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/audit.json",
+    "bytes": 219971,
+    "sha256": "3e69322401c57d9afce4133b980471577c0259b421e7acebad27ed4e27d8810c",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt",
+      "tests/integration/sqs-inbox-m15.test.ts"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/cleanup.txt",
+    "bytes": 243,
+    "sha256": "32aab7e8c5137e9bcec41aef94017fe8c50811497e6f52f38191a81f5fd9ee9c",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/files.txt",
+    "bytes": 1654,
+    "sha256": "f5125cc3ceef2a34e81d52369f9f5482642168bdd26c6e9cfd1566cca91cac8e",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/results.json",
+    "bytes": 894,
+    "sha256": "c6753add77aaba40e64a435482bcaf4b87b0027e4c6ae0f52c61ab03ca357238",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-m15-final.txt",
+    "bytes": 2315,
+    "sha256": "93828e430c6684393084159125b51feed691c225ffc8522e6eccdacc9f3f777d",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-m15.txt",
+    "bytes": 2004,
+    "sha256": "98f0c15b9a571da0494144542e9843d9430a4b906d376e67c2bd3bb9b96fb410",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-m18-recheck.txt",
+    "bytes": 900,
+    "sha256": "f0ef95df9c0b5459da5622bc7c60ec94a14d10d28d2af4416fe0ce0e40bd8550",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-official-final.txt",
+    "bytes": 135701,
+    "sha256": "e5f9da8899d6bc59e83b6c9846b0d0bca95ad78e08f944c4be51b1670505f72a",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-official-verified.txt",
+    "bytes": 130558,
+    "sha256": "b593ab500a5e6dd95e3ac751eee1d4716dcb0d3f7a1f7d5557571153836aa2a9",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-official.txt",
+    "bytes": 96264,
+    "sha256": "437df47e43f04a607f62bdb4f2a686c6002818a33c794f4504f5a2f9fca0ba23",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-smoke.txt",
+    "bytes": 723,
+    "sha256": "b65109dd18efb45362850b12cf5815200a42ed5ea3cae353d8460349d357657a",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m15/windows-typecheck.txt",
+    "bytes": 16,
+    "sha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9",
+    "exactPathReferences": [
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m16-consumer-reliability.md",
+    "bytes": 6454,
+    "sha256": "8b1042b46b8180c40a5eb6f7e13902448d7355bfc93fc98ece14dbaf2edfa29f",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m16/INVESTIGATION.md",
+    "bytes": 3472,
+    "sha256": "475de7899fe17bb9ee3272ec0a3ea40b7f1542e68cc3a9436a6ffdd29855e8ae",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m16/linux/broker-financial-audit.json",
+    "bytes": 18432,
+    "sha256": "c8cc6405f7627ec7a1f12609098063c3fb692bb29fc1d0de5b0c75fcb1541ea1",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m16/linux/results.json",
+    "bytes": 5202,
+    "sha256": "9d9bcac001f27a722245d42e19b9a9fe32937911629fe4efe1d755e04a2b279f",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m16/resources.json",
+    "bytes": 509,
+    "sha256": "15cceac55a313e67676a448416128f51fe3c58d7c4f70e59cc8bf6d40cfbad4c",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m16/win32/broker-financial-audit.json",
+    "bytes": 13568,
+    "sha256": "f751fe27bb82c89f46ee12ca9e730d0a3c4b68d07025c10cf68f7203ce6e352d",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m16/win32/results.json",
+    "bytes": 10251,
+    "sha256": "7e93cec6a30f7570055eff675d8bb0d42ddb2d3935b61fa1c8199300859a8ffb",
+    "exactPathReferences": []
+  },
+  {
+    "path": "docs/evidence/m17-final.md",
+    "bytes": 10023,
+    "sha256": "1cf4af0374b84c013f243ed223f3b81baaf3ad42062a1f9ce1b806f854d425d2",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m17-validation-results.json",
+    "bytes": 4180,
+    "sha256": "932c2d51970f3cb78bbafceae33c1562313f61c9e1d3174923a46b58ac4aab89",
+    "exactPathReferences": [
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "docs/evidence/m18/FILES.txt",
+    "bytes": 1392,
+    "sha256": "d0bd22c1495c812c9b397e00c74069b999bd3cfd8b3785480aa888dc906c160e",
+    "exactPathReferences": [
+      "docs/evidence/m18/FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m18/RESULTS.md",
+    "bytes": 7805,
+    "sha256": "6a9a3f2338af64c73d2022ed40156962e75b4a89f73a20e8526b43318d2c349f",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "M18-INTEGRATION.md",
+      "README.md",
+      "docs/evidence/m18/FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m18/linux/validation.json",
+    "bytes": 1591,
+    "sha256": "87e9be784321bfbe2987b0ff86a18f0f588f4d8521e8de942d20d37db2cae087",
+    "exactPathReferences": [
+      "docs/evidence/m18/FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m18/source-sha256.json",
+    "bytes": 2948,
+    "sha256": "85756bb9a72b465dfc6968c725a3ebc097d0c97821b7f75528acb47dbd762494",
+    "exactPathReferences": [
+      "docs/evidence/m18/FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m18/win32/attempts.jsonl",
+    "bytes": 285,
+    "sha256": "da8d542ae0cbaab69c6e09af81c5c5a9eeff691c4481e6094309b3aff4e45d5a",
+    "exactPathReferences": [
+      "docs/evidence/m18/FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m18/win32/validation.json",
+    "bytes": 1588,
+    "sha256": "ccfbcd1c892e81cd9a08187e032bd041a052bb13c53cf6e2465d3cc3b41e217e",
+    "exactPathReferences": [
+      "docs/evidence/m18/FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/m18/windows/results.txt",
+    "bytes": 154,
+    "sha256": "09fc59eff0ce215cb63f7be1cced6363814da5f391a43431245ed9150330ca36",
+    "exactPathReferences": [
+      "docs/evidence/m18/FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/evidence/run-m10-validation.ps1",
+    "bytes": 1227,
+    "sha256": "40dfd9457fe56deec1c58bfce57ef9be50e188e9378dfed25cfd6deaa6a9d2b8",
+    "exactPathReferences": [
+      "docs/evidence/m10-shutdown.md"
+    ]
+  },
+  {
+    "path": "docs/messaging/ACCEPTANCE-MATRIX.md",
+    "bytes": 12698,
+    "sha256": "76f148691efa9bcff77b6c0148a2216062655fc0d0472465f18eb50ff2157dee",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/messaging/EXTERNAL-CONTRACT.md",
+    "bytes": 4432,
+    "sha256": "a0a2f1e4122446bd09cb4d632efb7b9c3697bc33a8e5da6bab455b262d77c71f",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "README.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt"
+    ]
+  },
+  {
+    "path": "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+    "bytes": 13595,
+    "sha256": "fa2b82198ff7c76b7b4e51de46e1ee197401c764bad265d2121f0e8810787aa0",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/messaging/INPUT-CONTRACT.md",
+    "bytes": 10990,
+    "sha256": "6371d830bf54e92e4480ef843c8d09738e0355fe9c3c786ee2b052d352099f26",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "docs/messaging/M15-IMPLEMENTED.md",
+    "bytes": 4486,
+    "sha256": "140fb9a1beba66908de6bed42e45b353301610b51b75fa6944729f09e539ded3",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m16-consumer-reliability.md"
+    ]
+  },
+  {
+    "path": "docs/messaging/M16-RELIABILITY.md",
+    "bytes": 10703,
+    "sha256": "e75f349b9ef49bada7ddd8a70957dd23aacf894d56b8280886c56d97aa2f0c1f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m16-consumer-reliability.md"
+    ]
+  },
+  {
+    "path": "docs/messaging/TRANSACTION-AND-ACK.md",
+    "bytes": 11481,
+    "sha256": "59a2d66d949894a77733c0a122c1d64108b13a8791bfe04e2c6a3b7415fee3b4",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "infra/README.md",
+    "bytes": 7886,
+    "sha256": "305ef85e58f3094d0d83acd3dfc768541ee4d104304d597074bbf7530533a325",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "infra/bootstrap-sqs.sh",
+    "bytes": 1334,
+    "sha256": "2dd410de1f88923370d853987f1880fbbf0d2b2c11bf7e599f22af9adebb0415",
+    "exactPathReferences": [
+      "docker-compose.local.yml",
+      "docker-compose.yml",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/INPUT-CONTRACT.md",
+      "docs/messaging/M16-RELIABILITY.md"
+    ]
+  },
+  {
+    "path": "infra/delivery-validation.compose.yml",
+    "bytes": 538,
+    "sha256": "08ce0da2aeea6a936461dc1f6353ff647696fea84fe4f60fe8d6f985b5f53727",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/RESULTS.md",
+      "docs/evidence/delivery/attempts.jsonl",
+      "docs/evidence/delivery/source-manifest.json",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "infra/healthcheck.ts",
+    "bytes": 282,
+    "sha256": "9d510fe989b8116a7512f9187352780cca007413e9299246a93ebbdf9475668a",
+    "exactPathReferences": [
+      "M18-INTEGRATION.md",
+      "docker-compose.local.yml",
+      "docker-compose.yml",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "infra/init-db.sql",
+    "bytes": 521,
+    "sha256": "89039f0b30a1c5c9d49d46eee31d14207d3d7882232da794c45dde342e5f5735",
+    "exactPathReferences": [
+      "docker-compose.local.yml",
+      "docker-compose.yml",
+      "docs/evidence/delivery/compose/postgres-storage.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "infra/delivery-validation.compose.yml"
+    ]
+  },
+  {
+    "path": "infra/m14-validation.compose.yml",
+    "bytes": 286,
+    "sha256": "248b92e2cddd3d061e57cf4f6f06cd20f5ffeae25029badff4dec2a9b28e9cc0",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/bootstrap-build-excerpt.txt",
+      "infra/m14-validation.ps1"
+    ]
+  },
+  {
+    "path": "infra/m14-validation.ps1",
+    "bytes": 1641,
+    "sha256": "1f262c87fe8c5879ffefa3213f4b1804a14613368d8ca00b89d4d97d98b32ea3",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md"
+    ]
+  },
+  {
+    "path": "infra/m18-validation.compose.yml",
+    "bytes": 1135,
+    "sha256": "db5983bc4ecdb8b376bf7ee1685a4a9575d11769b64650010a49ad43687d0996",
+    "exactPathReferences": [
+      "M18-INTEGRATION.md",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/RESULTS.md",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "infra/smoke-api.ts",
+    "bytes": 7279,
+    "sha256": "07f1352410bda6ed7235480c7d91fbbde1ba526a636f28aec743e60b1f0f64a2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15-sqs-inbox.md",
+      "infra/README.md",
+      "infra/m14-validation.ps1",
+      "scripts/m15-financial-smoke.ts"
+    ]
+  },
+  {
+    "path": "package.json",
+    "bytes": 1729,
+    "sha256": "3f7a2571d77d73797ff4847c7919913d34e31968e605faef1203b58b97e96f4a",
+    "exactPathReferences": [
+      ".dockerignore",
+      "Dockerfile",
+      "docs/evidence/delivery/accepted/build.txt",
+      "docs/evidence/delivery/build.txt",
+      "docs/evidence/delivery/compose/build.txt",
+      "docs/evidence/delivery/final-validation/build.txt",
+      "docs/evidence/delivery/final/build.txt",
+      "docs/evidence/delivery/release/build.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/build.txt",
+      "docs/evidence/delivery/verification-final/build.txt",
+      "docs/evidence/delivery/verification/build.txt",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/build-final-integrated.txt",
+      "docs/evidence/m14-stabilization/build.txt",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m18/source-sha256.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "infra/README.md"
+    ]
+  },
+  {
+    "path": "scripts/db-start.ps1",
+    "bytes": 1227,
+    "sha256": "7ebff1b68bde44d57b90f487d90724b35606cf3295b95cb4895a1987b11009da",
+    "exactPathReferences": [
+      "README.md",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "scripts/db-stop.ps1",
+    "bytes": 245,
+    "sha256": "144b5aba47d9460e2cf196cd239592f1c9855735cad4cda0c1e6e1d4c5df60e3",
+    "exactPathReferences": [
+      "README.md",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "scripts/delivery-compose-smoke.ts",
+    "bytes": 6594,
+    "sha256": "a80e1874395b3de85ef1e26d0eb01baa61f1c32b2c63e857cd1ecf75899ab2bb",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/RESULTS.md",
+      "docs/evidence/delivery/compose/attempts.jsonl",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "scripts/delivery-personal-http.ps1",
+    "bytes": 2349,
+    "sha256": "373e018d762ab666af3f743221870135eed86f19922cad31df13006b33e957e1",
+    "exactPathReferences": [
+      "docs/delivery/FINAL-MANUAL-TEST.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "scripts/delivery-send-command.ts",
+    "bytes": 1308,
+    "sha256": "e700d90d3f5e93512f4fee0d9b7a77e0e86f5fcca381ed3fdfb5e991340a2bfc",
+    "exactPathReferences": [
+      "docs/delivery/FINAL-MANUAL-TEST.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "scripts/delivery-send-command.ts"
+    ]
+  },
+  {
+    "path": "scripts/delivery-validate.ps1",
+    "bytes": 3285,
+    "sha256": "8aed78e915572f9c80fc4bf2049089c42c51482f809aa3c168154a78268f1a46",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/RESULTS.md",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "scripts/init-db.sql",
+    "bytes": 352,
+    "sha256": "74cc376aa2502cdc0aaf3c0b1c59b6d17b3916e5fffbf6195a11eef15cf9219a",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "scripts/m15-financial-smoke.ts",
+    "bytes": 975,
+    "sha256": "4000bfbe598065e817f8cf849b42dad9bfaf4fee10aa996ae80c2bfbf091f644",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/m15-sqs-inbox.md",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m15/results.json",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/evidence/m16/linux/results.json",
+      "docs/evidence/m16/win32/results.json",
+      "docs/evidence/m18/linux/validation.json",
+      "docs/evidence/m18/win32/validation.json",
+      "scripts/delivery-validate.ps1",
+      "scripts/m16-validation.ts",
+      "scripts/m18-validate.ts"
+    ]
+  },
+  {
+    "path": "scripts/m16-validation.ts",
+    "bytes": 2140,
+    "sha256": "a6bd97487ea711dbf306c813b281b8c6d49cc4e4dcf8b5cc678a9bd00e328463",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/messaging/M16-RELIABILITY.md"
+    ]
+  },
+  {
+    "path": "scripts/m18-validate.ps1",
+    "bytes": 513,
+    "sha256": "7a0df197d6911f3573fa16cf7f91dacfea2982e6b1b6774e21c69a23c927535a",
+    "exactPathReferences": [
+      "M18-INTEGRATION.md",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/RESULTS.md",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "scripts/m18-validate.ts",
+    "bytes": 2088,
+    "sha256": "d3cd029ec3ea7b8a73e3e23cb2cada384107fa9153576d29b0884ce2d55bccbf",
+    "exactPathReferences": [
+      "M18-INTEGRATION.md",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/RESULTS.md",
+      "docs/evidence/m18/source-sha256.json",
+      "scripts/m18-validate.ps1"
+    ]
+  },
+  {
+    "path": "scripts/run-tests.ts",
+    "bytes": 1599,
+    "sha256": "1f703af575e458f27b22c2e86fda6542b2c3eb6c299f89fb1392db7dd3917b37",
+    "exactPathReferences": [
+      "README.md",
+      "docs/evidence/delivery/accepted/attempts.jsonl",
+      "docs/evidence/delivery/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/final-validation/windows-official.txt",
+      "docs/evidence/delivery/final/attempts.jsonl",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/release/attempts.jsonl",
+      "docs/evidence/delivery/release/windows-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification-final/windows-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/evidence/delivery/windows-official.txt",
+      "docs/evidence/m12-ledger-constraints.md",
+      "docs/evidence/m14-stabilization/linux-m14-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m14-stabilization/windows-m14-verified.txt",
+      "docs/evidence/m14-stabilization/windows-m14.txt",
+      "docs/evidence/m14-stabilization/windows-official-final.txt",
+      "docs/evidence/m14-stabilization/windows-official-sequential.txt",
+      "docs/evidence/m14-stabilization/windows-official.txt",
+      "docs/evidence/m15/windows-m15-final.txt",
+      "docs/evidence/m15/windows-official-final.txt",
+      "docs/evidence/m15/windows-official-verified.txt",
+      "docs/evidence/m15/windows-official.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/evidence/m16/linux/results.json",
+      "docs/evidence/m16/win32/results.json",
+      "docs/evidence/m17-final.md",
+      "infra/README.md",
+      "package.json",
+      "scripts/delivery-validate.ps1",
+      "scripts/m16-validation.ts",
+      "tests/unit/test-runner.test.ts",
+      "tsconfig.json"
+    ]
+  },
+  {
+    "path": "src/application/dto/common.dto.ts",
+    "bytes": 78,
+    "sha256": "14dae1fd1a1692f04a05915dc19797fdc3e9646949333c362c05e15ee900300b",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/application/dto/query-wagering-transaction.dto.ts",
+    "bytes": 1175,
+    "sha256": "7194d16568d7a323233623d79f000ef329aab6d610936a53ece2a473d2e082cc",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "src/application/dto/query-wallet-ledger.dto.ts",
+    "bytes": 710,
+    "sha256": "dc9b48305e0e712b7fb0d3fa1879c309b29b29095ba277bb9b9b1b6690a02ae8",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/application/dto/wager.dto.ts",
+    "bytes": 695,
+    "sha256": "502ce9c6f3c22bc67badbc37ce5de97de7e12ead47c1c730dabd6f51e6bba1a2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/INPUT-CONTRACT.md"
+    ]
+  },
+  {
+    "path": "src/application/dto/wallet.dto.ts",
+    "bytes": 499,
+    "sha256": "4a8f2e1ff138f91bc02c1bda01e3a130fdbf1470ef8b9e197ccd3be0c55b0e71",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/application/messaging/consume-wager-command.ts",
+    "bytes": 2561,
+    "sha256": "5e526e28804d01de51db3bf83caa92ae0136080c12ae46b2641dde1d7b2a4560",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/compose/attempts.jsonl",
+      "docs/evidence/delivery/compose/deployed-source-hashes.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/application/messaging/wager-command.ts",
+    "bytes": 3178,
+    "sha256": "299e65ebfdc4aa35126e5e7132430cb02cd8c6a0bc6d58dcfd27d3010c095f8e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/compose/attempts.jsonl",
+      "docs/evidence/delivery/compose/deployed-source-hashes.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "src/application/pagination/ledger-cursor-codec.ts",
+    "bytes": 3017,
+    "sha256": "a250178b1aca4590446bed8cead0c743a52568ecd88bfbfeefcfe6828a19fa39",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "src/application/ports/operational-observability.ts",
+    "bytes": 1836,
+    "sha256": "b5e7d541ec61831da7570955612eccc9fc77a1237d2573a7cee27a583a5a00be",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/application/ports/ports.ts",
+    "bytes": 3358,
+    "sha256": "8f28c060f2b244cc31022f2fe9d9887707bd1e2ad83708243afd6b1fa55b8d72",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m10-shutdown.md",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/application/ports/wallet-ledger-query.port.ts",
+    "bytes": 458,
+    "sha256": "d4e061af835f1af9790320deb8ec04804c523eca07af3f074a1fd91d676d4ca2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/application/services/reversal-processor.service.ts",
+    "bytes": 12433,
+    "sha256": "9c736aa992938fb24959a59b14dd94b843f219ce3fe90e49c86dfdbf0bc68c7e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/application/services/win-processor.service.ts",
+    "bytes": 11430,
+    "sha256": "5c2e9c53fc3921ebc4d1ac7ea562c9cc5f51778c27bef457973a59d54715060d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/create-wallet.use-case.ts",
+    "bytes": 7406,
+    "sha256": "09bf5a7d88e6e13145dca38150a7472fc94960b9dc1d3695824c637b5ab5e7d0",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/get-wagering-transaction-by-external-id.use-case.ts",
+    "bytes": 1073,
+    "sha256": "334ad4c9d6410784007e2505c7a177b9b56b2c414aa0b5fb496201b314a98afb",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/get-wagering-transaction-by-id.use-case.ts",
+    "bytes": 935,
+    "sha256": "3fd50010369d58041e675198980f838bc2e63ef45eca45cd217864df663f5f4f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/get-wallet-ledger.use-case.ts",
+    "bytes": 1355,
+    "sha256": "0a4afb98b924c7a64d9dc9b0621911aa67e4b95c8977f36ce982ee7cae74973c",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/get-wallet.use-case.ts",
+    "bytes": 887,
+    "sha256": "bab6c357a06e3ae3d2628b690224cd1e8fb6de75f0398b08023130875a57e586",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/process-bet.use-case.ts",
+    "bytes": 311,
+    "sha256": "b094ec002adc92ff76357bae645566d5f6aa7a2ffbefa7b3ab75178dd6be6ed2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization.md"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/process-wager.use-case.ts",
+    "bytes": 24108,
+    "sha256": "97eb5847ee50292ae20755a2fc578287c633fad6f1fa5f2e608f80e995c10459",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/compose/attempts.jsonl",
+      "docs/evidence/delivery/compose/deployed-source-hashes.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m15/files.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/INPUT-CONTRACT.md",
+      "docs/messaging/TRANSACTION-AND-ACK.md"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/publish-outbox-events.use-case.ts",
+    "bytes": 7064,
+    "sha256": "0ce3ed69b6e7721977a9930759a317344d9d198249324f4779700d1d834e66ec",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/reconcile-wallet.use-case.ts",
+    "bytes": 2650,
+    "sha256": "5339cdfd9c165c270e3ea736c8ab95f6f9135c543782c51373fd92ad1a0d83ac",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m12-ledger-constraints.md"
+    ]
+  },
+  {
+    "path": "src/application/use-cases/reprocess-pending-references.use-case.ts",
+    "bytes": 17416,
+    "sha256": "9565e9aafa710f3312ea5f6cfc028a0e618ce0031e80c55d46f9cd4b494a46e2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/TRANSACTION-AND-ACK.md"
+    ]
+  },
+  {
+    "path": "src/application/validation/outbox-contract.ts",
+    "bytes": 3619,
+    "sha256": "f71f4aa37c9f8e157fab9a149d768d790ff7ab1c3dcc3e0981afab25a3e82e80",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md"
+    ]
+  },
+  {
+    "path": "src/application/validators/snapshot.validator.ts",
+    "bytes": 3406,
+    "sha256": "a87b1fe115705f5f938367414c5baa92277b26103e8b3edda67af17751907385",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/application/validators/wager-input.validator.ts",
+    "bytes": 10299,
+    "sha256": "92c82eba6068dbecdd4998b99513773f8474812fa77d42cd1be0f338462fea5d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "src/domain/entities/wager-transaction.entity.ts",
+    "bytes": 10711,
+    "sha256": "384990b1052983d69c3621b0c3c02621df341965df60f55a247d7b8972a14673",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/domain/entities/wallet-ledger-entry.entity.ts",
+    "bytes": 3263,
+    "sha256": "26ccd723d5a85777c5b3f01d00deb2282649b676a0fda045d19ea494b23f1922",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/domain/entities/wallet.entity.ts",
+    "bytes": 7013,
+    "sha256": "fbf9ff32beba6bbe01b41ace7c61a3e3fb035d806e5ebe1075ad68e41b5e7d34",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/domain/errors/domain.error.ts",
+    "bytes": 2999,
+    "sha256": "229874d35894edec12840afd4dab5f4c76e7123ebc4d2814d6146045c92db677",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/domain/events/events.ts",
+    "bytes": 4560,
+    "sha256": "339137ea8c4304b15497d50e92222829770d4f7120f74c87bb78fe744566b8ed",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/INPUT-CONTRACT.md"
+    ]
+  },
+  {
+    "path": "src/domain/value-objects/money.vo.ts",
+    "bytes": 7410,
+    "sha256": "c60f14294256240511a3fd71d2295a99224e9152b7d0385ffb946785ec6c70a1",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/INPUT-CONTRACT.md"
+    ]
+  },
+  {
+    "path": "src/infrastructure/config/database.config.ts",
+    "bytes": 1077,
+    "sha256": "34eaf20ce56b9265e1e1128bb14f8af6445eed1ed698b15b59b39e74dc39b4ee",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/messaging/sqs-outbox-queue-publisher.service.ts",
+    "bytes": 4013,
+    "sha256": "deb6dff14fbf40bb729f713d67b748ee29a96c23a6d691264088cf434b31fba5",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/messaging/sqs-wager-consumer.service.ts",
+    "bytes": 14366,
+    "sha256": "f3c87cc44157345c823f019d702c0c5d73a9e74e7ebfa05c9fc44191778ba37d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/observability/http-observability.ts",
+    "bytes": 12678,
+    "sha256": "2e930577d9482af4037e3db88f5044d18e94ca8eaaa74c886011d1dfd4f99392",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/compose/attempts.jsonl",
+      "docs/evidence/delivery/compose/deployed-source-hashes.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/observability/observability.controller.ts",
+    "bytes": 2509,
+    "sha256": "6d9ae56f95f4cfa57b272e619afb8247585fea63f7f9183af5430f086d87a1a9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/observability/observability.module.ts",
+    "bytes": 288,
+    "sha256": "aa48964b40828cc0edfdd8d7abf0abef37368c78c1312d7994253b2e5748c58a",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/observability/operational-logger.ts",
+    "bytes": 909,
+    "sha256": "b281392f7dbb38334c80537bf8c6ccc368a97fff20d1ec15d954d42f4e1cb0fe",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/001_initial_schema.down.sql",
+    "bytes": 715,
+    "sha256": "58b683df6bc7b677aa795ee24e003aea543d2a1b065411dec3a937e049b9ad7b",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/001_initial_schema.sql",
+    "bytes": 4461,
+    "sha256": "3d6d91cce45a1381df69f48546b0212640c672d69a6d1cd65e7f75317eae2f0c",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/002_reinforce_schema_and_outbox.down.sql",
+    "bytes": 927,
+    "sha256": "1f4a1e2b69ddeae36eaaf32b4cd7166d06c2be2092931de1b62e49251a2b1c08",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/002_reinforce_schema_and_outbox.sql",
+    "bytes": 2681,
+    "sha256": "5ca8dff3cbee6d084a3aa92147304012581bd78c95b07d2927b19fb5c3b9f46f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/003_protect_terminals_and_composite_fk.down.sql",
+    "bytes": 2770,
+    "sha256": "19f1b3669cec723d60e5e51070ab32b6a4aaae6b4307f37b13bf1db21d898a39",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/003_protect_terminals_and_composite_fk.sql",
+    "bytes": 5380,
+    "sha256": "b8ddba4ee4144f4cd172a5d745fa56872924930a44dc7c563fe3ffeb2ecd5214",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/004_restrict_reversal_unique_index.down.sql",
+    "bytes": 1124,
+    "sha256": "30627c4a8b5ed55f051156911798f4c20b97b3f2e4d6930d3f3c2a820aa34338",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/004_restrict_reversal_unique_index.sql",
+    "bytes": 574,
+    "sha256": "1059caf54c724b1ad96125d6f34b07f6930ece41a9ca5a0379474a307c979b9b",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/005_pending_reference_worker_lease.down.sql",
+    "bytes": 431,
+    "sha256": "b8d6fec645f8e3e1f69797524a31b23dd339f4b8dde6deacee3d24b0279b1374",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/005_pending_reference_worker_lease.sql",
+    "bytes": 1278,
+    "sha256": "5e0a5501698a9e55ca92920c1d7fe080aa2e7ca1c4f21dd556691610351bc27a",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/006_terminal_transaction_protection.down.sql",
+    "bytes": 1902,
+    "sha256": "078299520750960a289ab9032566d453139949fb5044c46c403357d00acacd36",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m11-integrated-validation-results.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/006_terminal_transaction_protection.sql",
+    "bytes": 1329,
+    "sha256": "b284164daacef09445b685aa8051e872fe69842eeda2211d1e15e2cf7d337b98",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/007_ledger_finite_values.down.sql",
+    "bytes": 142,
+    "sha256": "26473079f875abe6ad2b2fdcb452db2f52af031538ea0f2f4409f97a16a04494",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/007_ledger_finite_values.sql",
+    "bytes": 546,
+    "sha256": "cd1a4041b3f754e0a4039fffa0e904200957824c59c7a16f81fd91057cab8418",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m12-ledger-constraints.md",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/008_outbox_publisher_lease_and_retry.down.sql",
+    "bytes": 556,
+    "sha256": "cb832a61ba814f86bfe7a0555c622acb78a75b985dc318bf7899dcfe546d9bde",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/008_outbox_publisher_lease_and_retry.sql",
+    "bytes": 1433,
+    "sha256": "649b80f3722bca73cf326546a04cab0cee0f084710c0efb2f6a19478e160de21",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/009_command_inbox.down.sql",
+    "bytes": 27,
+    "sha256": "6f95715e85d88c3ce3e37326047a150b57681506d044727d04f3accb03deb078",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/009_command_inbox.sql",
+    "bytes": 449,
+    "sha256": "5c9e5330e039e64172f765d34cc8bee7c269e106b86a256527c998be09a2fbe1",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/010_external_inbox_identity.down.sql",
+    "bytes": 252,
+    "sha256": "3ac68bf20d4f420198dc55c5985bbfcf2414a76d324cf215ba77ad55e12958f7",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/010_external_inbox_identity.sql",
+    "bytes": 181,
+    "sha256": "0267fe9d743e343be269eaa120df7e82a0c70f1023a56f87ba29f0704255b0b5",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/compose/attempts.jsonl",
+      "docs/evidence/delivery/compose/deployed-source-hashes.txt",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/migrator.ts",
+    "bytes": 8547,
+    "sha256": "62d5a780c92e094a843978b87489433b07ab8ce261507133141155ff30dcf771",
+    "exactPathReferences": [
+      "README.md",
+      "docker-compose.local.yml",
+      "docker-compose.yml",
+      "docs/evidence/delivery/source-manifest.json",
+      "tests/unit/migrator-robustness.test.ts"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/entities/orm-entities.ts",
+    "bytes": 6657,
+    "sha256": "95e37ade203c385192d242362ad904217c111841190f184866c6011cfc76b6ba",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm-adapter.ts",
+    "bytes": 30915,
+    "sha256": "8262827e10242b28a289577102b68358f862b64241175c5e8d3557432463fffc",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/TRANSACTION-AND-ACK.md"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm-inbox-repository.ts",
+    "bytes": 1670,
+    "sha256": "303b5aab353e5df6db2218e9c3b407564f95d433b787514b1f6e74aa29a3ba1b",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm-wallet-ledger-query-repository.ts",
+    "bytes": 3779,
+    "sha256": "6873045356e4ff56a1a69823a2b065ff4f00627c47c441af55405fc4c0f8e716",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm.config.ts",
+    "bytes": 1568,
+    "sha256": "10d52dda3202e5161d2aa84e4e701ee3d557da9e288e73b821b4004eed734526",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/persistence.module.ts",
+    "bytes": 1389,
+    "sha256": "dff9838a425b9176b1d99d0e77217519706422e2954af19f06070c1bfde640d4",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/TRANSACTION-AND-ACK.md"
+    ]
+  },
+  {
+    "path": "src/infrastructure/persistence/postgres/postgres-adapter.ts",
+    "bytes": 688,
+    "sha256": "47f9cec9f71a93fa07483bef5c4150e3d59eea0790283c8aecf281958e624088",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/workers/outbox-publisher-worker.module.ts",
+    "bytes": 1660,
+    "sha256": "3ac4e5c446e23576edd35d60ce4dbf417dd8ee7934941d43388cac0d8245c03d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/workers/outbox-publisher-worker.service.ts",
+    "bytes": 7281,
+    "sha256": "323dad38e5f1764e05a515a1b069debc02a73ebc1657013bcfa8a0ea0243285b",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/workers/pending-reference-worker.module.ts",
+    "bytes": 648,
+    "sha256": "38d66eeb4efd8ee6ea5827281dc66e2bab464903b94285c43f5f38a79fc252ea",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/infrastructure/workers/pending-reference-worker.service.ts",
+    "bytes": 7261,
+    "sha256": "de63f0c61c5f0c222cdda664df0479a59fb0bdad1a8a4d18437dbba9d7cb687f",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/TRANSACTION-AND-ACK.md"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/app.module.ts",
+    "bytes": 8406,
+    "sha256": "6ce169987a36fa0fad07a96cedcdc95e1441c5e86f86d26328c6a75b764f3626",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/compose/attempts.jsonl",
+      "docs/evidence/delivery/compose/deployed-source-hashes.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/auth/provider-identity.port.ts",
+    "bytes": 513,
+    "sha256": "687f8bdc1b506256eb48b77a681488a07459674d68081949e68cc18cf068d84b",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/controllers/provider-wagering-query.controller.ts",
+    "bytes": 1283,
+    "sha256": "b43809d40c76849251121c1b8edf45090248daa085a720c7ec3e9d21d4029267",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/controllers/wagering-query.controller.ts",
+    "bytes": 895,
+    "sha256": "70ea0489c4919d3056dd95bacadd470acc69e0ba96ddf9bdf75a1c2a1d58c216",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/controllers/wagering.controller.ts",
+    "bytes": 1345,
+    "sha256": "35ed8da7cffd6e26a574b99376b0138c915436b8b01c383802b056efd19932d2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/controllers/wallet-ledger-query.controller.ts",
+    "bytes": 1171,
+    "sha256": "4782de3aa0c2df700aac5af051923ca631fbcc5413c12dcc0e2e3ca8a7abf981",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/controllers/wallet.controller.ts",
+    "bytes": 1666,
+    "sha256": "18d09bd43f74f3b2549ae9131c821ddeb71a402a51c38ee84ad95564d9e0c6f1",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/filters/domain-exception.filter.ts",
+    "bytes": 5452,
+    "sha256": "cb84cf9323473c0522ad94cb84c773bc3d27024759ac4eb5d89305c5b51649bc",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/validation/http-validator.ts",
+    "bytes": 631,
+    "sha256": "8ad7d0a6fa8f5cc4a0a52a5d711b566f733daf8f97bd836bb4bec8a461cd90b6",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "docs/messaging/INPUT-CONTRACT.md"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/validation/query-validator.ts",
+    "bytes": 2682,
+    "sha256": "995577be1cfa2ded5f8e0198eb9c55c70c2d3292bfff4813942e4f6a17375381",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "src/interfaces/http/wagering-query.module.ts",
+    "bytes": 2541,
+    "sha256": "9ac6ef7b6183cf13e0620088b75224e2c92630375cb7b628e2c13dc891afd04d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m17-final.md"
+    ]
+  },
+  {
+    "path": "src/main.ts",
+    "bytes": 633,
+    "sha256": "dec45a9c97994f542d9bd67057a2ebb55c447846abcd20d6c4fa37e7fd98b175",
+    "exactPathReferences": [
+      "docs/evidence/delivery/compose/app-logs.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m18/linux/validation.json",
+      "docs/evidence/m18/win32/attempts.jsonl",
+      "docs/evidence/m18/win32/validation.json",
+      "package.json",
+      "scripts/m18-validate.ts"
+    ]
+  },
+  {
+    "path": "tests/concurrency/concurrency.test.ts",
+    "bytes": 23852,
+    "sha256": "80c769e548d5d6e5c45e8018e6892a9fa083bda89d327c428248db6f8afcf793",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "tests/concurrency/consumer-shutdown-m16-runner.ts",
+    "bytes": 2772,
+    "sha256": "9e960c7a29215893292731e10c2d0567783aeecf92397da332673b2317732f85",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m16-consumer-reliability.md"
+    ]
+  },
+  {
+    "path": "tests/concurrency/delivery-independent-wallets.test.ts",
+    "bytes": 4633,
+    "sha256": "d4e3c744879a8264b874e3a6c3757746204ac8f9e2a66bdc408fdc07ea2b48d4",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt"
+    ]
+  },
+  {
+    "path": "tests/concurrency/inbox-worker-runner.ts",
+    "bytes": 2758,
+    "sha256": "8ebc60b65da173ccc25abb7cb025956cfd1ea06cff4bad160d0f2a0ae3cd2be7",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m15/files.txt"
+    ]
+  },
+  {
+    "path": "tests/concurrency/outbox-worker-runner.ts",
+    "bytes": 3129,
+    "sha256": "9821cdd494b4fa2c291fecc780f068ca8f38866c26ad5b27c99a22af8743383e",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/m14-outbox-publisher.md",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md"
+    ]
+  },
+  {
+    "path": "tests/concurrency/pending-worker-runner.ts",
+    "bytes": 3259,
+    "sha256": "c038ea666c01973255a4338ca69263a32e692742368b09188c4a237344b29115",
+    "exactPathReferences": [
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "tests/concurrency/worker.ts",
+    "bytes": 3665,
+    "sha256": "774521dd981226867e235d07b95ba29799b560444543c68a5304fab4420428e0",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "tests/integration/external-wager-contract.test.ts",
+    "bytes": 9519,
+    "sha256": "d2276e633beffe5cf6d7645563e79d545625d1f7c952a6804eeec644c2d0c8d1",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/accepted/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/final/attempts.jsonl",
+      "docs/evidence/delivery/release/attempts.jsonl",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/messaging/EXTERNAL-CONTRACT.md",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/integration/financial-outbox-m13.test.ts",
+    "bytes": 59998,
+    "sha256": "23e8bf5dc104413cc6910345744e59175e1fd874b7209ed355ef6d5e741e802a",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m13-financial-outbox-results.json",
+      "docs/evidence/m13-financial-outbox.md",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "infra/README.md"
+    ]
+  },
+  {
+    "path": "tests/integration/http-endpoints.test.ts",
+    "bytes": 36996,
+    "sha256": "4f4bc9858c7724ee6f35d2a0bcad9a5b4487526d65e3296cd328031549379218",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/integration/ledger-constraints-m12.test.ts",
+    "bytes": 17120,
+    "sha256": "9f313498fa163d4b981a4e35a09bf86e8bc2eaed9ede2f7d0048caf92dc34388",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m12-ledger-constraints.md",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m15/files.txt",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/integration/m17-read-endpoints.test.ts",
+    "bytes": 32541,
+    "sha256": "455079bb592635002aa2cef60c49248cb23c5e2ee9bdd0f2c59112d26fdb7c5d",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "package.json"
+    ]
+  },
+  {
+    "path": "tests/integration/migrations.test.ts",
+    "bytes": 6334,
+    "sha256": "9a5c64ad2a9ddd57abc20bd705a89bc833a451e82f71fb642271c73405daefd3",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m12-ledger-constraints.md",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/integration/mikro-orm-uow-m05.test.ts",
+    "bytes": 33873,
+    "sha256": "cd5ae0b5d255cb72f70080f247ffcd692273800fc51f92a54075833c9483d442",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "tests/integration/money-postgres-roundtrip.test.ts",
+    "bytes": 10905,
+    "sha256": "0deef23befdce32faf525a59f5f80715ef09dad8fd122aff3df04718e2f1d128",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/integration/outbox-publisher-m14.test.ts",
+    "bytes": 42425,
+    "sha256": "c170de6edfc7a1cd523c3121f625670b16bfa723ffbb3363f9d9ba929140bbcb",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m14-outbox-publisher-results.json",
+      "docs/evidence/m14-outbox-publisher.md",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/linux-m14-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-final.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m14-stabilization/windows-m14-verified.txt",
+      "docs/evidence/m14-stabilization/windows-m14.txt",
+      "package.json"
+    ]
+  },
+  {
+    "path": "tests/integration/pending-reference-worker-m10.test.ts",
+    "bytes": 74827,
+    "sha256": "9b1252a4728b111f5fb557e67db52c79a90203e4f1ed98157f79d1a7d8c27d83",
+    "exactPathReferences": [
+      "ARCHITECTURE.md",
+      "IMPLEMENTATION.md",
+      "README.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/integration/postgres-invariants.test.ts",
+    "bytes": 28868,
+    "sha256": "d68386bb41a453a48b10801af830a203cbbfc959b4788878da27b33c9fe8fd14",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/integration/sqs-consumer-m16.test.ts",
+    "bytes": 26866,
+    "sha256": "215136edacde2446d806be06068478fd65b1fcd9dd4b40e299d3e0569eec0e69",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "docs/evidence/m16/linux/results.json",
+      "docs/evidence/m16/win32/results.json",
+      "docs/messaging/M16-RELIABILITY.md",
+      "package.json",
+      "scripts/m16-validation.ts"
+    ]
+  },
+  {
+    "path": "tests/integration/sqs-inbox-m15.test.ts",
+    "bytes": 25768,
+    "sha256": "1abe5fdbb08f12f0440e6d6129564548820bdd25af57737447e2899a19acc518",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m15/windows-m15-final.txt",
+      "docs/evidence/m16-consumer-reliability.md",
+      "package.json"
+    ]
+  },
+  {
+    "path": "tests/integration/terminal-protection-m11.test.ts",
+    "bytes": 9061,
+    "sha256": "bf336c6c6cd8425ef59ba3259436356b0a59a170bef25d21122e152d88a48091",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m15/files.txt",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/integration/wager-bet-replay.test.ts",
+    "bytes": 57727,
+    "sha256": "8e50f8bc413313f94c7bf37fda9d2edacce0fc33b57dbc6ff63f6c61b6b0e29d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/integration/wager-operations.test.ts",
+    "bytes": 19620,
+    "sha256": "a2f36269e4c24f4ab8821994248719e27cbeb8c813ccda799222a3deab55dd21",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/integration/wager-pending-replay-m09.test.ts",
+    "bytes": 97921,
+    "sha256": "d3ae9b8d3a27459796dce3d0383bd1cadde0c4034340bbc3f08b7bc9293efb54",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "tests/integration/wager-reversals-m07.test.ts",
+    "bytes": 88876,
+    "sha256": "306cd23620c2602c5dea31f4d7912529bc47995fafb1da086b18c245a332e2cd",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/integration/wager-reversals-m08.test.ts",
+    "bytes": 72647,
+    "sha256": "a6cbd53b6aa1931a63576bf1be21db9e63bcbe39f6233045f098c9488a0e9c28",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/integration/wager-win-loss-m06.test.ts",
+    "bytes": 106596,
+    "sha256": "69efc34622c6a6e5e8d3f7b836f153daa5facc0360acadfeee425866136ad5f8",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m15/files.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/integration/wallet-opening.test.ts",
+    "bytes": 40960,
+    "sha256": "c309a6b6c2205789396862b4db7a0f8f36940731fa27c46d54126bfac5ba0686",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/observability/m18-http.test.ts",
+    "bytes": 11162,
+    "sha256": "b1a8a472efd8dbdf2bae76abc88dfa409dece42266b0fbeb9ab33a9889629b98",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m15-sqs-inbox.md",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "tests/observability/m18-messaging.test.ts",
+    "bytes": 15057,
+    "sha256": "ccc4357316da84ad6924e003bea9f2cbc63c7c0fc01ad742736c555810f0ed25",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m18/FILES.txt",
+      "docs/evidence/m18/source-sha256.json"
+    ]
+  },
+  {
+    "path": "tests/test-db-helper.ts",
+    "bytes": 4345,
+    "sha256": "ce6005c98dd2d5c12846f4b11e0e9d20fcda5dc86bb1fd2fc8ad4ce09dc96cfe",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/source-manifest.json"
+    ]
+  },
+  {
+    "path": "tests/unit/delivery-metrics.test.ts",
+    "bytes": 1911,
+    "sha256": "13df318fc27c7cdca11ff373222704b721ae59450ad0c3024e9f6d480f3d46f5",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/accepted/attempts.jsonl",
+      "docs/evidence/delivery/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/final/attempts.jsonl",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/release/attempts.jsonl",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/unit/external-wager-contract.test.ts",
+    "bytes": 2097,
+    "sha256": "7cbeddbfdf54d7a050c0197068aef5c5e8665435c688d1b9984a74fa916d38c9",
+    "exactPathReferences": [
+      "docs/evidence/delivery/CHANGED-FILES.txt",
+      "docs/evidence/delivery/accepted/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/attempts.jsonl",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/final/attempts.jsonl",
+      "docs/evidence/delivery/release/attempts.jsonl",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/attempts.jsonl",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/delivery/verification/attempts.jsonl",
+      "docs/messaging/EXTERNAL-CONTRACT.md",
+      "scripts/delivery-validate.ps1"
+    ]
+  },
+  {
+    "path": "tests/unit/migrator-robustness.test.ts",
+    "bytes": 9458,
+    "sha256": "6b39774c14c7834580d4affddecba10879582b795d9b163ffccd29d3a2e58eb2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt"
+    ]
+  },
+  {
+    "path": "tests/unit/money.test.ts",
+    "bytes": 12512,
+    "sha256": "575667f1fde378bf413b0df433f2c8c5f9df3dac973336d3c26905cbf70538dc",
+    "exactPathReferences": [
+      "IMPLEMENTATION.md",
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/unit/outbox-contract-m14.test.ts",
+    "bytes": 4350,
+    "sha256": "89c90dee6de1e270fca068f963279df44d4863d6f0bb690a7c07dbbadd3112f5",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m14-stabilization-results.json",
+      "docs/evidence/m14-stabilization.md",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt"
+    ]
+  },
+  {
+    "path": "tests/unit/payload-hash.test.ts",
+    "bytes": 4485,
+    "sha256": "04131a5a98c53f8343893410a086effc5465dcb1cc6651e5feb044dfe9e01d32",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json",
+      "docs/messaging/IMPLEMENTATION-HANDOFF.md"
+    ]
+  },
+  {
+    "path": "tests/unit/sqs-consumer-policy-m16.test.ts",
+    "bytes": 1850,
+    "sha256": "3c18de4b66df25ec5bc4c9638594b4d303596cc64d1b0f9a2e97deb2d24d05ff",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m16-consumer-reliability.md"
+    ]
+  },
+  {
+    "path": "tests/unit/test-runner.test.ts",
+    "bytes": 1725,
+    "sha256": "77f68796aee7017067415f234342267506753bdeff74b5183a7501af3c25f3a2",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/unit/wallet-ledger-entry.test.ts",
+    "bytes": 3262,
+    "sha256": "fa20462a12b5d2f0cc7918248342d82cef6f30d671f4b173b0a989b53541c670",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tests/unit/wallet.test.ts",
+    "bytes": 5147,
+    "sha256": "461f7da04dd6223f7cf8a6ec0da00d11b4844cd2893d97855fdbb0774d72240d",
+    "exactPathReferences": [
+      "docs/evidence/delivery/final-validation/linux-official.txt",
+      "docs/evidence/delivery/linux-official.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/verification-final/linux-official.txt",
+      "docs/evidence/m10-shutdown.md",
+      "docs/evidence/m11-integrated-validation-results.json",
+      "docs/evidence/m11-integrated-validation.md",
+      "docs/evidence/m12-ledger-constraints-results.json",
+      "docs/evidence/m14-stabilization/linux-official-postcheckpoint.txt",
+      "docs/evidence/m14-stabilization/linux-official-sequential.txt",
+      "docs/evidence/m14-stabilization/linux-official.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m17-validation-results.json"
+    ]
+  },
+  {
+    "path": "tsconfig.json",
+    "bytes": 894,
+    "sha256": "c2eff4e48e3ec8d150a95c2c4e3cd65bb6e78089d6897267f235043000d93253",
+    "exactPathReferences": [
+      ".dockerignore",
+      "Dockerfile",
+      "docs/evidence/delivery/accepted/build.txt",
+      "docs/evidence/delivery/build.txt",
+      "docs/evidence/delivery/compose/build.txt",
+      "docs/evidence/delivery/final-validation/build.txt",
+      "docs/evidence/delivery/final/build.txt",
+      "docs/evidence/delivery/release/build.txt",
+      "docs/evidence/delivery/source-manifest.json",
+      "docs/evidence/delivery/validated/build.txt",
+      "docs/evidence/delivery/verification-final/build.txt",
+      "docs/evidence/delivery/verification/build.txt",
+      "docs/evidence/m14-stabilization/build-final-integrated.txt",
+      "docs/evidence/m14-stabilization/build.txt",
+      "docs/evidence/m17-final.md",
+      "docs/evidence/m18/source-sha256.json",
+      "infra/README.md"
+    ]
+  }
+]

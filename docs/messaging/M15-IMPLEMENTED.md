@@ -1,3 +1,5 @@
+> Contrato interno implementado na etapa histórica. Para renovação, retry, DLQ e shutdown atuais, veja [confiabilidade](M16-RELIABILITY.md); para entrada externa e migration 010, veja [contrato externo](EXTERNAL-CONTRACT.md).
+
 
 Entrega atual: consulte [contrato externo confirmado](EXTERNAL-CONTRACT.md). A proposta abaixo é histórica; o consumidor aceita também WagerTransactionRequested e a migration 010 preserva identidades textuais.
 

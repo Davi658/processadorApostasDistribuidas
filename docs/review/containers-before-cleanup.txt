@@ -1,0 +1,6 @@
+wagers-review-20261018-app-1 Up 5 minutes (healthy) 127.0.0.1:3078->3000/tcp
+wagers-review-20261018-postgres-1 Up 5 minutes (healthy) 127.0.0.1:55478->5432/tcp
+wagers-review-20261018-localstack-1 Up 5 minutes (healthy) 127.0.0.1:45678->4566/tcp
+wagers-personal-20261018130747-app-1 Up 32 minutes (healthy) 127.0.0.1:3093->3000/tcp
+wagers-personal-20261018130747-postgres-1 Up 32 minutes (healthy) 127.0.0.1:55593->5432/tcp
+wagers-personal-20261018130747-localstack-1 Up 37 minutes (healthy) 127.0.0.1:45693->4566/tcp

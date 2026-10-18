@@ -1,12 +1,14 @@
+> Arquivo histórico: descreve etapas e seus limites na data de execução, não o estado atual. Consulte [arquitetura atual](../../ARCHITECTURE.md) e [roteiro de avaliação](../../README.md).
+
 # Consolidação da versão de entrega
 
-O estado atual de M18/M19/M20/M21 é documentado em [resultados da entrega](docs/evidence/delivery/RESULTS.md); entradas anteriores abaixo são registros históricos, não resultados atribuídos automaticamente aos fontes finais.
+O estado atual de M18/M19/M20/M21 é documentado em [resultados da entrega](../../docs/evidence/delivery/RESULTS.md); entradas anteriores abaixo são registros históricos, não resultados atribuídos automaticamente aos fontes finais.
 
 - Contrato externo confirmado: WagerTransactionRequested com messageId textual e chave em data; preserva ProcessWager interno e exige migration incremental **010_external_inbox_identity**. Migrations atuais **001–010**. Validação, hash, snapshot, atomicidade e delete pós-commit permanecem compartilhados.
 - Observabilidade: invocações separadas de linhas persistidas; labels financeiros limitados; DLQ sem contador cumulativo inventado; gauges outbox do banco separados do histograma após marcação; conflitos PostgreSQL explícitos por SQLSTATE.
 - M20: 50 duplicatas em três processos, locks simultâneos em carteiras diferentes e crash externo real depois de commit/antes de delete. Reutiliza as provas M14/M15/M16 para publishers concorrentes, crash depois do envio, lease recovery e reconciliação.
 - Regressão reproduzível: `scripts/delivery-validate.ps1`, projeto exclusivo, logs e exit codes preservados. A imagem tester cria diretórios de evidência com permissão para bun; o runtime continua não privilegiado. O orçamento de aquisição de conexão dos testes de concorrência é 10 s, mantendo 50 operações, dez conexões por processo e todas as asserções; a configuração de produção não foi alterada. A onda inicial permanece paralela; o worker aguarda todas as respostas e repete no máximo duas vezes somente SQLSTATE 55P03/40P01/40001, registrando a contagem de retries. Erros desconhecidos falham a prova.
-- Conferência pessoal: [roteiro PowerShell](docs/delivery/FINAL-MANUAL-TEST.md), scripts pequenos de HTTP e envio SQS. O agente não executa esse roteiro em nome do candidato.
+- Conferência pessoal: [roteiro PowerShell](../../docs/delivery/FINAL-MANUAL-TEST.md), scripts pequenos de HTTP e envio SQS. O agente não executa esse roteiro em nome do candidato.
 
 ---
 
@@ -26,7 +28,7 @@ Os testes existentes de abertura, M05/UoW, M06, M07/M08 e concorrência continua
 
 **Limite comprovado:** constraints não garantem igualdade de wallets.balance com o total do ledger, continuidade entre linhas ou correspondência de tipo/valor/status com a operação referenciada. A UoW e os processadores mantêm esses vínculos sob lock; SQL direto pode gerar divergência e a reconciliação a reporta. TRUNCATE é protegido pelos privilégios de app_user, sem trigger contra administrador. NUMERIC arredonda escala excedente; o contrato canônico é validado por Money. Totais/deltas de reconciliação são relatórios exatos em strings, podendo exceder o limite persistível ao diagnosticar divergência.
 
-Ambiente: Windows, Bun e PostgreSQL 16.8 real em cluster exclusivo descartável, porta 55413, com migrations reais e app_user restrito. Nenhum cluster com dados do usuário foi alterado. Docker, containers e Linux permanecem não validados. Diagnóstico, comandos, exit codes e resultados da validação integrada estão em [evidências M12](docs/evidence/m12-ledger-constraints.md).
+Ambiente: Windows, Bun e PostgreSQL 16.8 real em cluster exclusivo descartável, porta 55413, com migrations reais e app_user restrito. Nenhum cluster com dados do usuário foi alterado. Docker, containers e Linux permanecem não validados. Diagnóstico, comandos, exit codes e resultados da validação integrada estão em [evidências M12](../../docs/evidence/m12-ledger-constraints.md).
 
 ## 1. Status Geral da Entrega (Rodada Atual)
 
@@ -281,7 +283,7 @@ Ambiente: Windows, Bun e PostgreSQL 16.8 real em cluster exclusivo descartável,
 - **Comprovação com PostgreSQL Real Descartável:**
   - Suíte `tests/integration/pending-reference-worker-m10.test.ts` (21 testes passando, 100% de sucesso) cobrindo os cenários existentes e seis variantes de shutdown com barreiras (escrita, before_commit, flush, commit confirmado, lock e consulta longa), incluindo 3 processos concorrentes com barreira de arquivos, concorrência distribuída, duas reversões da mesma referência, falhas injetadas e reconciliação contábil integral.
 
-Evidências finais, comandos, códigos de saída e limitações: [M10 shutdown](docs/evidence/m10-shutdown.md).
+Evidências finais, comandos, códigos de saída e limitações: [M10 shutdown](../../docs/evidence/m10-shutdown.md).
 
 ---
 
@@ -350,7 +352,7 @@ Execução real em Windows x64, Bun 1.4.3 e PostgreSQL 16.8 exclusivo na porta 5
 
 Não houve correção de código, alteração de migrations, refatoração, remoção de testes, redução de assertions ou ampliação de timeouts. Dois runs anteriores falharam e estão registrados separadamente: indisponibilidade do cluster compartilhado e, no primeiro run exclusivo, timeout HTTP e asserção de duração do shutdown M10. O run final completo passou com os mesmos testes e parâmetros. DOWN continua restaurando a implementação histórica defeituosa; a operação normal exige 006 aplicada.
 
-Base, ambiente, comandos, exit codes, resultados de cada arquivo, hashes de logs, falhas intermediárias e limites: [evidências da validação integrada M11](docs/evidence/m11-integrated-validation.md) e [resultados estruturados](docs/evidence/m11-integrated-validation-results.json). Esta entrega contém apenas documentação e evidências, concluída com commit local, sem push, merge ou publicação.
+Base, ambiente, comandos, exit codes, resultados de cada arquivo, hashes de logs, falhas intermediárias e limites: [evidências da validação integrada M11](../../docs/evidence/m11-integrated-validation.md) e [resultados estruturados](../../docs/evidence/m11-integrated-validation-results.json). Esta entrega contém apenas documentação e evidências, concluída com commit local, sem push, merge ou publicação.
 
 ---
 
@@ -452,11 +454,11 @@ Base: `51c14400282749e972903929ef4517674c77bf0c`; branch `codex/m14-stabilizatio
 
 ## M15 — consumidor de comandos
 
-Implementados envelope v1, validação FIFO, normalização compartilhada, inbox transacional reversível, replay pelo snapshot atual, receive/process/delete com SDK oficial e drenagem normal. Ativação: SQS_CONSUMER_ENABLED=true e WAGER_TRANSACTIONS_QUEUE_URL explícita. Inbox ACCEPTED é representada pela existência da associação; inclui rejeições persistidas e pendências. Não existe reserva confirmada separada. Colisões escapam da UoW externa e são reconciliadas em redelivery saudável. Consulte [contrato final M15](docs/messaging/M15-IMPLEMENTED.md) e [evidências](docs/evidence/m15-sqs-inbox.md). Retry avançado, renovação de visibilidade, DLQ e shutdown completo sob falhas permanecem em M16.
+Implementados envelope v1, validação FIFO, normalização compartilhada, inbox transacional reversível, replay pelo snapshot atual, receive/process/delete com SDK oficial e drenagem normal. Ativação: SQS_CONSUMER_ENABLED=true e WAGER_TRANSACTIONS_QUEUE_URL explícita. Inbox ACCEPTED é representada pela existência da associação; inclui rejeições persistidas e pendências. Não existe reserva confirmada separada. Colisões escapam da UoW externa e são reconciliadas em redelivery saudável. Consulte [contrato final M15](../../docs/messaging/M15-IMPLEMENTED.md) e [evidências](../../docs/evidence/m15-sqs-inbox.md). Retry avançado, renovação de visibilidade, DLQ e shutdown completo sob falhas permanecem em M16.
 
 
 ## M18 — observabilidade integrada
 
 AppModule registra `GET /health/live`, `GET /health/ready` e `GET /metrics`, com middleware HTTP e registro único compartilhado por publisher, consumidor e referências. Logs JSON usam allowlist; métricas Prometheus têm cardinalidade limitada e distinguem tentativa, confirmação SQS, commit local e replay. Readiness reutiliza UoW/clientes, limita sondagens concorrentes, consulta apenas dependências habilitadas e recusa tráfego durante shutdown. Liveness independe de PostgreSQL/SQS.
 
-Contratos, lacuna de correlação tardia, semântica dos contadores por processo, reprodução exclusiva e provas: [M18-INTEGRATION.md](M18-INTEGRATION.md) e [evidências M18](docs/evidence/m18/RESULTS.md).
+Contratos, lacuna de correlação tardia, semântica dos contadores por processo, reprodução exclusiva e provas: [M18-INTEGRATION.md](observability.md) e [evidências M18](../../docs/evidence/m18/RESULTS.md).

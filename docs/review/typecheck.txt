@@ -1,0 +1,10 @@
+ Container wagers-review-20261018-postgres-1 Running
+ Container wagers-review-20261018-postgres-1 Waiting
+ Container wagers-review-20261018-postgres-1 Healthy
+ Container wagers-review-20261018-migrate-1 Starting
+ Container wagers-review-20261018-migrate-1 Started
+ Container wagers-review-20261018-migrate-1 Waiting
+ Container wagers-review-20261018-migrate-1 Exited
+ Container wagers-review-20261018-test-runner-run-f8105a38ae20 Creating
+ Container wagers-review-20261018-test-runner-run-f8105a38ae20 Created
+$ tsc --noEmit

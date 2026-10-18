@@ -1,0 +1,7 @@
+ Container wagers-review-20261018-postgres-1 Running
+ Container wagers-review-20261018-postgres-1 Waiting
+ Container wagers-review-20261018-postgres-1 Healthy
+ Container wagers-review-20261018-migrate-run-b972f813c387 Creating
+ Container wagers-review-20261018-migrate-run-b972f813c387 Created
+Running UP migrations...
+No new migrations to apply.
