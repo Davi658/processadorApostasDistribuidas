@@ -44,7 +44,7 @@ export interface TransactionContext {
   depth: number;
   rollbackOnly: boolean;
   rollbackReason?: unknown;
-  phase?: 'working' | 'committing' | 'committed' | 'rolled_back';
+  phase?: 'working' | 'committing' | 'committed' | 'commit_unknown' | 'rolled_back';
 }
 
 @Injectable()
@@ -244,9 +244,14 @@ export class MikroOrmUnitOfWork implements UnitOfWorkPort, OnModuleInit, OnAppli
       await this.triggerTestHook('after_commit', result);
       return result;
     } catch (error) {
-      if (begun && context.phase !== 'committed') {
+      if (begun && context.phase === 'working') {
         await em.rollback();
         context.phase = 'rolled_back';
+      } else if (context.phase === 'committing') {
+        // A failed COMMIT acknowledgement does not establish rollback. Knex has
+        // settled the dispatched transaction; reconcile durability in a new UoW.
+        context.phase = 'commit_unknown';
+        em.resetTransactionContext();
       }
       throw error;
     } finally {

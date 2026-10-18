@@ -23,6 +23,6 @@ Mesma identidade/impressão lê a transação associada e valida o snapshot atua
 
 SQS_CONSUMER_ENABLED=true habilita o loop (padrão false). WAGER_TRANSACTIONS_QUEUE_URL deve apontar explicitamente para a fila FIFO de comandos wager-transactions.fifo. URL ausente, não FIFO ou de wager-events é recusada quando habilitado. SQS_ENDPOINT, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY e SQS_REQUEST_TIMEOUT_MS seguem o padrão do adaptador SQS existente. Os dois componentes mantêm ownership independente; cliente injetado é emprestado e nunca destruído pelo consumidor.
 
-## M16 pendente
+## Evolução em M16
 
-Retry avançado com jitter/backoff, renovação e expiração real da visibilidade durante execução, redrive/DLQ comprovado, drenagem limitada com cancelamento de operações sob falhas e provas completas de sinais OS continuam em M16. M15 drena normalmente sem fechar ORM antes do trabalho; não promete prazo máximo para uma aplicação arbitrariamente travada. Não há novo receive durante shutdown nem cancelamento global de transações de outros componentes.
+A política atual de retry/backoff, renovação finita de visibilidade, redrive/DLQ e shutdown com cancelamento seguro está em [M16 — confiabilidade do consumidor](M16-RELIABILITY.md). Esse documento atualiza D5/D7 e registra as provas de falhas e sinais OS, preservando o contrato de entrada, a atomicidade da inbox e o processamento financeiro M15 descritos acima.

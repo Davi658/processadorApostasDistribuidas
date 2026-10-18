@@ -1,0 +1,15 @@
+{
+  "project": "wagers-m16",
+  "retainedLocalImage": "wagers-m16-tester:bun-1.4.3",
+  "teardownExitCode": 0,
+  "testClientConnectionsBeforeTeardown": 0,
+  "checkedAtUtc": "2026-10-18T03:44:13.8085630Z",
+  "remainingContainers": [],
+  "remainingNetworks": [],
+  "preexistingServicesStillRunning": [
+    "wagers-local-app-1 127.0.0.1:3000->3000/tcp",
+    "wagers-local-postgres-1 127.0.0.1:5433->5432/tcp",
+    "wagers-local-localstack-1 127.0.0.1:4566->4566/tcp"
+  ],
+  "remainingVolumes": []
+}

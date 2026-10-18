@@ -1,7 +1,7 @@
 {
   "name": "processador-apostas-distribuidas",
   "version": "1.0.0",
-  "description": "Backend financeiro distribuído de processamento de apostas com precisão monetária e idempotência",
+  "description": "Backend financeiro distribu\u00eddo de processamento de apostas com precis\u00e3o monet\u00e1ria e idempot\u00eancia",
   "main": "src/main.ts",
   "type": "module",
   "scripts": {
@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test:m15": "bun run scripts/run-tests.ts tests/integration/sqs-inbox-m15.test.ts",
     "test:m14": "bun run scripts/run-tests.ts tests/integration/outbox-publisher-m14.test.ts",
-    "test:m17": "bun run scripts/run-tests.ts tests/integration/m17-read-endpoints.test.ts"
+    "test:m17": "bun run scripts/run-tests.ts tests/integration/m17-read-endpoints.test.ts",
+    "test:m16": "bun run scripts/run-tests.ts tests/integration/sqs-consumer-m16.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1152.0",
