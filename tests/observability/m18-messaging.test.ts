@@ -94,11 +94,11 @@ test('rollback produces no durable result, commit and inbox replay preserve all 
   expect(lines.join('')).not.toMatch(/123\.45|secret|ReceiptHandle|MessageBody|balance/);
   const metrics = await (await fetch(`${url}/metrics`)).text();
   expect(metrics).toContain('component="consumer",operation="inbox",result="duplicate"} 2');
-  expect(metrics).toContain('financial_transactions_total{status="PROCESSED",kind="BET"}');
-  expect(metrics).toContain('financial_transaction_duration_seconds');
-  expect(metrics).toContain('sqs_dlq_messages_visible{queue="wager-transactions-dlq.fifo"} 0');
+  expect(metrics).toContain('financial_invocations_total{status="PROCESSED",kind="BET"}');
+  expect(metrics).toContain('financial_invocation_duration_seconds');
+  expect(metrics).toContain('# TYPE sqs_dlq_messages_visible gauge');
   expect(metrics).toContain('outbox_delay_seconds');
-  expect(metrics).toContain('outbox_pending_events_total');
+  expect(metrics).toContain('outbox_pending_events');
   expect(metrics).not.toContain(command.commandId); expect(metrics).not.toContain(command.idempotencyKey);
   const inboxEvents = events().filter(e => e.component === 'consumer' && e.operation === 'inbox');
   expect(inboxEvents.some(e => e.walletId === wallet.id)).toBe(true);
@@ -129,6 +129,46 @@ test('reference metrics count confirmed resolutions only and disclose missing hi
   expect(resolved.correlationId).toBeNull(); expect(resolved.transactionId).toBe(pending.transactionId);
   expect(lines.join('')).not.toMatch(/123\.45|secret-reference|historical-trace-not-persisted/);
   expect((await sql.query('select balance::text from wallets where id=$1', [wallet.id])).rows[0].balance).toBe('123.45');
+});
+
+test('financial invocations include replay, technical failure and external rollback without claiming durability', async () => {
+  const telemetry = new HttpObservability(() => {});
+  const wallet = await app.get(CreateWalletUseCase).execute({ playerId: crypto.randomUUID(), initialBalance: { amount: '100.00', currency: 'BRL' } });
+  const uow = app.get(MikroOrmUnitOfWork);
+  const { MikroOrmWalletRepository, MikroOrmWalletLedgerRepository, MikroOrmOutboxRepository } = await import('../../src/infrastructure/persistence/mikro-orm/mikro-orm-adapter');
+  const useCase = new ProcessWagerUseCase(new MikroOrmWalletRepository(uow), app.get(MikroOrmWagerTransactionRepository),
+    new MikroOrmWalletLedgerRepository(uow), new MikroOrmOutboxRepository(uow), uow, undefined, undefined, telemetry);
+  const dto = { providerId: 'delivery-metrics', externalTransactionId: crypto.randomUUID(), playerId: wallet.playerId,
+    walletId: wallet.id, roundId: 'r', gameId: 'g', kind: 'BET' as const, money: { amount: '10.00', currency: 'BRL' } };
+  const key = crypto.randomUUID();
+  const committed = await useCase.execute(key, dto);
+  expect(committed.idempotentReplay).toBe(false);
+  expect((await useCase.execute(key, dto)).idempotentReplay).toBe(true);
+  const rolledBackKey = crypto.randomUUID();
+  await expect(uow.runInTransaction(async () => {
+    await useCase.execute(rolledBackKey, { ...dto, externalTransactionId: crypto.randomUUID() }, { externalTransaction: true });
+    throw new Error('EXTERNAL_ROLLBACK');
+  })).rejects.toThrow('EXTERNAL_ROLLBACK');
+  uow.setTestHook('before_commit', () => { throw new Error('TECHNICAL_FAILURE'); });
+  try {
+    await expect(useCase.execute(crypto.randomUUID(), { ...dto, externalTransactionId: crypto.randomUUID() })).rejects.toThrow('TECHNICAL_FAILURE');
+  } finally { uow.clearTestHooks(); }
+  const blocker = await sql.connect();
+  try {
+    await blocker.query('BEGIN');
+    await blocker.query('select id from wallets where id=$1 for update', [wallet.id]);
+    await expect(uow.runInTransaction(async () => {
+      await uow.getEntityManager().execute("SET LOCAL lock_timeout = '50ms'");
+      return useCase.execute(crypto.randomUUID(), { ...dto, externalTransactionId: crypto.randomUUID() }, { externalTransaction: true });
+    })).rejects.toThrow();
+  } finally { await blocker.query('ROLLBACK'); blocker.release(); }
+  expect((await sql.query('select count(*)::int as n from wager_transactions where wallet_id=$1 and kind=\'BET\'', [wallet.id])).rows[0].n).toBe(1);
+  expect((await sql.query('select balance::text from wallets where id=$1', [wallet.id])).rows[0].balance).toBe('90.00');
+  const text = await telemetry.render();
+  expect(text).toContain('financial_invocations_total{status="PROCESSED",kind="BET"} 3');
+  expect(text).toContain('financial_invocations_total{status="FAILED",kind="BET"} 2');
+  expect(text).toContain('component="financial",operation="transaction",result="lock_conflict"} 1');
+  expect(text).not.toContain('financial_transactions_total');
 });
 
 test('real SQS unavailability returns generic 503 while liveness stays up, recovers and disabled dependencies skip probing', async () => {

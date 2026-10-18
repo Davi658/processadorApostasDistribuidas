@@ -153,6 +153,8 @@ export class AppModule implements NestModule {
         try {
           const knex = this.uow?.getOrm().em.getConnection().getKnex();
           if (!knex) return;
+          const financial = await knex.raw('SELECT kind, status, COUNT(*)::int AS count FROM wager_transactions GROUP BY kind, status').timeout(500, { cancel: true });
+          this.http.recordPersistedFinancial(financial.rows);
           const result = await knex.raw(`
             SELECT 
               COALESCE(EXTRACT(EPOCH FROM (now() - min(occurred_at))), 0)::float AS oldest_age,

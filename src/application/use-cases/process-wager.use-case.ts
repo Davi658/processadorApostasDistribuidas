@@ -179,6 +179,20 @@ export class ProcessWagerUseCase {
         // Unrelated 23505 or other database error: rethrow without transforming into IdempotencyConflictError
         throw err;
       }
+    } catch (error) {
+      // Count only explicit PostgreSQL lock/deadlock/serialization failures, not
+      // ordinary wallet lock acquisition or arbitrary technical exceptions.
+      let cause: any = error;
+      const seen = new Set<unknown>();
+      while (cause && !seen.has(cause)) {
+        seen.add(cause);
+        if (['55P03', '40P01', '40001'].includes(cause.code)) {
+          this.telemetry?.event('financial', 'transaction', 'lock_conflict');
+          break;
+        }
+        cause = cause.cause ?? cause.originalError;
+      }
+      throw error;
     } finally {
       const durationSeconds = Math.max(0, performance.now() - startTime) / 1000;
       const durationMs = durationSeconds * 1000;

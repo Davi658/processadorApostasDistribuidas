@@ -18,6 +18,7 @@ export type Operation =
   | 'dlq';
 
 export type OperationalResult =
+  | 'lock_conflict'
   | 'attempt'
   | 'broker_confirmed'
   | 'local_confirmed'
@@ -78,14 +79,12 @@ export interface OperationalObservabilityPort {
   recordDlqStats?(
     queueName: string,
     visibleCount: number,
-    totalMovedCount?: number
   ): void;
 
-  incrementDlqMessages?(queueName: string, count?: number): void;
+  recordOutboxPublishLag?(publishLagSeconds: number): void;
 
   recordOutboxLag?(
     delaySeconds: number,
     pendingCount?: number,
-    publishLagSeconds?: number
   ): void;
 }

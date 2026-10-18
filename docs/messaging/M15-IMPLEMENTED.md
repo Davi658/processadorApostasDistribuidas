@@ -1,3 +1,6 @@
+
+Entrega atual: consulte [contrato externo confirmado](EXTERNAL-CONTRACT.md). A proposta abaixo é histórica; o consumidor aceita também WagerTransactionRequested e a migration 010 preserva identidades textuais.
+
 # M15 — contrato implementado
 
 Base: origin/main bf5d9fe886c55ee8b321df96f9fbacf837869584, obtida por fetch. Branch codex/m15-sqs-inbox; worktree .worktrees/m15-sqs-inbox. Os quatro documentos de proposta permanecem como histórico; este documento define as decisões efetivamente implementadas.

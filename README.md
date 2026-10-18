@@ -1,5 +1,9 @@
 # Processador Financeiro de Apostas Distribuídas
 
+Entrega M18–M21: [conferência pessoal em PowerShell](docs/delivery/FINAL-MANUAL-TEST.md), [evidências e limitações](docs/evidence/delivery/RESULTS.md), [contrato SQS externo](docs/messaging/EXTERNAL-CONTRACT.md) e [semântica das métricas](docs/delivery/OBSERVABILITY.md). Migrations atuais: **001–010**. O Compose padrão habilita consumer, publisher e worker de referências; o teste pessoal usa projeto e portas próprios.
+
+Autenticação foi omitida conforme permitido pelo enunciado. `ProviderIdentityPort` é o ponto de extensão para IdP externo com guard HTTP; health fica público e SQS continua sujeito à validação de domínio. Não há verificação AWS de produção nem garantia exactly-once do transporte.
+
 Backend financeiro independente e resiliente para processamento de transações de apostas, construído com foco em **precisão monetária estrita**, **idempotência persistente**, **garantias contábeis imutáveis**, **integração transacional com MikroORM**, **reversões referenciadas** e **controle de concorrência com PostgreSQL real**.
 
 ---
@@ -13,10 +17,10 @@ A verificação do ambiente local identificou:
 | **Bun** | Bun 1.x | **Instalado** (v1.4.3) | Utilizado como runtime, gerenciador de pacotes e test runner |
 | **Git** | Git 2.x | **Instalado** (v2.52.0.windows.1) | Controle de versão local estrito |
 | **Docker & Compose** | Docker / Compose | **Operacional** | Arquivos `docker-compose.yml` (entrega padrão) e `docker-compose.local.yml` provisionam a plataforma completa com PostgreSQL, LocalStack SQS, migrações e trabalhadores distribuídos |
-| **PostgreSQL** | PostgreSQL Real | **Instalado e Operacional** (v16.8) | Binários em `~/.pgsql/pgsql`, cluster em `~/.pgsql_data`, porta 5432 |
+| **PostgreSQL** | PostgreSQL Real | **Docker Compose** (16.6-alpine) | Porta host configurável por `LOCAL_POSTGRES_PORT`; ambiente de entrega isolado |
 
 > [!NOTE]
-> Conforme a restrição mandatória de **nunca substituir PostgreSQL por SQLite ou mocks**, o PostgreSQL 16.8 está em execução local na porta padrão 5432. Os testes rodam contra bancos descartáveis isolados (`betting_test_*` e `http_endpoints_*`), executados pelo usuário de aplicação `app_user` com privilégios estritamente delimitados (sem permissão de `TRUNCATE` e sem superusuário).
+> A entrega usa PostgreSQL real em Compose. As regressões devem rodar em projeto exclusivo, separado dos dados pessoais; cada suíte cria bancos descartáveis e usa `app_user` restrito. Veja o roteiro de entrega para portas, credenciais exclusivamente locais e encerramento sem excluir volumes.
 
 ---
 
@@ -59,7 +63,7 @@ docker compose up -d --build
 O projeto possui um runner autônomo de migrações que suporta operações UP e DOWN incrementais com rastreamento na tabela `schema_migrations` e proteção contra execução concorrente via PostgreSQL Advisory Lock (`pg_advisory_xact_lock`):
 
 ```bash
-# Aplicar todas as migrações (001 a 005)
+# Aplicar todas as migrações (001 a 010)
 bun run src/infrastructure/persistence/migrator.ts up
 
 # Reverter migrações de forma limpa

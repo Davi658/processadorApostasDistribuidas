@@ -13,6 +13,9 @@ USER bun
 
 # Estágio dedicado para execução de testes em contêiner
 FROM base AS tester
+USER root
+RUN mkdir -p /app/docs/evidence /app/.data && chown -R bun:bun /app/docs /app/.data
+USER bun
 COPY --chown=bun:bun scripts ./scripts
 COPY --chown=bun:bun tests ./tests
 CMD ["bun", "run", "test"]
