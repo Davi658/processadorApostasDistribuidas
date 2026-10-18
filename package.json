@@ -12,9 +12,11 @@
     "test:integration": "bun run scripts/run-tests.ts tests/integration",
     "test:concurrency": "bun run scripts/run-tests.ts tests/concurrency",
     "typecheck": "tsc --noEmit",
+    "test:m14": "bun run scripts/run-tests.ts tests/integration/outbox-publisher-m14.test.ts",
     "test:m17": "bun run scripts/run-tests.ts tests/integration/m17-read-endpoints.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1152.0",
     "@mikro-orm/cli": "^6.4.9",
     "@mikro-orm/core": "^6.4.9",
     "@mikro-orm/migrations": "^6.4.9",

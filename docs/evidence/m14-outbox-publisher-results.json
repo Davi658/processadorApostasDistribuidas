@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-17",
+  "timezone": "America/Sao_Paulo",
+  "milestone": "M14",
+  "title": "Publisher Concorrente da Outbox e SQS FIFO",
+  "base": "f73e308a94cf18a366021a4e44c70334ea65d47c",
+  "branch": "feat/m14-outbox-publisher",
+  "worktree": "D:/processadorApostasDistribuidas/.worktrees/m14-outbox-publisher",
+  "environment": {
+    "platform": "Windows x64",
+    "bun": "1.4.3",
+    "postgres": "16.6-alpine (Docker 5433) / 16.8 (disposable)",
+    "localstack": "4.0.3 (Docker 4566)",
+    "sqsQueue": "http://127.0.0.1:4566/000000000000/wager-events.fifo",
+    "applicationRole": "app_user: NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS",
+    "localInfrastructureIntact": true
+  },
+  "typecheck": {
+    "command": "bun run typecheck",
+    "exitCode": 0
+  },
+  "dedicatedSuite": {
+    "file": "tests/integration/outbox-publisher-m14.test.ts",
+    "command": "bun test tests/integration/outbox-publisher-m14.test.ts --timeout 30000",
+    "exitCode": 0,
+    "passed": 11,
+    "failed": 0,
+    "expectCalls": 116
+  },
+  "combinedSuite": {
+    "command": "bun run test",
+    "exitCode": 0,
+    "files": 25,
+    "failedFiles": 0
+  },
+  "proofs": {
+    "A": "Uncommitted transaction event is not visible / published (MVCC)",
+    "B": "Publication preserves complete envelope and FIFO attributes (MessageGroupId=aggregateId, MessageDeduplicationId=eventId)",
+    "C": "Concurrent claims are disjoint under FOR UPDATE SKIP LOCKED",
+    "D": "Pre-send failure recorded with backoff and recovered after lease expiration",
+    "E": "Real child process crash after claim: second worker resumes after lease expiration",
+    "F": "Real child process crash after SQS confirmation before published_at: recovery republishes with identical eventId without data loss",
+    "G": "Obsolete claim token rejected, cannot overwrite new lease",
+    "H": "SQS failure schedules backoff with attempts=1 and last_error",
+    "I": "Invalid envelope isolated (is_operationally_blocked=true) without blocking batch",
+    "J": "NestJS graceful shutdown drains in-flight work and blocks new claims",
+    "K": "Financial immutability: zero mutation of balances, versions, transactions, or ledger entries"
+  },
+  "outOfScope": [
+    "financial consumer (M15)",
+    "inbox table (M15)",
+    "consumer DLQ handling (M16)"
+  ]
+}

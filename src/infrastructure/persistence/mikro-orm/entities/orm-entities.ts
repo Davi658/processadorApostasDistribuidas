@@ -175,4 +175,28 @@ export class OutboxMessageOrmEntity {
 
   @Property({ fieldName: 'published_at', columnType: 'timestamptz', nullable: true })
   publishedAt?: Date | null;
+
+  @Property({ fieldName: 'lease_token', length: 64, nullable: true })
+  leaseToken?: string | null;
+
+  @Property({ fieldName: 'lease_owner', length: 255, nullable: true })
+  leaseOwner?: string | null;
+
+  @Property({ fieldName: 'lease_expires_at', columnType: 'timestamptz', nullable: true })
+  leaseExpiresAt?: Date | null;
+
+  @Property({ default: 0 })
+  attempts: number = 0;
+
+  @Property({ fieldName: 'next_attempt_at', columnType: 'timestamptz', nullable: true })
+  nextAttemptAt?: Date | null;
+
+  @Property({ fieldName: 'last_error', columnType: 'text', nullable: true })
+  lastError?: string | null;
+
+  @Property({ fieldName: 'is_operationally_blocked', default: false })
+  isOperationallyBlocked: boolean = false;
+
+  @Property({ fieldName: 'operational_block_reason', length: 255, nullable: true })
+  operationalBlockReason?: string | null;
 }

@@ -31,12 +31,15 @@ describe('Reversible Migrations on Disposable Database', () => {
 
       // 2. Run UP migrations
       const applied = await migrator.up();
-      expect(applied.length).toBe(7);
+      expect(applied.length).toBe(8);
       expect(applied).toContain('001_initial_schema');
       expect(applied).toContain('002_reinforce_schema_and_outbox');
       expect(applied).toContain('003_protect_terminals_and_composite_fk');
       expect(applied).toContain('004_restrict_reversal_unique_index');
       expect(applied).toContain('005_pending_reference_worker_lease');
+      expect(applied).toContain('006_terminal_transaction_protection');
+      expect(applied).toContain('007_ledger_finite_values');
+      expect(applied).toContain('008_outbox_publisher_lease_and_retry');
 
       // Verify tables and constraints exist
       const client = new pg.Client(disposableConfig);
@@ -59,8 +62,13 @@ describe('Reversible Migrations on Disposable Database', () => {
       `);
       expect(triggerRes.rows.length).toBe(1);
 
-      expect(applied).toContain('006_terminal_transaction_protection');
-      expect(applied).toContain('007_ledger_finite_values');
+      // M14 outbox lease migration must reverse first
+      const outboxLeaseColumns = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'outbox_messages' AND column_name = 'lease_token'`);
+      expect(outboxLeaseColumns.rows.length).toBe(1);
+      expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
+      const removedOutboxLeaseColumns = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'outbox_messages' AND column_name = 'lease_token'`);
+      expect(removedOutboxLeaseColumns.rows.length).toBe(0);
+
       expect(await migrator.down()).toBe('007_ledger_finite_values');
       expect(await migrator.down()).toBe('006_terminal_transaction_protection');
 

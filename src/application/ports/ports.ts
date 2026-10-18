@@ -36,10 +36,52 @@ export interface WalletLedgerRepositoryPort {
   listByWalletId(walletId: string): Promise<WalletLedgerEntry[]>;
 }
 
+export interface ClaimedOutboxMessage {
+  id: string;
+  aggregateType: string;
+  aggregateId: string;
+  eventType: string;
+  version: number;
+  correlationId: string;
+  causationId: string | null;
+  occurredAt: string;
+  payload: any;
+  leaseToken: string;
+  leaseOwner: string;
+  leaseExpiresAt: string;
+  attempts: number;
+}
+
+export interface OutboxQueuePublisherPort {
+  publish(
+    event: IntegrationEventEnvelope,
+    options?: { signal?: AbortSignal }
+  ): Promise<{ messageId: string }>;
+}
+
 export interface OutboxRepositoryPort {
   save(event: IntegrationEvent<unknown>): Promise<void>;
   listUnpublished(limit?: number): Promise<IntegrationEventEnvelope[]>;
   findById(id: string): Promise<IntegrationEventEnvelope | null>;
+  claimUnpublishedEvents(
+    batchSize?: number,
+    leaseDurationMs?: number,
+    owner?: string
+  ): Promise<ClaimedOutboxMessage[]>;
+  markPublished(id: string, leaseToken: string): Promise<boolean>;
+  recordFailure(
+    id: string,
+    leaseToken: string,
+    retryDelayMs: number,
+    errorMessage: string
+  ): Promise<boolean>;
+  markOperationallyBlocked(
+    id: string,
+    leaseToken: string,
+    reason: string,
+    errorMessage?: string
+  ): Promise<boolean>;
+  releaseLease(id: string, leaseToken: string): Promise<boolean>;
 }
 
 export interface UnitOfWorkPort {

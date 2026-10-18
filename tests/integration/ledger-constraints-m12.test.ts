@@ -117,10 +117,12 @@ describe('M12 ledger constraints and exact reconciliation on disposable PostgreS
     await pool.query(insert,[crypto.randomUUID(),w,tx,'CREDIT','1.00','BRL','0.00','1.00']);
     const before = await snapshot(pool), migrator = new DatabaseMigrator(migrationDb.adminConfig);
     try {
+      expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
       expect(await migrator.down()).toBe('007_ledger_finite_values');
       expect(await snapshot(pool)).toEqual(before);
-      expect(await migrator.up()).toEqual(['007_ledger_finite_values']);
+      expect(await migrator.up()).toEqual(['007_ledger_finite_values', '008_outbox_publisher_lease_and_retry']);
       expect(await snapshot(pool)).toEqual(before);
+      expect(await migrator.down()).toBe('008_outbox_publisher_lease_and_retry');
       expect(await migrator.down()).toBe('007_ledger_finite_values');
       // Reproduce the historical loophole without disabling any trigger.
       const legacyTx = await transaction(w,'BRL',pool), legacyId = crypto.randomUUID();

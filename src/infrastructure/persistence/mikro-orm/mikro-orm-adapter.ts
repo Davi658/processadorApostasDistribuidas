@@ -13,6 +13,7 @@ import {
   TransactionRollbackOnlyError,
 } from '../../../domain/errors/domain.error';
 import {
+  ClaimedOutboxMessage,
   OutboxRepositoryPort,
   UnitOfWorkPort,
   WalletLedgerRepositoryPort,
@@ -731,5 +732,131 @@ export class MikroOrmOutboxRepository implements OutboxRepositoryPort {
       occurredAt: e.occurredAt.toISOString(),
       data: e.payload,
     };
+  }
+
+  public async claimUnpublishedEvents(
+    batchSize: number = 20,
+    leaseDurationMs: number = 30000,
+    owner: string = 'outbox-publisher'
+  ): Promise<ClaimedOutboxMessage[]> {
+    const em = this.em;
+    const query = `
+      WITH eligible AS (
+        SELECT id
+        FROM outbox_messages
+        WHERE published_at IS NULL
+          AND is_operationally_blocked = FALSE
+          AND (next_attempt_at IS NULL OR next_attempt_at <= clock_timestamp())
+          AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
+        ORDER BY next_attempt_at ASC NULLS FIRST, created_at ASC
+        LIMIT ?
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE outbox_messages om
+      SET lease_token = gen_random_uuid()::text,
+          lease_owner = ?,
+          lease_expires_at = clock_timestamp() + (? * INTERVAL '1 millisecond')
+      FROM eligible
+      WHERE om.id = eligible.id
+      RETURNING om.id, om.aggregate_type, om.aggregate_id, om.event_type, om.version,
+                om.correlation_id, om.causation_id, om.occurred_at, om.payload,
+                om.lease_token, om.lease_owner, om.lease_expires_at, om.attempts;
+    `;
+
+    const results = await em.execute<any[]>(query, [batchSize, owner, leaseDurationMs]);
+    return (results || []).map((row) => ({
+      id: row.id,
+      aggregateType: row.aggregate_type,
+      aggregateId: row.aggregate_id,
+      eventType: row.event_type,
+      version: Number(row.version),
+      correlationId: row.correlation_id,
+      causationId: row.causation_id ?? null,
+      occurredAt:
+        row.occurred_at instanceof Date
+          ? row.occurred_at.toISOString()
+          : new Date(row.occurred_at).toISOString(),
+      payload: row.payload,
+      leaseToken: row.lease_token,
+      leaseOwner: row.lease_owner,
+      leaseExpiresAt:
+        row.lease_expires_at instanceof Date
+          ? row.lease_expires_at.toISOString()
+          : new Date(row.lease_expires_at).toISOString(),
+      attempts: Number(row.attempts || 0),
+    }));
+  }
+
+  public async markPublished(id: string, leaseToken: string): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      UPDATE outbox_messages
+      SET published_at = clock_timestamp(),
+          lease_token = NULL,
+          lease_owner = NULL,
+          lease_expires_at = NULL
+      WHERE id = ? AND lease_token = ?
+      RETURNING id;
+    `;
+    const res = await em.execute<any[]>(query, [id, leaseToken]);
+    return Array.isArray(res) && res.length > 0;
+  }
+
+  public async recordFailure(
+    id: string,
+    leaseToken: string,
+    retryDelayMs: number,
+    errorMessage: string
+  ): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      UPDATE outbox_messages
+      SET attempts = attempts + 1,
+          next_attempt_at = clock_timestamp() + (? * INTERVAL '1 millisecond'),
+          last_error = ?,
+          lease_token = NULL,
+          lease_owner = NULL,
+          lease_expires_at = NULL
+      WHERE id = ? AND lease_token = ?
+      RETURNING id;
+    `;
+    const res = await em.execute<any[]>(query, [retryDelayMs, errorMessage, id, leaseToken]);
+    return Array.isArray(res) && res.length > 0;
+  }
+
+  public async markOperationallyBlocked(
+    id: string,
+    leaseToken: string,
+    reason: string,
+    errorMessage?: string
+  ): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      UPDATE outbox_messages
+      SET is_operationally_blocked = TRUE,
+          operational_block_reason = ?,
+          last_error = COALESCE(?, last_error),
+          lease_token = NULL,
+          lease_owner = NULL,
+          lease_expires_at = NULL
+      WHERE id = ? AND lease_token = ?
+      RETURNING id;
+    `;
+    const res = await em.execute<any[]>(query, [reason, errorMessage ?? null, id, leaseToken]);
+    return Array.isArray(res) && res.length > 0;
+  }
+
+  public async releaseLease(id: string, leaseToken: string): Promise<boolean> {
+    const em = this.em;
+    const query = `
+      UPDATE outbox_messages
+      SET lease_token = NULL,
+          lease_owner = NULL,
+          lease_expires_at = NULL
+      WHERE id = ? AND lease_token = ?
+      RETURNING id;
+    `;
+    const res = await em.execute<any[]>(query, [id, leaseToken]);
+    return Array.isArray(res) && res.length > 0;
   }
 }
