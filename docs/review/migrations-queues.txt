@@ -1,0 +1,66 @@
+queues-1   | http://localstack:4566/queue/us-east-1/000000000000/wager-transactions-dlq.fifo
+queues-1   | {
+queues-1   |     "Attributes": {
+queues-1   |         "ApproximateNumberOfMessages": "0",
+queues-1   |         "ApproximateNumberOfMessagesNotVisible": "0",
+queues-1   |         "ApproximateNumberOfMessagesDelayed": "0",
+queues-1   |         "CreatedTimestamp": "1792341648",
+queues-1   |         "DelaySeconds": "0",
+queues-1   |         "LastModifiedTimestamp": "1792341648",
+queues-1   |         "MaximumMessageSize": "262144",
+queues-1   |         "MessageRetentionPeriod": "345600",
+queues-1   |         "QueueArn": "arn:aws:sqs:us-east-1:000000000000:wager-transactions-dlq.fifo",
+queues-1   |         "ReceiveMessageWaitTimeSeconds": "0",
+queues-1   |         "VisibilityTimeout": "30",
+queues-1   |         "SqsManagedSseEnabled": "true",
+queues-1   |         "ContentBasedDeduplication": "false",
+queues-1   |         "DeduplicationScope": "queue",
+queues-1   |         "FifoThroughputLimit": "perQueue",
+queues-1   |         "FifoQueue": "true"
+queues-1   |     }
+queues-1   | }
+queues-1   | http://localstack:4566/queue/us-east-1/000000000000/wager-transactions.fifo
+queues-1   | {
+queues-1   |     "Attributes": {
+queues-1   |         "ApproximateNumberOfMessages": "0",
+queues-1   |         "ApproximateNumberOfMessagesNotVisible": "0",
+queues-1   |         "ApproximateNumberOfMessagesDelayed": "0",
+queues-1   |         "CreatedTimestamp": "1792341649",
+queues-1   |         "DelaySeconds": "0",
+queues-1   |         "LastModifiedTimestamp": "1792341649",
+queues-1   |         "MaximumMessageSize": "262144",
+queues-1   |         "MessageRetentionPeriod": "345600",
+queues-1   |         "QueueArn": "arn:aws:sqs:us-east-1:000000000000:wager-transactions.fifo",
+queues-1   |         "ReceiveMessageWaitTimeSeconds": "0",
+queues-1   |         "VisibilityTimeout": "30",
+queues-1   |         "SqsManagedSseEnabled": "true",
+queues-1   |         "ContentBasedDeduplication": "false",
+queues-1   |         "DeduplicationScope": "queue",
+queues-1   |         "FifoThroughputLimit": "perQueue",
+queues-1   |         "FifoQueue": "true",
+queues-1   |         "RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:wager-transactions-dlq.fifo\",\"maxReceiveCount\":\"5\"}"
+queues-1   |     }
+queues-1   | }
+queues-1   | http://localstack:4566/queue/us-east-1/000000000000/wager-events.fifo
+queues-1   | {
+queues-1   |     "Attributes": {
+queues-1   |         "ApproximateNumberOfMessages": "0",
+queues-1   |         "ApproximateNumberOfMessagesNotVisible": "0",
+queues-1   |         "ApproximateNumberOfMessagesDelayed": "0",
+queues-1   |         "CreatedTimestamp": "1792341649",
+queues-1   |         "DelaySeconds": "0",
+queues-1   |         "LastModifiedTimestamp": "1792341649",
+queues-1   |         "MaximumMessageSize": "262144",
+queues-1   |         "MessageRetentionPeriod": "345600",
+queues-1   |         "QueueArn": "arn:aws:sqs:us-east-1:000000000000:wager-events.fifo",
+queues-1   |         "ReceiveMessageWaitTimeSeconds": "0",
+queues-1   |         "VisibilityTimeout": "30",
+queues-1   |         "SqsManagedSseEnabled": "true",
+queues-1   |         "ContentBasedDeduplication": "false",
+queues-1   |         "DeduplicationScope": "queue",
+queues-1   |         "FifoThroughputLimit": "perQueue",
+queues-1   |         "FifoQueue": "true"
+queues-1   |     }
+queues-1   | }
+migrate-1  | Running UP migrations...
+migrate-1  | Applied migrations: 001_initial_schema, 002_reinforce_schema_and_outbox, 003_protect_terminals_and_composite_fk, 004_restrict_reversal_unique_index, 005_pending_reference_worker_lease, 006_terminal_transaction_protection, 007_ledger_finite_values, 008_outbox_publisher_lease_and_retry, 009_command_inbox, 010_external_inbox_identity

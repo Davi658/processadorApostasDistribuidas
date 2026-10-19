@@ -1,0 +1,6 @@
+{
+  "liveStatus": 200,
+  "liveBody": "{\"status\":\"ok\"}",
+  "readyStatus": 200,
+  "readyBody": "{\"status\":\"ok\"}"
+}

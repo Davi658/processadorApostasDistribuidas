@@ -1,0 +1,13 @@
+                version                 |          applied_at
+----------------------------------------+-------------------------------
+ 001_initial_schema                     | 2026-10-18 16:40:49.782144+00
+ 002_reinforce_schema_and_outbox        | 2026-10-18 16:40:49.782144+00
+ 003_protect_terminals_and_composite_fk | 2026-10-18 16:40:49.782144+00
+ 004_restrict_reversal_unique_index     | 2026-10-18 16:40:49.782144+00
+ 005_pending_reference_worker_lease     | 2026-10-18 16:40:49.782144+00
+ 006_terminal_transaction_protection    | 2026-10-18 16:40:49.782144+00
+ 007_ledger_finite_values               | 2026-10-18 16:40:49.782144+00
+ 008_outbox_publisher_lease_and_retry   | 2026-10-18 16:40:49.782144+00
+ 009_command_inbox                      | 2026-10-18 16:40:49.782144+00
+ 010_external_inbox_identity            | 2026-10-18 16:40:49.782144+00
+(10 rows)

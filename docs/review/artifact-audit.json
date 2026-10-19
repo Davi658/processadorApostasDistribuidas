@@ -1,0 +1,8 @@
+{
+  "trackedFiles": 338,
+  "forbiddenTrackedPaths": [],
+  "highConfidenceSecretFiles": [],
+  "scope": "Tracked files at base plus documentation edits; not entire Git history",
+  "localCredentials": "Reviewed Compose, .env.example, SQL init, tests and scripts; local fixture values only",
+  "configurationReferences": "package.json scripts, Docker COPY/build targets, Compose commands/volumes, script entry points retained unchanged"
+}

@@ -1,0 +1,762 @@
+[
+  {
+    "path": ".dockerignore",
+    "sha256": "6efc6ee3cc68c2a112e6e5405791867afb66289cb36ef82e92ed2910c1386bb6",
+    "matchesBase": true
+  },
+  {
+    "path": ".gitignore",
+    "sha256": "c2b4124ce5205168c2e34b05f6a37a38ef68898c7e132df1e66e396371317bc8",
+    "matchesBase": true
+  },
+  {
+    "path": "Dockerfile",
+    "sha256": "ba0d85d853491ccac9cea2ee96a2d63cc3ce63ceadeb02679a916bb9fcc9f361",
+    "matchesBase": true
+  },
+  {
+    "path": "bun.lock",
+    "sha256": "3a2c9f2ea7dd461d24b35267b1945e83e9f344d59dc361449bd56cf6a5bc4e30",
+    "matchesBase": true
+  },
+  {
+    "path": "docker-compose.local.yml",
+    "sha256": "2a1e3bd8958cd395f4371a43a2418340eb86aa47c2b1715760a2cd65ad8d4dbf",
+    "matchesBase": true
+  },
+  {
+    "path": "docker-compose.yml",
+    "sha256": "2a1e3bd8958cd395f4371a43a2418340eb86aa47c2b1715760a2cd65ad8d4dbf",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/bootstrap-sqs.sh",
+    "sha256": "2dd410de1f88923370d853987f1880fbbf0d2b2c11bf7e599f22af9adebb0415",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/delivery-validation.compose.yml",
+    "sha256": "08ce0da2aeea6a936461dc1f6353ff647696fea84fe4f60fe8d6f985b5f53727",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/healthcheck.ts",
+    "sha256": "9d510fe989b8116a7512f9187352780cca007413e9299246a93ebbdf9475668a",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/init-db.sql",
+    "sha256": "89039f0b30a1c5c9d49d46eee31d14207d3d7882232da794c45dde342e5f5735",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/m14-validation.compose.yml",
+    "sha256": "248b92e2cddd3d061e57cf4f6f06cd20f5ffeae25029badff4dec2a9b28e9cc0",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/m14-validation.ps1",
+    "sha256": "1f262c87fe8c5879ffefa3213f4b1804a14613368d8ca00b89d4d97d98b32ea3",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/m18-validation.compose.yml",
+    "sha256": "db5983bc4ecdb8b376bf7ee1685a4a9575d11769b64650010a49ad43687d0996",
+    "matchesBase": true
+  },
+  {
+    "path": "infra/smoke-api.ts",
+    "sha256": "07f1352410bda6ed7235480c7d91fbbde1ba526a636f28aec743e60b1f0f64a2",
+    "matchesBase": true
+  },
+  {
+    "path": "package.json",
+    "sha256": "3f7a2571d77d73797ff4847c7919913d34e31968e605faef1203b58b97e96f4a",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/db-start.ps1",
+    "sha256": "7ebff1b68bde44d57b90f487d90724b35606cf3295b95cb4895a1987b11009da",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/db-stop.ps1",
+    "sha256": "144b5aba47d9460e2cf196cd239592f1c9855735cad4cda0c1e6e1d4c5df60e3",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/delivery-compose-smoke.ts",
+    "sha256": "a80e1874395b3de85ef1e26d0eb01baa61f1c32b2c63e857cd1ecf75899ab2bb",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/delivery-personal-http.ps1",
+    "sha256": "373e018d762ab666af3f743221870135eed86f19922cad31df13006b33e957e1",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/delivery-send-command.ts",
+    "sha256": "e700d90d3f5e93512f4fee0d9b7a77e0e86f5fcca381ed3fdfb5e991340a2bfc",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/delivery-validate.ps1",
+    "sha256": "8aed78e915572f9c80fc4bf2049089c42c51482f809aa3c168154a78268f1a46",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/init-db.sql",
+    "sha256": "74cc376aa2502cdc0aaf3c0b1c59b6d17b3916e5fffbf6195a11eef15cf9219a",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/m15-financial-smoke.ts",
+    "sha256": "4000bfbe598065e817f8cf849b42dad9bfaf4fee10aa996ae80c2bfbf091f644",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/m16-validation.ts",
+    "sha256": "a6bd97487ea711dbf306c813b281b8c6d49cc4e4dcf8b5cc678a9bd00e328463",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/m18-validate.ps1",
+    "sha256": "7a0df197d6911f3573fa16cf7f91dacfea2982e6b1b6774e21c69a23c927535a",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/m18-validate.ts",
+    "sha256": "d3cd029ec3ea7b8a73e3e23cb2cada384107fa9153576d29b0884ce2d55bccbf",
+    "matchesBase": true
+  },
+  {
+    "path": "scripts/run-tests.ts",
+    "sha256": "1f703af575e458f27b22c2e86fda6542b2c3eb6c299f89fb1392db7dd3917b37",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/dto/common.dto.ts",
+    "sha256": "14dae1fd1a1692f04a05915dc19797fdc3e9646949333c362c05e15ee900300b",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/dto/query-wagering-transaction.dto.ts",
+    "sha256": "7194d16568d7a323233623d79f000ef329aab6d610936a53ece2a473d2e082cc",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/dto/query-wallet-ledger.dto.ts",
+    "sha256": "dc9b48305e0e712b7fb0d3fa1879c309b29b29095ba277bb9b9b1b6690a02ae8",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/dto/wager.dto.ts",
+    "sha256": "502ce9c6f3c22bc67badbc37ce5de97de7e12ead47c1c730dabd6f51e6bba1a2",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/dto/wallet.dto.ts",
+    "sha256": "4a8f2e1ff138f91bc02c1bda01e3a130fdbf1470ef8b9e197ccd3be0c55b0e71",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/messaging/consume-wager-command.ts",
+    "sha256": "5e526e28804d01de51db3bf83caa92ae0136080c12ae46b2641dde1d7b2a4560",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/messaging/wager-command.ts",
+    "sha256": "299e65ebfdc4aa35126e5e7132430cb02cd8c6a0bc6d58dcfd27d3010c095f8e",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/pagination/ledger-cursor-codec.ts",
+    "sha256": "a250178b1aca4590446bed8cead0c743a52568ecd88bfbfeefcfe6828a19fa39",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/ports/operational-observability.ts",
+    "sha256": "b5e7d541ec61831da7570955612eccc9fc77a1237d2573a7cee27a583a5a00be",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/ports/ports.ts",
+    "sha256": "8f28c060f2b244cc31022f2fe9d9887707bd1e2ad83708243afd6b1fa55b8d72",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/ports/wallet-ledger-query.port.ts",
+    "sha256": "d4e061af835f1af9790320deb8ec04804c523eca07af3f074a1fd91d676d4ca2",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/services/reversal-processor.service.ts",
+    "sha256": "9c736aa992938fb24959a59b14dd94b843f219ce3fe90e49c86dfdbf0bc68c7e",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/services/win-processor.service.ts",
+    "sha256": "5c2e9c53fc3921ebc4d1ac7ea562c9cc5f51778c27bef457973a59d54715060d",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/create-wallet.use-case.ts",
+    "sha256": "09bf5a7d88e6e13145dca38150a7472fc94960b9dc1d3695824c637b5ab5e7d0",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/get-wagering-transaction-by-external-id.use-case.ts",
+    "sha256": "334ad4c9d6410784007e2505c7a177b9b56b2c414aa0b5fb496201b314a98afb",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/get-wagering-transaction-by-id.use-case.ts",
+    "sha256": "3fd50010369d58041e675198980f838bc2e63ef45eca45cd217864df663f5f4f",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/get-wallet-ledger.use-case.ts",
+    "sha256": "0a4afb98b924c7a64d9dc9b0621911aa67e4b95c8977f36ce982ee7cae74973c",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/get-wallet.use-case.ts",
+    "sha256": "bab6c357a06e3ae3d2628b690224cd1e8fb6de75f0398b08023130875a57e586",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/process-bet.use-case.ts",
+    "sha256": "b094ec002adc92ff76357bae645566d5f6aa7a2ffbefa7b3ab75178dd6be6ed2",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/process-wager.use-case.ts",
+    "sha256": "97eb5847ee50292ae20755a2fc578287c633fad6f1fa5f2e608f80e995c10459",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/publish-outbox-events.use-case.ts",
+    "sha256": "0ce3ed69b6e7721977a9930759a317344d9d198249324f4779700d1d834e66ec",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/reconcile-wallet.use-case.ts",
+    "sha256": "5339cdfd9c165c270e3ea736c8ab95f6f9135c543782c51373fd92ad1a0d83ac",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/use-cases/reprocess-pending-references.use-case.ts",
+    "sha256": "9565e9aafa710f3312ea5f6cfc028a0e618ce0031e80c55d46f9cd4b494a46e2",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/validation/outbox-contract.ts",
+    "sha256": "f71f4aa37c9f8e157fab9a149d768d790ff7ab1c3dcc3e0981afab25a3e82e80",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/validators/snapshot.validator.ts",
+    "sha256": "a87b1fe115705f5f938367414c5baa92277b26103e8b3edda67af17751907385",
+    "matchesBase": true
+  },
+  {
+    "path": "src/application/validators/wager-input.validator.ts",
+    "sha256": "92c82eba6068dbecdd4998b99513773f8474812fa77d42cd1be0f338462fea5d",
+    "matchesBase": true
+  },
+  {
+    "path": "src/domain/entities/wager-transaction.entity.ts",
+    "sha256": "384990b1052983d69c3621b0c3c02621df341965df60f55a247d7b8972a14673",
+    "matchesBase": true
+  },
+  {
+    "path": "src/domain/entities/wallet-ledger-entry.entity.ts",
+    "sha256": "26ccd723d5a85777c5b3f01d00deb2282649b676a0fda045d19ea494b23f1922",
+    "matchesBase": true
+  },
+  {
+    "path": "src/domain/entities/wallet.entity.ts",
+    "sha256": "fbf9ff32beba6bbe01b41ace7c61a3e3fb035d806e5ebe1075ad68e41b5e7d34",
+    "matchesBase": true
+  },
+  {
+    "path": "src/domain/errors/domain.error.ts",
+    "sha256": "229874d35894edec12840afd4dab5f4c76e7123ebc4d2814d6146045c92db677",
+    "matchesBase": true
+  },
+  {
+    "path": "src/domain/events/events.ts",
+    "sha256": "339137ea8c4304b15497d50e92222829770d4f7120f74c87bb78fe744566b8ed",
+    "matchesBase": true
+  },
+  {
+    "path": "src/domain/value-objects/money.vo.ts",
+    "sha256": "c60f14294256240511a3fd71d2295a99224e9152b7d0385ffb946785ec6c70a1",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/config/database.config.ts",
+    "sha256": "34eaf20ce56b9265e1e1128bb14f8af6445eed1ed698b15b59b39e74dc39b4ee",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/messaging/sqs-outbox-queue-publisher.service.ts",
+    "sha256": "deb6dff14fbf40bb729f713d67b748ee29a96c23a6d691264088cf434b31fba5",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/messaging/sqs-wager-consumer.service.ts",
+    "sha256": "f3c87cc44157345c823f019d702c0c5d73a9e74e7ebfa05c9fc44191778ba37d",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/observability/http-observability.ts",
+    "sha256": "2e930577d9482af4037e3db88f5044d18e94ca8eaaa74c886011d1dfd4f99392",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/observability/observability.controller.ts",
+    "sha256": "6d9ae56f95f4cfa57b272e619afb8247585fea63f7f9183af5430f086d87a1a9",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/observability/observability.module.ts",
+    "sha256": "aa48964b40828cc0edfdd8d7abf0abef37368c78c1312d7994253b2e5748c58a",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/observability/operational-logger.ts",
+    "sha256": "b281392f7dbb38334c80537bf8c6ccc368a97fff20d1ec15d954d42f4e1cb0fe",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/001_initial_schema.down.sql",
+    "sha256": "58b683df6bc7b677aa795ee24e003aea543d2a1b065411dec3a937e049b9ad7b",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/001_initial_schema.sql",
+    "sha256": "3d6d91cce45a1381df69f48546b0212640c672d69a6d1cd65e7f75317eae2f0c",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/002_reinforce_schema_and_outbox.down.sql",
+    "sha256": "1f4a1e2b69ddeae36eaaf32b4cd7166d06c2be2092931de1b62e49251a2b1c08",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/002_reinforce_schema_and_outbox.sql",
+    "sha256": "5ca8dff3cbee6d084a3aa92147304012581bd78c95b07d2927b19fb5c3b9f46f",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/003_protect_terminals_and_composite_fk.down.sql",
+    "sha256": "19f1b3669cec723d60e5e51070ab32b6a4aaae6b4307f37b13bf1db21d898a39",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/003_protect_terminals_and_composite_fk.sql",
+    "sha256": "b8ddba4ee4144f4cd172a5d745fa56872924930a44dc7c563fe3ffeb2ecd5214",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/004_restrict_reversal_unique_index.down.sql",
+    "sha256": "30627c4a8b5ed55f051156911798f4c20b97b3f2e4d6930d3f3c2a820aa34338",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/004_restrict_reversal_unique_index.sql",
+    "sha256": "1059caf54c724b1ad96125d6f34b07f6930ece41a9ca5a0379474a307c979b9b",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/005_pending_reference_worker_lease.down.sql",
+    "sha256": "b8d6fec645f8e3e1f69797524a31b23dd339f4b8dde6deacee3d24b0279b1374",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/005_pending_reference_worker_lease.sql",
+    "sha256": "5e0a5501698a9e55ca92920c1d7fe080aa2e7ca1c4f21dd556691610351bc27a",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/006_terminal_transaction_protection.down.sql",
+    "sha256": "078299520750960a289ab9032566d453139949fb5044c46c403357d00acacd36",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/006_terminal_transaction_protection.sql",
+    "sha256": "b284164daacef09445b685aa8051e872fe69842eeda2211d1e15e2cf7d337b98",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/007_ledger_finite_values.down.sql",
+    "sha256": "26473079f875abe6ad2b2fdcb452db2f52af031538ea0f2f4409f97a16a04494",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/007_ledger_finite_values.sql",
+    "sha256": "cd1a4041b3f754e0a4039fffa0e904200957824c59c7a16f81fd91057cab8418",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/008_outbox_publisher_lease_and_retry.down.sql",
+    "sha256": "cb832a61ba814f86bfe7a0555c622acb78a75b985dc318bf7899dcfe546d9bde",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/008_outbox_publisher_lease_and_retry.sql",
+    "sha256": "649b80f3722bca73cf326546a04cab0cee0f084710c0efb2f6a19478e160de21",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/009_command_inbox.down.sql",
+    "sha256": "6f95715e85d88c3ce3e37326047a150b57681506d044727d04f3accb03deb078",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/009_command_inbox.sql",
+    "sha256": "5c9e5330e039e64172f765d34cc8bee7c269e106b86a256527c998be09a2fbe1",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/010_external_inbox_identity.down.sql",
+    "sha256": "3ac68bf20d4f420198dc55c5985bbfcf2414a76d324cf215ba77ad55e12958f7",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrations/010_external_inbox_identity.sql",
+    "sha256": "0267fe9d743e343be269eaa120df7e82a0c70f1023a56f87ba29f0704255b0b5",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/migrator.ts",
+    "sha256": "62d5a780c92e094a843978b87489433b07ab8ce261507133141155ff30dcf771",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/entities/orm-entities.ts",
+    "sha256": "95e37ade203c385192d242362ad904217c111841190f184866c6011cfc76b6ba",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm-adapter.ts",
+    "sha256": "8262827e10242b28a289577102b68358f862b64241175c5e8d3557432463fffc",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm-inbox-repository.ts",
+    "sha256": "303b5aab353e5df6db2218e9c3b407564f95d433b787514b1f6e74aa29a3ba1b",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm-wallet-ledger-query-repository.ts",
+    "sha256": "6873045356e4ff56a1a69823a2b065ff4f00627c47c441af55405fc4c0f8e716",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/mikro-orm/mikro-orm.config.ts",
+    "sha256": "10d52dda3202e5161d2aa84e4e701ee3d557da9e288e73b821b4004eed734526",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/persistence.module.ts",
+    "sha256": "dff9838a425b9176b1d99d0e77217519706422e2954af19f06070c1bfde640d4",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/persistence/postgres/postgres-adapter.ts",
+    "sha256": "47f9cec9f71a93fa07483bef5c4150e3d59eea0790283c8aecf281958e624088",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/workers/outbox-publisher-worker.module.ts",
+    "sha256": "3ac4e5c446e23576edd35d60ce4dbf417dd8ee7934941d43388cac0d8245c03d",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/workers/outbox-publisher-worker.service.ts",
+    "sha256": "323dad38e5f1764e05a515a1b069debc02a73ebc1657013bcfa8a0ea0243285b",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/workers/pending-reference-worker.module.ts",
+    "sha256": "38d66eeb4efd8ee6ea5827281dc66e2bab464903b94285c43f5f38a79fc252ea",
+    "matchesBase": true
+  },
+  {
+    "path": "src/infrastructure/workers/pending-reference-worker.service.ts",
+    "sha256": "de63f0c61c5f0c222cdda664df0479a59fb0bdad1a8a4d18437dbba9d7cb687f",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/app.module.ts",
+    "sha256": "6ce169987a36fa0fad07a96cedcdc95e1441c5e86f86d26328c6a75b764f3626",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/auth/provider-identity.port.ts",
+    "sha256": "687f8bdc1b506256eb48b77a681488a07459674d68081949e68cc18cf068d84b",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/controllers/provider-wagering-query.controller.ts",
+    "sha256": "b43809d40c76849251121c1b8edf45090248daa085a720c7ec3e9d21d4029267",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/controllers/wagering-query.controller.ts",
+    "sha256": "70ea0489c4919d3056dd95bacadd470acc69e0ba96ddf9bdf75a1c2a1d58c216",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/controllers/wagering.controller.ts",
+    "sha256": "35ed8da7cffd6e26a574b99376b0138c915436b8b01c383802b056efd19932d2",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/controllers/wallet-ledger-query.controller.ts",
+    "sha256": "4782de3aa0c2df700aac5af051923ca631fbcc5413c12dcc0e2e3ca8a7abf981",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/controllers/wallet.controller.ts",
+    "sha256": "18d09bd43f74f3b2549ae9131c821ddeb71a402a51c38ee84ad95564d9e0c6f1",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/filters/domain-exception.filter.ts",
+    "sha256": "cb84cf9323473c0522ad94cb84c773bc3d27024759ac4eb5d89305c5b51649bc",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/validation/http-validator.ts",
+    "sha256": "8ad7d0a6fa8f5cc4a0a52a5d711b566f733daf8f97bd836bb4bec8a461cd90b6",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/validation/query-validator.ts",
+    "sha256": "995577be1cfa2ded5f8e0198eb9c55c70c2d3292bfff4813942e4f6a17375381",
+    "matchesBase": true
+  },
+  {
+    "path": "src/interfaces/http/wagering-query.module.ts",
+    "sha256": "9ac6ef7b6183cf13e0620088b75224e2c92630375cb7b628e2c13dc891afd04d",
+    "matchesBase": true
+  },
+  {
+    "path": "src/main.ts",
+    "sha256": "dec45a9c97994f542d9bd67057a2ebb55c447846abcd20d6c4fa37e7fd98b175",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/concurrency/concurrency.test.ts",
+    "sha256": "80c769e548d5d6e5c45e8018e6892a9fa083bda89d327c428248db6f8afcf793",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/concurrency/consumer-shutdown-m16-runner.ts",
+    "sha256": "9e960c7a29215893292731e10c2d0567783aeecf92397da332673b2317732f85",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/concurrency/delivery-independent-wallets.test.ts",
+    "sha256": "d4e3c744879a8264b874e3a6c3757746204ac8f9e2a66bdc408fdc07ea2b48d4",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/concurrency/inbox-worker-runner.ts",
+    "sha256": "8ebc60b65da173ccc25abb7cb025956cfd1ea06cff4bad160d0f2a0ae3cd2be7",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/concurrency/outbox-worker-runner.ts",
+    "sha256": "9821cdd494b4fa2c291fecc780f068ca8f38866c26ad5b27c99a22af8743383e",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/concurrency/pending-worker-runner.ts",
+    "sha256": "c038ea666c01973255a4338ca69263a32e692742368b09188c4a237344b29115",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/concurrency/worker.ts",
+    "sha256": "774521dd981226867e235d07b95ba29799b560444543c68a5304fab4420428e0",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/external-wager-contract.test.ts",
+    "sha256": "d2276e633beffe5cf6d7645563e79d545625d1f7c952a6804eeec644c2d0c8d1",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/financial-outbox-m13.test.ts",
+    "sha256": "23e8bf5dc104413cc6910345744e59175e1fd874b7209ed355ef6d5e741e802a",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/http-endpoints.test.ts",
+    "sha256": "4f4bc9858c7724ee6f35d2a0bcad9a5b4487526d65e3296cd328031549379218",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/ledger-constraints-m12.test.ts",
+    "sha256": "9f313498fa163d4b981a4e35a09bf86e8bc2eaed9ede2f7d0048caf92dc34388",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/m17-read-endpoints.test.ts",
+    "sha256": "455079bb592635002aa2cef60c49248cb23c5e2ee9bdd0f2c59112d26fdb7c5d",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/migrations.test.ts",
+    "sha256": "9a5c64ad2a9ddd57abc20bd705a89bc833a451e82f71fb642271c73405daefd3",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/mikro-orm-uow-m05.test.ts",
+    "sha256": "cd5ae0b5d255cb72f70080f247ffcd692273800fc51f92a54075833c9483d442",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/money-postgres-roundtrip.test.ts",
+    "sha256": "0deef23befdce32faf525a59f5f80715ef09dad8fd122aff3df04718e2f1d128",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/outbox-publisher-m14.test.ts",
+    "sha256": "c170de6edfc7a1cd523c3121f625670b16bfa723ffbb3363f9d9ba929140bbcb",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/pending-reference-worker-m10.test.ts",
+    "sha256": "9b1252a4728b111f5fb557e67db52c79a90203e4f1ed98157f79d1a7d8c27d83",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/postgres-invariants.test.ts",
+    "sha256": "d68386bb41a453a48b10801af830a203cbbfc959b4788878da27b33c9fe8fd14",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/sqs-consumer-m16.test.ts",
+    "sha256": "215136edacde2446d806be06068478fd65b1fcd9dd4b40e299d3e0569eec0e69",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/sqs-inbox-m15.test.ts",
+    "sha256": "1abe5fdbb08f12f0440e6d6129564548820bdd25af57737447e2899a19acc518",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/terminal-protection-m11.test.ts",
+    "sha256": "bf336c6c6cd8425ef59ba3259436356b0a59a170bef25d21122e152d88a48091",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/wager-bet-replay.test.ts",
+    "sha256": "8e50f8bc413313f94c7bf37fda9d2edacce0fc33b57dbc6ff63f6c61b6b0e29d",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/wager-operations.test.ts",
+    "sha256": "a2f36269e4c24f4ab8821994248719e27cbeb8c813ccda799222a3deab55dd21",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/wager-pending-replay-m09.test.ts",
+    "sha256": "d3ae9b8d3a27459796dce3d0383bd1cadde0c4034340bbc3f08b7bc9293efb54",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/wager-reversals-m07.test.ts",
+    "sha256": "306cd23620c2602c5dea31f4d7912529bc47995fafb1da086b18c245a332e2cd",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/wager-reversals-m08.test.ts",
+    "sha256": "a6cbd53b6aa1931a63576bf1be21db9e63bcbe39f6233045f098c9488a0e9c28",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/wager-win-loss-m06.test.ts",
+    "sha256": "69efc34622c6a6e5e8d3f7b836f153daa5facc0360acadfeee425866136ad5f8",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/integration/wallet-opening.test.ts",
+    "sha256": "c309a6b6c2205789396862b4db7a0f8f36940731fa27c46d54126bfac5ba0686",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/observability/m18-http.test.ts",
+    "sha256": "b1a8a472efd8dbdf2bae76abc88dfa409dece42266b0fbeb9ab33a9889629b98",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/observability/m18-messaging.test.ts",
+    "sha256": "ccc4357316da84ad6924e003bea9f2cbc63c7c0fc01ad742736c555810f0ed25",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/test-db-helper.ts",
+    "sha256": "ce6005c98dd2d5c12846f4b11e0e9d20fcda5dc86bb1fd2fc8ad4ce09dc96cfe",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/delivery-metrics.test.ts",
+    "sha256": "13df318fc27c7cdca11ff373222704b721ae59450ad0c3024e9f6d480f3d46f5",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/external-wager-contract.test.ts",
+    "sha256": "7cbeddbfdf54d7a050c0197068aef5c5e8665435c688d1b9984a74fa916d38c9",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/migrator-robustness.test.ts",
+    "sha256": "6b39774c14c7834580d4affddecba10879582b795d9b163ffccd29d3a2e58eb2",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/money.test.ts",
+    "sha256": "575667f1fde378bf413b0df433f2c8c5f9df3dac973336d3c26905cbf70538dc",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/outbox-contract-m14.test.ts",
+    "sha256": "89c90dee6de1e270fca068f963279df44d4863d6f0bb690a7c07dbbadd3112f5",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/payload-hash.test.ts",
+    "sha256": "04131a5a98c53f8343893410a086effc5465dcb1cc6651e5feb044dfe9e01d32",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/sqs-consumer-policy-m16.test.ts",
+    "sha256": "3c18de4b66df25ec5bc4c9638594b4d303596cc64d1b0f9a2e97deb2d24d05ff",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/test-runner.test.ts",
+    "sha256": "77f68796aee7017067415f234342267506753bdeff74b5183a7501af3c25f3a2",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/wallet-ledger-entry.test.ts",
+    "sha256": "fa20462a12b5d2f0cc7918248342d82cef6f30d671f4b173b0a989b53541c670",
+    "matchesBase": true
+  },
+  {
+    "path": "tests/unit/wallet.test.ts",
+    "sha256": "461f7da04dd6223f7cf8a6ec0da00d11b4844cd2893d97855fdbb0774d72240d",
+    "matchesBase": true
+  },
+  {
+    "path": "tsconfig.json",
+    "sha256": "c2eff4e48e3ec8d150a95c2c4e3cd65bb6e78089d6897267f235043000d93253",
+    "matchesBase": true
+  }
+]

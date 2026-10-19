@@ -1,0 +1,163 @@
+ Image wagers-review-20261018-app:local Building
+ Image wagers-review-20261018-app:local Building
+ Image wagers-review-20261018-test:local Building
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.88kB 0.0s done
+#1 DONE 0.0s
+
+#2 [app internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 878B 0.0s done
+#2 DONE 0.4s
+
+#3 [app internal] load metadata for docker.io/oven/bun:1.4.3
+#3 ...
+
+#4 [auth] oven/bun:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 [app internal] load metadata for docker.io/oven/bun:1.4.3
+#3 DONE 2.2s
+
+#5 [app internal] load .dockerignore
+#5 transferring context: 200B 0.0s done
+#5 DONE 0.1s
+
+#6 [migrate dependencies 1/4] FROM docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#6 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
+#6 resolve docker.io/oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 0.2s done
+#6 DONE 0.3s
+
+#7 [migrate internal] load build context
+#7 transferring context: 414.98kB 0.4s done
+#7 DONE 0.8s
+
+#8 [migrate dependencies 4/4] RUN bun install --frozen-lockfile
+#8 CACHED
+
+#9 [migrate dependencies 2/4] WORKDIR /app
+#9 CACHED
+
+#10 [migrate dependencies 3/4] COPY package.json bun.lock ./
+#10 CACHED
+
+#11 [migrate base 3/6] COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
+#11 CACHED
+
+#12 [migrate base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#12 CACHED
+
+#13 [migrate base 5/6] COPY --chown=bun:bun src ./src
+#13 ...
+
+#12 [test-runner base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#12 CACHED
+
+#14 [test-runner internal] load build context
+#14 transferring context: 1.46MB 0.9s done
+#14 DONE 1.1s
+
+#13 [test-runner base 5/6] COPY --chown=bun:bun src ./src
+#13 DONE 0.6s
+
+#15 [test-runner base 6/6] COPY --chown=bun:bun infra ./infra
+#15 DONE 0.3s
+
+#16 [test-runner dependencies 4/4] RUN bun install --frozen-lockfile
+#16 CACHED
+
+#17 [test-runner base 3/6] COPY --from=dependencies --chown=bun:bun /app/node_modules ./node_modules
+#17 CACHED
+
+#18 [test-runner base 4/6] COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+#18 CACHED
+
+#19 [test-runner base 6/6] COPY --chown=bun:bun infra ./infra
+#19 CACHED
+
+#20 [test-runner base 5/6] COPY --chown=bun:bun src ./src
+#20 CACHED
+
+#9 [test-runner dependencies 2/4] WORKDIR /app
+#9 CACHED
+
+#21 [test-runner dependencies 3/4] COPY package.json bun.lock ./
+#21 CACHED
+
+#22 [app] exporting to image
+#22 exporting layers
+#22 exporting layers 0.8s done
+#22 ...
+
+#23 [test-runner tester 1/3] RUN mkdir -p /app/docs/evidence /app/.data && chown -R bun:bun /app/docs /app/.data
+#23 DONE 1.0s
+
+#22 [app] exporting to image
+#22 exporting manifest sha256:78e8e562e8cb3ced7640cf1f9ed6b0e0f91b7fac44cf1e04e56e2bf352f61322
+#22 exporting manifest sha256:78e8e562e8cb3ced7640cf1f9ed6b0e0f91b7fac44cf1e04e56e2bf352f61322 0.3s done
+#22 exporting config sha256:4358b30e682ec1c8850e441cbfa9aa81a51dd9af325e9c3e405b7ce01aea3fb1 0.1s done
+#22 exporting attestation manifest sha256:f3370877fdc6fa259c762f24b1a08fb78210cf41c79f7dbe1f35561b5442465b
+#22 exporting attestation manifest sha256:f3370877fdc6fa259c762f24b1a08fb78210cf41c79f7dbe1f35561b5442465b 0.3s done
+#22 exporting manifest list sha256:d1a064e1daac5e8c51995e77466409d9f23c6c3bc6f9d04c2189c1b4cb86d20d
+#22 exporting manifest list sha256:d1a064e1daac5e8c51995e77466409d9f23c6c3bc6f9d04c2189c1b4cb86d20d 0.2s done
+#22 naming to docker.io/library/wagers-review-20261018-app:local
+#22 ...
+
+#24 [test-runner tester 2/3] COPY --chown=bun:bun scripts ./scripts
+#24 DONE 1.1s
+
+#22 [app] exporting to image
+#22 naming to docker.io/library/wagers-review-20261018-app:local 0.1s done
+#22 unpacking to docker.io/library/wagers-review-20261018-app:local
+#22 ...
+
+#25 [migrate] exporting to image
+#25 exporting layers 0.8s done
+#25 exporting manifest sha256:525c8114592e43958951b92f9cbfe1ddad80c7a8fe1b1bec652fab98c10eaa15 0.3s done
+#25 exporting config sha256:ab4dfbdacc7b6ada22792706410219d73470502691e11e548bf014ce0678f60d 0.2s done
+#25 exporting attestation manifest sha256:4c1de1c024a53e71c1fb5d8ea049432b20c895e6cf2cd50e733558a4160c3ece 0.3s done
+#25 exporting manifest list sha256:66b232a5b8819a16caf556dbaf28d9886a8e55bb40ddfebd5116e71240573b56 0.2s done
+#25 naming to docker.io/library/wagers-review-20261018-app:local 0.1s done
+#25 unpacking to docker.io/library/wagers-review-20261018-app:local 0.5s done
+#25 DONE 2.6s
+
+#22 [app] exporting to image
+#22 unpacking to docker.io/library/wagers-review-20261018-app:local 0.5s done
+#22 DONE 2.9s
+
+#26 [test-runner tester 3/3] COPY --chown=bun:bun tests ./tests
+#26 DONE 1.0s
+
+#27 [test-runner] exporting to image
+#27 exporting layers 1.1s done
+#27 exporting manifest sha256:85a3c83d36cfe18d3e99fb1b1e45925854d0a8333bea0d1b6a509847ebf6311a
+#27 exporting manifest sha256:85a3c83d36cfe18d3e99fb1b1e45925854d0a8333bea0d1b6a509847ebf6311a 0.1s done
+#27 exporting config sha256:d3a7ca8a15568249fd2c91f1b587312feb803454ad42ef5fcf210a543e0c4d7c
+#27 exporting config sha256:d3a7ca8a15568249fd2c91f1b587312feb803454ad42ef5fcf210a543e0c4d7c 0.1s done
+#27 exporting attestation manifest sha256:f4ac3678650dc528bd34b0f7c35ad3ef03b38c64a51f6f45013447b529a51e18
+#27 exporting attestation manifest sha256:f4ac3678650dc528bd34b0f7c35ad3ef03b38c64a51f6f45013447b529a51e18 0.1s done
+#27 exporting manifest list sha256:1fcdf44ca5f22a07c090b8288dea64597352cdeea416adef5c7c010d1a6c607d
+#27 ...
+
+#28 [migrate] resolving provenance for metadata file
+#28 DONE 0.0s
+
+#27 [test-runner] exporting to image
+#27 exporting manifest list sha256:1fcdf44ca5f22a07c090b8288dea64597352cdeea416adef5c7c010d1a6c607d 0.1s done
+#27 naming to docker.io/library/wagers-review-20261018-test:local
+#27 ...
+
+#29 [app] resolving provenance for metadata file
+#29 DONE 0.0s
+
+#27 [test-runner] exporting to image
+#27 naming to docker.io/library/wagers-review-20261018-test:local 0.0s done
+#27 unpacking to docker.io/library/wagers-review-20261018-test:local
+#27 unpacking to docker.io/library/wagers-review-20261018-test:local 0.2s done
+#27 DONE 2.0s
+
+#30 [test-runner] resolving provenance for metadata file
+#30 DONE 0.0s
+ Image wagers-review-20261018-test:local Built
+ Image wagers-review-20261018-app:local Built
+ Image wagers-review-20261018-app:local Built

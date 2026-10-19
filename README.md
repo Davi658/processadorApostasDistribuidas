@@ -1,185 +1,134 @@
-# Processador Financeiro de Apostas Distribuídas
+# Processador financeiro de apostas distribuídas
 
-Entrega M18–M21: [conferência pessoal em PowerShell](docs/delivery/FINAL-MANUAL-TEST.md), [evidências e limitações](docs/evidence/delivery/RESULTS.md), [contrato SQS externo](docs/messaging/EXTERNAL-CONTRACT.md) e [semântica das métricas](docs/delivery/OBSERVABILITY.md). Migrations atuais: **001–010**. O Compose padrão habilita consumer, publisher e worker de referências; o teste pessoal usa projeto e portas próprios.
+Backend de avaliação técnica para carteiras, apostas, ganhos, perdas e reversões. Usa valores decimais exatos, ledger, idempotência persistente, referências fora de ordem e mensageria transacional com TypeScript/Bun, NestJS, MikroORM, PostgreSQL real e SQS FIFO via LocalStack.
 
-Autenticação foi omitida conforme permitido pelo enunciado. `ProviderIdentityPort` é o ponto de extensão para IdP externo com guard HTTP; health fica público e SQS continua sujeito à validação de domínio. Não há verificação AWS de produção nem garantia exactly-once do transporte.
+O escopo é consistência financeira e recuperação sob concorrência/falhas. A autenticação foi omitida para concentrar a avaliação no motor financeiro. O ponto de extensão é a porta `ProviderIdentityPort` com um adaptador OIDC/JWKS e Guard antes dos controllers, com autorização de acesso a carteiras/provedores, antes de exposição externa. Não há garantia exactly-once, operação AWS de produção certificada ou processamento automático de DLQ.
 
-Backend financeiro independente e resiliente para processamento de transações de apostas, construído com foco em **precisão monetária estrita**, **idempotência persistente**, **garantias contábeis imutáveis**, **integração transacional com MikroORM**, **reversões referenciadas** e **controle de concorrência com PostgreSQL real**.
+## Pré-requisitos e versões
 
----
+Git, Docker com containers Linux, Compose com `--wait`, acesso aos registries e portas locais livres. Não é necessário Bun ou PostgreSQL no host nem `.env` pessoal. Execute da raiz do clone em terminal novo.
 
-## 1. Status do Ambiente
+Ambiente desta revisão: Windows, Docker Desktop 4.95.0, Engine 29.8.2, Compose 5.6.0, containers Linux/amd64. Imagens: Bun 1.4.3, PostgreSQL 16.6-alpine e LocalStack 4.0.3. Versões exatas das dependências: [bun.lock](bun.lock). Resultados efetivamente obtidos: [validação](docs/review/VALIDATION.md). O bloco Bash é equivalente; não significa nova validação em host Linux nativo.
 
-A verificação do ambiente local identificou:
+## Avaliação rápida — executar do zero
 
-| Ferramenta | Requisito | Status Local | Observação |
-|---|---|---|---|
-| **Bun** | Bun 1.x | **Instalado** (v1.4.3) | Utilizado como runtime, gerenciador de pacotes e test runner |
-| **Git** | Git 2.x | **Instalado** (v2.52.0.windows.1) | Controle de versão local estrito |
-| **Docker & Compose** | Docker / Compose | **Operacional** | Arquivos `docker-compose.yml` (entrega padrão) e `docker-compose.local.yml` provisionam a plataforma completa com PostgreSQL, LocalStack SQS, migrações e trabalhadores distribuídos |
-| **PostgreSQL** | PostgreSQL Real | **Docker Compose** (16.6-alpine) | Porta host configurável por `LOCAL_POSTGRES_PORT`; ambiente de entrega isolado |
+No host, PowerShell (Windows) ou Bash (Linux):
 
-> [!NOTE]
-> A entrega usa PostgreSQL real em Compose. As regressões devem rodar em projeto exclusivo, separado dos dados pessoais; cada suíte cria bancos descartáveis e usa `app_user` restrito. Veja o roteiro de entrega para portas, credenciais exclusivamente locais e encerramento sem excluir volumes.
+```text
+git clone https://github.com/Davi658/processadorApostasDistribuidas.git
+cd processadorApostasDistribuidas
+```
 
----
+Use checkout limpo. Confira `docker ps -a` e `docker volume ls`: projeto `wagers-review-20261018`, imagens e portas 55478, 45678 e 3078 devem estar livres. Se já existirem, escolha outro nome e portas na configuração e substitua também `-p wagers-review-20261018` em **todos** os comandos. Não reutilize volume de outra avaliação.
 
-## 2. Tecnologias Utilizadas
+### 1. Configuração no host
 
-- **Runtime & Test Runner:** [Bun](https://bun.sh/) 1.4.3
-- **Linguagem:** TypeScript 5.8 em modo estrito (`strict: true`)
-- **Framework HTTP:** NestJS 11 (`@nestjs/core`, `@nestjs/common`, `@nestjs/testing` alinhados na versão 11)
-- **ORM & Unidade de Trabalho:** MikroORM 6.4 (PostgreSQL) com transação explícita e isolamento por `AsyncLocalStorage`
-- **Banco de Dados:** PostgreSQL 16.8
-- **Containerização:** Docker Compose (`docker-compose.yml` e `docker-compose.local.yml`)
+PowerShell, Windows (testado com 7.6.7; gera arquivo ignorado pelo Git, somente valores locais):
 
----
-
-## 3. Comandos Reproduzíveis
-
-### 3.1 Inicialização da Plataforma e Banco de Dados
-
-#### Opção A: PostgreSQL Nativo Local (Scripts PowerShell inclusos)
-Para iniciar o serviço PostgreSQL local:
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/db-start.ps1
+'COMPOSE_PROJECT_NAME','APP_IMAGE','TEST_IMAGE','LOCAL_API_PORT','LOCAL_POSTGRES_PORT','LOCAL_SQS_PORT' | ForEach-Object { Remove-Item "Env:$_" -ErrorAction SilentlyContinue }
+@'
+APP_IMAGE=wagers-review-20261018-app:local
+TEST_IMAGE=wagers-review-20261018-test:local
+LOCAL_API_PORT=3078
+LOCAL_POSTGRES_PORT=55478
+LOCAL_SQS_PORT=45678
+'@ | Set-Content -Encoding ascii .env.local
 ```
-Para parar o serviço PostgreSQL local:
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/db-stop.ps1
-```
 
-#### Opção B: Docker Compose — Plataforma Completa (em ambientes com Docker disponível)
-Para inicializar toda a plataforma (PostgreSQL 16, LocalStack SQS FIFO, migrador automático e API com os trabalhadores distribuídos `SQS_CONSUMER_ENABLED`, `OUTBOX_PUBLISHER_ENABLED` e `PENDING_WORKER_ENABLED` ativados):
-```bash
-docker compose up -d --build
-```
-*(ou via `docker-compose up -d` ou `docker compose -f docker-compose.local.yml up -d`)*
-
----
-
-### 3.2 Execução de Migrações SQL Reversíveis
-
-O projeto possui um runner autônomo de migrações que suporta operações UP e DOWN incrementais com rastreamento na tabela `schema_migrations` e proteção contra execução concorrente via PostgreSQL Advisory Lock (`pg_advisory_xact_lock`):
+Alternativa Bash, Linux:
 
 ```bash
-# Aplicar todas as migrações (001 a 010)
-bun run src/infrastructure/persistence/migrator.ts up
-
-# Reverter migrações de forma limpa
-bun run src/infrastructure/persistence/migrator.ts down
+unset COMPOSE_PROJECT_NAME APP_IMAGE TEST_IMAGE LOCAL_API_PORT LOCAL_POSTGRES_PORT LOCAL_SQS_PORT
+cat > .env.local <<'ENV'
+APP_IMAGE=wagers-review-20261018-app:local
+TEST_IMAGE=wagers-review-20261018-test:local
+LOCAL_API_PORT=3078
+LOCAL_POSTGRES_PORT=55478
+LOCAL_SQS_PORT=45678
+ENV
 ```
 
----
+Os comandos Docker seguintes são iguais nos dois shells e executados no host. Rode um por vez e pare em exit code não zero (`$LASTEXITCODE` no PowerShell, `$?` no Bash). O Compose padrão e o local são equivalentes nesta base; o roteiro explicita o arquivo para evitar ambiguidades.
 
-### 3.3 Execução da Suíte de Testes
+### 2. Instalação congelada e infraestrutura exclusiva
 
-Todas as suítes utilizam **Bun Test**, executam com isolamento de processos e banco descartável por execução, interagindo com o **PostgreSQL real**:
-
-```bash
-# Executar verificação de tipos estritos TypeScript (0 erros)
-bun run typecheck
-
-# Executar TODOS os testes, incluindo concorrência, por arquivo em processos separados
-bun run test
-
-# Executar testes unitários de domínio (Money, Wallet, Ledger)
-bun run test:unit
-
-# Executar testes de integração com PostgreSQL real (Invariantes, Migrações descartáveis, Operações e HTTP)
-bun run test:integration
-
-# Executar testes de alta concorrência (50 requests paralelas, corrida de saldo, chave disputada em paralelo e barreira de sincronização entre 3 processos)
-bun run test:concurrency
-
-# Executar suíte M10 — Worker de referências pendentes com PostgreSQL real e processos OS reais
-bun run scripts/run-tests.ts tests/integration/pending-reference-worker-m10.test.ts
+```text
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml config --quiet
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml --profile test build app migrate test-runner
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml up -d --wait --wait-timeout 180
 ```
 
-O comando oficial `bun run test` usa `scripts/run-tests.ts` em Windows e Linux, sem shell específico. Descobre todos os arquivos `.test.ts`, executa cada um sequencialmente em processo Bun novo com prazo padrão de 30 segundos por teste e retorna exit code 1 se qualquer processo falhar, receber sinal ou não iniciar. Continua executando os arquivos restantes para expor todas as falhas. Testes com timeout explícito conservam seu próprio limite. Isso evita vazamento de estado de módulos/variáveis de ambiente entre arquivos; cada integração cria seu banco PostgreSQL descartável. `bun test` diretamente não oferece esse isolamento por arquivo e não é o comando oficial de validação.
+O build executa `bun install --frozen-lockfile` na imagem. Não atualize o lockfile. A subida cria rede e volume `wagers-review-20261018_local_pgdata`, PostgreSQL, LocalStack, três filas, aplica migrations **001–010** e inicia a API. `queues` e `migrate` devem terminar com exit 0; `postgres`, `localstack` e `app` devem ficar healthy.
 
-```bash
-# Consultas M17 pela aplicação principal
-bun run test:m17
+### 3. Migrations e readiness
+
+```text
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml ps -a
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml logs migrate queues
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml run --rm migrate
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml exec -T app bun run infra/healthcheck.ts
 ```
 
----
+A segunda execução do migrador deve informar `No new migrations to apply.` e exit 0. Readiness (`GET /health/ready`) responde 200 ou 503 se indisponível. Liveness (`GET /health/live`) independe das dependências. API no host: `http://127.0.0.1:3078`; healthcheck no container: porta interna 3000. Não reverta migrations para encerrar.
 
-### 3.4 Execução da API
+### 4. Typecheck e suíte oficial em containers Linux
 
-Para iniciar o servidor HTTP:
-
-```bash
-# Modo de produção
-bun run start
-
-# Modo de desenvolvimento com auto-reload
-bun run start:dev
+```text
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml run --rm test-runner bun install --frozen-lockfile
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml run --rm test-runner bun run typecheck
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml run --rm -e SQS_ENDPOINT=http://localstack:4566 -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_REGION=us-east-1 -e SQS_CONSUMER_ENABLED=false -e OUTBOX_PUBLISHER_ENABLED=false -e PENDING_WORKER_ENABLED=false test-runner bun run test
 ```
 
----
+A instalação explícita deve sair 0 e confere o lockfile mesmo quando o build usou cache. Typecheck deve sair 0. O comando oficial `bun run test` usa `scripts/run-tests.ts`: cada `.test.ts` roda sequencialmente em processo Bun novo, timeout padrão de 30 s por teste, mantendo limites explícitos. Continua após falhas; retorna 1 se qualquer arquivo falhar, receber sinal ou não iniciar. Exit 0 significa todos os arquivos aprovados. `bun test` direto não substitui esse isolamento.
 
-## 4. Matriz de Operações Financeiras Suportadas
+Testes criam/removem bancos descartáveis e filas exclusivas **na infraestrutura desta avaliação**, usando administrador para provisionamento e `app_user` para runtime. Não use banco compartilhado/produção. A API usa `betting_db`: executar testes não é subir a aplicação nem validar os dados do smoke. O administrador tem privilégios elevados somente nesse ambiente local descartável.
 
-A API e o caso de uso unificado `ProcessWagerUseCase` processam as seguintes operações financeiras:
+### 5. Smoke da API real
 
-| Operação | Natureza | Efeito no Saldo | Registro no Ledger | Version | Reversão / Referência |
-|---|---|---|---|---|---|
-| `BET` | Débito | Deduz valor | Sim (`DEBIT`) | Incrementa (+1) | N/A. Rejeita se saldo insuficiente (`INSUFFICIENT_FUNDS`) |
-| `WIN` | Crédito | Adiciona valor | Sim (`CREDIT`) | Incrementa (+1) | N/A. Exige valor > 0 |
-| `LOSS` | Neutro | Inalterado | **Não** | **Inalterado** | N/A. Aceita valor "0.00" |
-| `REFUND` | Crédito | Adiciona valor da BET | Sim (`CREDIT`) | Incrementa (+1) | Referencia `BET` processada. Reverte valor integral |
-| `ROLLBACK` | Reversão | Movimento inverso | Sim (Inverso) | Incrementa (+1) | Referencia `BET` (crédito), `WIN` (débito) ou `REFUND` (débito) |
+```text
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml exec -T app bun run infra/smoke-api.ts
+```
 
-### 4.1 Ciclo de Vida Explícito da Transação
+Espera exit 0 e `All smoke operations passed successfully!`: abertura 100.00 BRL, BET 25.00, saldo 75.00, replay sem segundo débito, consulta da transação, dois lançamentos no ledger e reconciliação com diferença 0.00. Cria registros em `betting_db` e não os remove. Não comprova entrega end-to-end pela fila.
 
-Toda transação nasce no estado `PENDING` e transiciona deterministicamente para um dos estados terminais ou pendência de referência:
-- `PENDING` -> `PROCESSED`: Operação autorizada, saldo alterado (ou LOSS neutro), ledger e outbox gravados atomicamente.
-- `PENDING` -> `REJECTED`: Operação recusada por regra de negócio (ex: saldo insuficiente, referência não processada). Snapshot preservado para replay idempotente idêntico.
-- `PENDING` -> `FAILED`: Falha técnica não recuperável.
-- `PENDING` -> `PENDING_REFERENCE`: Operação de reversão recebida fora de ordem antes da transação de referência. Retorna HTTP 202 Accepted. Reprocessada via worker com backoff exponencial.
+A composição habilita consumidor SQS, publisher da outbox e worker de referências. A suíte usa bancos/filas próprios e habilita componentes nos cenários específicos. Consulte [infraestrutura](infra/README.md), [comandos SQS](docs/messaging/M15-IMPLEMENTED.md) e [retry, lease, DLQ e shutdown](docs/messaging/M16-RELIABILITY.md).
 
----
+### 6. Encerramento seguro
 
-## 5. Idempotência Persistente e Correlação
+Mesmo após falha, use somente o projeto criado acima:
 
-- **Chaves de até 255 Caracteres:** A coluna `outbox_messages.correlation_id` e `causation_id` foi expandida para `VARCHAR(255)`. Chaves de 128, 129 e 255 caracteres são aceitas sem truncamento e sem erros de persistência. Chaves maiores que 255 caracteres são rejeitadas com HTTP 400.
-- **Correlação Independente:** O cabeçalho `x-correlation-id` propaga o identificador de rastreabilidade fim a fim pelos casos de uso e outbox, mantendo a chave integral `Idempotency-Key` como identidade transacional e de causalidade (`causationId`).
-- **Detecção Segura de Conflito Concorrente:** Quando uma requisição com mesma chave porém payload divergente disputa inserção no PostgreSQL, o erro de violação de unicidade (`23505`) é resolvido fora da transação abortada, retornando HTTP 409 Conflict sem corromper o estado da carteira.
-- **Serialização Canônica Recursiva e Registros Anteriores:** O cálculo do SHA-256 (`canonicalStringify`) ordena recursivamente todas as chaves de objetos em qualquer profundidade e preserva arrays. Registros de transações persistidos anteriormente utilizam o algoritmo legado e exigem uma decisão explícita de compatibilidade antes de qualquer ação; não há suposição de descarte ou expiração automática por TTL.
+```text
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml down --timeout 40
+```
 
----
+Isso encerra containers/rede desse projeto e preserva seu volume. Para descartar **também os dados desta avaliação**, depois de conferir o nome do projeto:
 
-## 6. Integridade Relacional e Proteções no PostgreSQL
+```text
+docker compose --env-file .env.local -p wagers-review-20261018 -f docker-compose.local.yml down -v --timeout 40
+```
 
-1. **Integridade Referencial Composta no Ledger:** Constraint `fk_ledger_wager_tx_wallet_currency` em `wallet_ledger_entries(transaction_id, wallet_id, currency) REFERENCES wager_transactions(id, wallet_id, currency)`. Garante fisicamente no banco que nenhum lançamento da carteira B possa referenciar uma transação da carteira A, nem com moeda divergente.
-2. **Proteção Rigorosa de Estados Terminais:** Trigger `prevent_terminal_transaction_modification()` utiliza `IS DISTINCT FROM` para proteger todos os campos que definem identidade, payload e resultado original (`wallet_id`, `player_id`, `provider_id`, `external_transaction_id`, `round_id`, `game_id`, `kind`, `amount`, `currency`, `idempotency_key`, `payload_hash`, `response_snapshot`, `status`) quando a transação está em estado terminal (`PROCESSED`, `REJECTED`, `FAILED`).
-3. **Unicidade de Reversão por Tipo e Referência:** Índice parcial `uq_processed_reversal_per_reference` em `(provider_id, reference_external_transaction_id, kind) WHERE status = 'PROCESSED' AND reference_external_transaction_id IS NOT NULL`. Impede no banco que duas reversões do mesmo tipo sejam processadas para a mesma referência.
-4. **Resiliência a Erros Transitórios:** `DomainExceptionFilter` reconhece erros de conexão como `ECONNREFUSED`, `ETIMEDOUT`, `ECONNRESET` e códigos PostgreSQL de shutdown/sobrecarga (`57P01`, `08006`, `08001`, `53300`, `40001`, `40P01`), retornando HTTP 503 `SERVICE_UNAVAILABLE` com mensagem segura sem expor dados internos.
+Não use prune, remoção global de volumes ou scripts de parada de PostgreSQL nativo. As imagens exclusivas podem permanecer em cache.
 
-## Consultas e paginação — M17
+## Operações e contratos
 
-As três rotas são registradas pelo `AppModule` principal. Escritas, worker M10 e consultas compartilham a mesma `MikroOrmUnitOfWork` e os repositórios exportados pelo `PersistenceModule`; o módulo de consultas não cria outro ORM/pool.
+| Operação | Efeito |
+| --- | --- |
+| BET | Débito, rejeita saldo insuficiente |
+| WIN | Crédito positivo; pode aguardar referência |
+| LOSS | Sem alteração de saldo, versão ou ledger |
+| REFUND | Crédito integral de BET processada |
+| ROLLBACK | Inverte BET, WIN ou REFUND; valida saldo no débito |
 
-| Método e rota | Resultado |
-|---|---|
-| `GET /wagering/transactions/:transactionId` | Transação por UUID; 400 para UUID inválido; 404 se ausente |
-| `GET /providers/:providerId/wagering/transactions/:externalTransactionId` | Transação pela combinação exata de provedor e identidade externa; 400 para campos vazios ou acima de 128 caracteres; 404 se a combinação não existir |
-| `GET /wallets/:walletId/ledger?limit=50&cursor=...` | Página do ledger; 400 para UUID, limite ou cursor inválidos; 404 para carteira ausente |
+Dinheiro: `{ amount: "25.00", currency: "BRL" }`, sem ponto flutuante. Escrita: `POST /wallets`, `POST /wagering/transactions` com `Idempotency-Key`; leitura: `GET /wallets/:id`, `GET /wagering/transactions/:id`, `GET /providers/:providerId/wagering/transactions/:externalTransactionId` e `GET /wallets/:id/ledger`. Reconciliação: `POST /wallets/:id/reconciliation`.
 
-Ambas as consultas de transação retornam **o mesmo contrato**, pelo mesmo mapper: `id`, `walletId`, `playerId`, `providerId`, `externalTransactionId`, `roundId`, `gameId`, `kind`, `money: { amount, currency }`, `status`, `rejectionReason`, `referenceExternalTransactionId`, `createdAt`, `updatedAt`. Motivo e referência podem ser `null`. Valores monetários são strings decimais exatas com duas casas, inclusive `"9999999999999999.99"`; não passam por `number`. O mesmo externalId pode existir em provedores distintos sem misturar as respostas.
+Pendências respondem 202; operações processadas 200, abertura 201. Entradas inválidas: 400; ausência: 404; conflito de idempotência: 409; falhas transitórias mapeadas: 503. Rejeição financeira é resultado persistido. Testes HTTP e DTOs detalham os contratos.
 
-O ledger retorna `{ items, nextCursor, hasMore, limit }`. Cada item contém `id`, `walletId`, `transactionId`, `entryType`, `amount`, `balanceBefore`, `balanceAfter` e `createdAt`; os três campos monetários usam `{ amount: string, currency: string }`. Carteira sem lançamentos retorna `items: []`, `nextCursor: null`, `hasMore: false`. Limite padrão 50, permitido de 1 a 100. A última página tem cursor nulo.
+## Leitura técnica
 
-A ordenação é ascendente por `(created_at, id)` e a consulta parametrizada busca `limit + 1`. O cursor contém `{ walletId, createdAt, id }` codificado em Base64URL canônico, sem padding. **Base64URL é codificação, não assinatura nem criptografia**: o cursor pode ser reconstruído pelo cliente e não é uma credencial de acesso. A aplicação valida o vínculo com a carteira solicitada.
+- [Arquitetura, decisões e limitações](ARCHITECTURE.md).
+- [Observabilidade e correlação](docs/delivery/OBSERVABILITY.md).
+- [Índice documental e evidências históricas](docs/README.md).
+- [Inventário, limpeza e validação desta revisão](docs/review/VALIDATION.md).
 
-O timestamp do ledger/cursor é exatamente `YYYY-MM-DDTHH:mm:ss.ffffffZ`: UTC, ano de 0001 a 9999, seis dígitos fracionários. O codec independente de HTTP valida calendário gregoriano, dias por mês, anos bissextos e hora de 00:00:00 a 23:59:59; rejeita formatos alternativos, offsets e datas impossíveis com HTTP 400 antes de qualquer acesso aos repositórios. Datas não são normalizadas com `Date.parse`. PostgreSQL formata os seis microssegundos e recebe de volta o mesmo texto no cursor.
-
-As consultas não alteram saldo, versão, transações, ledger ou outbox. A suíte M17 usa HTTP real com `NestFactory.create(AppModule)` e PostgreSQL descartável, verifica snapshots completos das quatro tabelas e confirma que `app.close()` fecha o único ORM e não deixa sessões da aplicação. O shutdown financeiro do M10 mantém suas barreiras de drenagem e cancelamento.
-
-
-## M18 — observabilidade integrada
-
-AppModule registra `GET /health/live`, `GET /health/ready` e `GET /metrics`, com middleware HTTP e registro único compartilhado por publisher, consumidor e referências. Logs JSON usam allowlist; métricas Prometheus têm cardinalidade limitada e distinguem tentativa, confirmação SQS, commit local e replay. Readiness reutiliza UoW/clientes, limita sondagens concorrentes, consulta apenas dependências habilitadas e recusa tráfego durante shutdown. Liveness independe de PostgreSQL/SQS.
-
-Contratos, lacuna de correlação tardia, semântica dos contadores por processo, reprodução exclusiva e provas: [M18-INTEGRATION.md](M18-INTEGRATION.md) e [evidências M18](docs/evidence/m18/RESULTS.md).
+`scripts/db-start.ps1` e `scripts/db-stop.ps1` são auxiliares históricos dependentes de instalação local; não são usados aqui. `.env.example` exemplifica execução nativa com senhas somente locais; o Compose usa outras credenciais. O roteiro acima cria toda a configuração necessária.

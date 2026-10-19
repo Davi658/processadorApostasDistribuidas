@@ -1,6 +1,8 @@
+> Arquivo histórico: descreve etapas e seus limites na data de execução, não o estado atual. Consulte [arquitetura atual](../../ARCHITECTURE.md) e [roteiro de avaliação](../../README.md).
+
 # Atualização de entrega
 
-O texto abaixo registra a integração M18 anterior. Para a versão atual, veja [semântica de métricas](docs/delivery/OBSERVABILITY.md) e [resultados finais](docs/evidence/delivery/RESULTS.md). As séries de invocações e transações persistidas são distintas; DLQ não possui contador cumulativo; migrations vão até 010. Não atribuir provas antigas aos fontes desta entrega.
+O texto abaixo registra a integração M18 anterior. Para a versão atual, veja [semântica de métricas](../../docs/delivery/OBSERVABILITY.md) e [resultados finais](../../docs/evidence/delivery/RESULTS.md). As séries de invocações e transações persistidas são distintas; DLQ não possui contador cumulativo; migrations vão até 010. Não atribuir provas antigas aos fontes desta entrega.
 
 ---
 

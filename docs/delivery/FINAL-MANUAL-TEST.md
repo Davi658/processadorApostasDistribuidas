@@ -9,7 +9,7 @@ Use PowerShell **7+** (os scripts usam `-SkipHttpErrorCheck`), Git, Bun **1.4.3*
 Abra PowerShell na worktree final informada na entrega, não em outra revisão. Confira SHA e versões:
 
 ```powershell
-Set-Location D:\processadorApostasDistribuidas\.worktrees\delivery-final
+# Execute da raiz do seu clone limpo; veja ../../README.md para avaliação rápida.
 git rev-parse HEAD
 git status --short
 bun --version
